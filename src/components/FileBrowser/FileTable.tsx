@@ -31,13 +31,18 @@ import {
   MoreVertical,
   CheckCircle2,
   Share2,
+  History,
+  Copy,
 } from "lucide-react";
 
 import { FilePreviewModal } from "./FilePreviewModal";
 import { DeleteConfirmModal } from "./DeleteConfirmModal";
 import { RenameItemModal } from "./RenameItemModal";
 import { MoveItemModal } from "./MoveItemModal";
+import { VersionHistoryModal } from "./VersionHistoryModal";
 import { ModernSelect } from "@/components/ui/ModernSelect";
+import JSZip from "jszip";
+import { saveAs } from "file-saver";
 import {
   deleteItem,
   deleteItemsBatch,
@@ -99,6 +104,8 @@ export function FileTable({
   const [optimisticHiddenIds, setOptimisticHiddenIds] = useState<string[]>([]);
 
   const [itemsToMove, setItemsToMove] = useState<FileItem[]>([]);
+  const [moveModalMode, setMoveModalMode] = useState<"move" | "copy">("move");
+  const [versionHistoryFile, setVersionHistoryFile] = useState<FileItem | null>(null);
 
   const [contextMenu, setContextMenu] = useState<{
     visible: boolean;
@@ -177,20 +184,60 @@ export function FileTable({
     return presignedUrl;
   };
 
-  const handleDownload = async (item: FileItem) => {
-    if (!item.objectKey) return;
+  const handleDownloadItems = async (items: FileItem[]) => {
+    if (items.length === 0) return;
+    
+    const toastId = toast.loading(`Menyiapkan download untuk ${items.length} item...`);
+    
     try {
-      const url = await getSignedUrl(item.objectKey, item.name);
-      const a = document.createElement("a");
-      a.href = url;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      const { getDownloadUrlsForItems } = await import("@/app/(dashboard)/folders/actions");
+      const result = await getDownloadUrlsForItems(items.map(i => ({ id: i.id, type: i.type, name: i.name })));
+      
+      if (!result.success || !result.files) {
+        throw new Error(result.error || "Gagal mendapatkan URL");
+      }
+
+      if (result.files.length === 0) {
+        toast.error("Tidak ada file yang dapat diunduh (kosong).", { id: toastId });
+        return;
+      }
+      
+      // Single file fast path
+      if (items.length === 1 && items[0].type === "file" && result.files.length === 1) {
+        const a = document.createElement("a");
+        a.href = result.files[0].url;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        toast.success("Download dimulai.", { id: toastId });
+        return;
+      }
+      
+      // ZIP path
+      toast.loading("Mengompresi file ke ZIP, mohon tunggu...", { id: toastId });
+      
+      const zip = new JSZip();
+      
+      await Promise.all(result.files.map(async (file) => {
+        try {
+          const response = await fetch(file.url);
+          if (response.ok) {
+            const blob = await response.blob();
+            zip.file(file.path, blob);
+          }
+        } catch (e) {
+          console.error(`Failed to fetch file for zip: ${file.path}`, e);
+        }
+      }));
+      
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      const zipName = items.length === 1 ? `${items[0].name}.zip` : `Arsip_${new Date().getTime()}.zip`;
+      saveAs(zipBlob, zipName);
+      
+      toast.success("Download ZIP berhasil.", { id: toastId });
     } catch (error) {
       console.error("Download failed:", error);
-      toast.error(
-        "Gagal mengunduh file. Akses ditolak atau file tidak ditemukan.",
-      );
+      toast.error("Gagal mengunduh item.", { id: toastId });
     }
   };
 
@@ -201,7 +248,7 @@ export function FileTable({
       item.mimeType === "application/pdf" ||
       item.mimeType?.startsWith("image/");
     if (!isSupported) {
-      return handleDownload(item);
+      return handleDownloadItems([item]);
     }
 
     setPreviewFile(item);
@@ -390,10 +437,12 @@ export function FileTable({
           const item = info.row.original;
           return (
             <div
-              className={`group/item flex items-center gap-3 py-1 ${item.type === "folder" ? "cursor-pointer" : ""}`}
+              className={`group/item flex items-center gap-3 py-1 ${item.type === "folder" || (item.type === "file" && (item.mimeType?.includes("pdf") || item.mimeType?.includes("image"))) ? "cursor-pointer" : ""}`}
               onClick={() => {
                 if (item.type === "folder" && onNavigate) {
                   onNavigate(item.id);
+                } else if (item.type === "file" && (item.mimeType?.includes("pdf") || item.mimeType?.includes("image"))) {
+                  handlePreview(item);
                 }
               }}
             >
@@ -479,6 +528,7 @@ export function FileTable({
       },
 
     ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [onNavigate],
   );
 
@@ -569,12 +619,38 @@ export function FileTable({
                 const items = table
                   .getSelectedRowModel()
                   .rows.map((r) => r.original as FileItem);
+                setMoveModalMode("move");
                 setItemsToMove(items);
               }}
               className="flex items-center gap-2 rounded-lg bg-emerald-700/50 px-3 py-1.5 text-sm font-medium hover:bg-emerald-700 transition-colors mr-2"
             >
               <FolderIcon className="h-4 w-4" />
               <span className="hidden sm:inline">Pindahkan</span>
+            </button>
+            <button
+              onClick={() => {
+                const items = table
+                  .getSelectedRowModel()
+                  .rows.map((r) => r.original as FileItem);
+                setMoveModalMode("copy");
+                setItemsToMove(items);
+              }}
+              className="flex items-center gap-2 rounded-lg bg-blue-500/50 px-3 py-1.5 text-sm font-medium hover:bg-blue-600 transition-colors mr-2"
+            >
+              <Copy className="h-4 w-4" />
+              <span className="hidden sm:inline">Salin</span>
+            </button>
+            <button
+              onClick={() => {
+                const items = table
+                  .getSelectedRowModel()
+                  .rows.map((r) => r.original as FileItem);
+                handleDownloadItems(items);
+              }}
+              className="flex items-center gap-2 rounded-lg bg-emerald-700/50 px-3 py-1.5 text-sm font-medium hover:bg-emerald-700 transition-colors mr-2"
+            >
+              <Download className="h-4 w-4" />
+              <span className="hidden sm:inline">Download</span>
             </button>
             <button
               onClick={() => {
@@ -886,7 +962,15 @@ export function FileTable({
         onClose={() => setItemsToMove([])}
         itemsToMove={itemsToMove}
         currentFolderId={folderId || null}
+        mode={moveModalMode}
         onSuccess={() => table.resetRowSelection()}
+      />
+
+      <VersionHistoryModal
+        isOpen={!!versionHistoryFile}
+        onClose={() => setVersionHistoryFile(null)}
+        file={versionHistoryFile}
+        folderId={folderId || null}
       />
 
       {contextMenu.visible && contextMenu.item && (
@@ -935,11 +1019,10 @@ export function FileTable({
             </button>
           )}
 
-          {!contextMenu.item.isRestricted &&
-            contextMenu.item.type !== "folder" && (
+          {!contextMenu.item.isRestricted && (
               <button
                 onClick={() => {
-                  handleDownload(contextMenu.item!);
+                  handleDownloadItems([contextMenu.item!]);
                   setContextMenu({ ...contextMenu, visible: false });
                 }}
                 className="w-full flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-emerald-600"
@@ -986,6 +1069,17 @@ export function FileTable({
               >
                 <Info className="h-4 w-4" /> Detail File
               </button>
+              {contextMenu.item.type !== "folder" && (
+                <button
+                  onClick={() => {
+                    setVersionHistoryFile(contextMenu.item!);
+                    setContextMenu({ ...contextMenu, visible: false });
+                  }}
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-emerald-600"
+                >
+                  <History className="h-4 w-4" /> Riwayat Versi
+                </button>
+              )}
               <button
                 onClick={() => {
                   setItemToRename(contextMenu.item!);
@@ -997,12 +1091,23 @@ export function FileTable({
               </button>
               <button
                 onClick={() => {
+                  setMoveModalMode("move");
                   setItemsToMove([contextMenu.item!]);
                   setContextMenu({ ...contextMenu, visible: false });
                 }}
                 className="w-full flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-emerald-600"
               >
                 <FolderIcon className="h-4 w-4" /> Pindahkan
+              </button>
+              <button
+                onClick={() => {
+                  setMoveModalMode("copy");
+                  setItemsToMove([contextMenu.item!]);
+                  setContextMenu({ ...contextMenu, visible: false });
+                }}
+                className="w-full flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50 hover:text-emerald-600"
+              >
+                <Copy className="h-4 w-4" /> Salin
               </button>
               <button
                 onClick={() => {

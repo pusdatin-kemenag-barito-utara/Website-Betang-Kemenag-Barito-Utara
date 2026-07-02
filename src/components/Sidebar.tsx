@@ -8,11 +8,14 @@ import {
   Trash2,
   Users,
   Building2,
+  Settings,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
 import { StorageQuotaWidget } from "./StorageQuotaWidget";
+import { createClient } from "@/lib/supabase/client";
+import { useEffect, useState } from "react";
 
 const mainNavigation = [
   { name: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -20,16 +23,36 @@ const mainNavigation = [
 ];
 
 const archiveManagement = [
-  { name: "Manajemen Pengguna", href: "/users", icon: Users },
-  { name: "Manajemen Bidang", href: "/bidang", icon: Building2 },
+  { name: "Manajemen Pengguna", href: "/users", icon: Users, requireSuperAdmin: true },
+  { name: "Manajemen Bidang", href: "/bidang", icon: Building2, requireSuperAdmin: true },
+  { name: "Pengaturan Sistem", href: "/settings", icon: Settings, requireSuperAdmin: true },
   { name: "Recycle Bin", href: "/trash", icon: Trash2 },
 ];
 
 export function Sidebar({ onClose }: { onClose?: () => void }) {
   const pathname = usePathname();
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
-  const renderNavItems = (items: typeof mainNavigation) => {
+  useEffect(() => {
+    const checkRole = async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        const { data: meta } = await supabase.from('users_metadata').select('role').eq('id', user.id).single();
+        if (meta?.role === 'super_admin' || meta?.role === 'Super Admin') {
+          setIsSuperAdmin(true);
+        }
+      }
+    };
+    checkRole();
+  }, []);
+
+  const renderNavItems = (items: typeof mainNavigation | typeof archiveManagement) => {
     return items.map((item) => {
+      if ('requireSuperAdmin' in item && item.requireSuperAdmin && !isSuperAdmin) {
+        return null;
+      }
+
       const isActive =
         pathname === item.href ||
         (item.href !== "/" && pathname.startsWith(item.href));
@@ -67,7 +90,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white p-1">
             <Image
-              src="/kemenag.svg"
+              src="/logo.png"
               alt="Logo"
               width={32}
               height={32}
@@ -75,8 +98,10 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
             />
           </div>
           <div>
-            <h2 className="text-sm font-bold tracking-wider text-white">
-              SI BETANG
+            <h2 className="text-sm font-bold tracking-wider text-white flex items-center">
+              SI BET
+              <Image src="/logo.png" alt="A" width={14} height={14} className="mx-[1.5px] -mt-[2px] object-contain" />
+              NG
             </h2>
             <p className="text-[10px] text-slate-400 tracking-widest uppercase">
               Kemenag Barito Utara

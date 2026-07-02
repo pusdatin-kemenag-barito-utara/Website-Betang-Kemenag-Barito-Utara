@@ -21,7 +21,11 @@ export default async function UsersManagementPage() {
   console.log("DEBUG USERS PAGE - Meta:", currentUserMeta)
   console.log("DEBUG USERS PAGE - Error:", metaError)
 
-  const isSuperAdmin = currentUserMeta?.role === 'Super Admin'
+  const isSuperAdmin = currentUserMeta?.role === 'Super Admin' || currentUserMeta?.role === 'super_admin';
+
+  if (!isSuperAdmin) {
+    redirect('/');
+  }
 
   // Fetch all users with their bidang name
   // Assuming Supabase supports foreign table joins via select('*, bidang(name)')

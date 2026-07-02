@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Breadcrumbs } from "@/components/FileBrowser/Breadcrumbs"
 import { FileTable } from "@/components/FileBrowser/FileTable"
@@ -15,13 +15,27 @@ interface FileBrowserViewProps {
   initialItems: FileItem[]
   breadcrumbs: { id: string; name: string }[]
   userBidangId: string
+  initialSearchQuery?: string
 }
 
-export function FileBrowserView({ folderId, initialItems, breadcrumbs, userBidangId }: FileBrowserViewProps) {
+export function FileBrowserView({ folderId, initialItems, breadcrumbs, userBidangId, initialSearchQuery = "" }: FileBrowserViewProps) {
   const router = useRouter()
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [isUploadOpen, setIsUploadOpen] = useState(false)
-  const [searchQuery, setSearchQuery] = useState("")
+  const [searchQuery, setSearchQuery] = useState(initialSearchQuery)
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchQuery !== initialSearchQuery) {
+        if (searchQuery) {
+          router.push(`/folders/${folderId === 'root' ? 'root' : folderId}?q=${encodeURIComponent(searchQuery)}`)
+        } else {
+          router.push(`/folders/${folderId === 'root' ? 'root' : folderId}`)
+        }
+      }
+    }, 500)
+    return () => clearTimeout(timer)
+  }, [searchQuery, folderId, router, initialSearchQuery])
   const [viewMode, setViewMode] = useState<"list" | "grid">("list")
   const [externalFiles, setExternalFiles] = useState<File[]>([])
   const [selectedInfoItem, setSelectedInfoItem] = useState<FileItem | null>(null)

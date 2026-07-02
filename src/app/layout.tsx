@@ -8,9 +8,41 @@ const jakartaSans = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "SI BETANG | Kemenag Barito Utara",
+  metadataBase: new URL("https://arsip.kemenag-baritoutara.com"),
+  title: {
+    default: "SI BETANG | Kemenag Barito Utara",
+    template: "%s | SI BETANG",
+  },
   description:
-    "Sistem Pengarsipan Digital Kementerian Agama Kabupaten Barito Utara",
+    "Portal resmi Sistem Informasi Basis Elektronik Tata Arsip dan Naskah Gabungan Kementerian Agama Kabupaten Barito Utara.",
+  keywords: [
+    "si betang kemenag",
+    "arsip kemenag barito utara",
+    "kementerian agama barito utara",
+    "pengarsipan digital kemenag",
+    "aplikasi arsip kemenag",
+    "e-arsip kemenag",
+  ],
+  authors: [{ name: "Kemenag Barito Utara" }],
+  creator: "Kemenag Barito Utara",
+  openGraph: {
+    type: "website",
+    locale: "id_ID",
+    url: "https://arsip.kemenag-baritoutara.com",
+    title: "SI BETANG | Kemenag Barito Utara",
+    description:
+      "Portal resmi Sistem Informasi Basis Elektronik Tata Arsip dan Naskah Gabungan Kementerian Agama Kabupaten Barito Utara.",
+    siteName: "SI BETANG Kemenag Barito Utara",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
+  icons: {
+    icon: "/kemenag.svg",
+    shortcut: "/kemenag.svg",
+    apple: "/kemenag.svg",
+  },
 };
 
 export default function RootLayout({

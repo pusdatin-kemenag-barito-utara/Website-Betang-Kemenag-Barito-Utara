@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { FolderIcon, Loader2, X } from "lucide-react"
-import { moveItem, getFoldersByBidang } from "@/app/(dashboard)/folders/actions"
+import { moveItem, copyItem, getFoldersByBidang } from "@/app/(dashboard)/folders/actions"
 import { toast } from "sonner"
 import type { FileItem } from "@/types"
 
@@ -11,6 +11,7 @@ interface MoveItemModalProps {
   onClose: () => void
   itemsToMove: FileItem[]
   currentFolderId: string | null
+  mode?: "move" | "copy"
   onSuccess?: () => void
 }
 
@@ -20,7 +21,7 @@ interface MinimalFolder {
   parent_id: string | null
 }
 
-export function MoveItemModal({ isOpen, onClose, itemsToMove, currentFolderId, onSuccess }: MoveItemModalProps) {
+export function MoveItemModal({ isOpen, onClose, itemsToMove, currentFolderId, mode = "move", onSuccess }: MoveItemModalProps) {
   const [folders, setFolders] = useState<MinimalFolder[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isMoving, setIsMoving] = useState(false)
@@ -68,21 +69,30 @@ export function MoveItemModal({ isOpen, onClose, itemsToMove, currentFolderId, o
         continue // Already there
       }
 
-      const res = await moveItem(item.id, item.type, destinationId, currentFolderId)
-      if (res.success) {
-        successCount++
+      if (mode === "copy") {
+        const res = await copyItem(item.id, item.type, destinationId, currentFolderId)
+        if (res.success) {
+          successCount++
+        } else {
+          errorCount++
+        }
       } else {
-        errorCount++
+        const res = await moveItem(item.id, item.type, destinationId, currentFolderId)
+        if (res.success) {
+          successCount++
+        } else {
+          errorCount++
+        }
       }
     }
 
     setIsMoving(false)
 
     if (successCount > 0) {
-      toast.success(`${successCount} item berhasil dipindahkan.`)
+      toast.success(`${successCount} item berhasil di${mode === "copy" ? "salin" : "pindahkan"}.`)
     }
     if (errorCount > 0) {
-      toast.error(`${errorCount} item gagal dipindahkan.`)
+      toast.error(`${errorCount} item gagal di${mode === "copy" ? "salin" : "pindahkan"}.`)
     }
 
     if (successCount > 0 && onSuccess) {
@@ -127,7 +137,7 @@ export function MoveItemModal({ isOpen, onClose, itemsToMove, currentFolderId, o
       <div className="relative w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl ring-1 ring-slate-100 animate-in zoom-in-95">
         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
           <div>
-            <h3 className="font-bold text-slate-800">Pindahkan ke...</h3>
+            <h3 className="font-bold text-slate-800">{mode === "copy" ? "Salin ke..." : "Pindahkan ke..."}</h3>
             <p className="text-xs text-slate-500 mt-0.5">{itemsToMove.length} item terpilih</p>
           </div>
           <button 
@@ -205,15 +215,19 @@ export function MoveItemModal({ isOpen, onClose, itemsToMove, currentFolderId, o
           <button
             onClick={handleMove}
             disabled={isMoving || isAlreadyHere}
-            className="flex items-center rounded-xl bg-emerald-600 px-6 py-2 text-sm font-bold text-white shadow-md shadow-emerald-600/20 transition-all hover:bg-emerald-700 disabled:opacity-50 disabled:shadow-none"
+            className={`flex items-center rounded-xl px-6 py-2 text-sm font-bold text-white shadow-md transition-all disabled:opacity-50 disabled:shadow-none ${
+              mode === "copy" 
+                ? "bg-blue-600 shadow-blue-600/20 hover:bg-blue-700" 
+                : "bg-emerald-600 shadow-emerald-600/20 hover:bg-emerald-700"
+            }`}
           >
             {isMoving ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Memindahkan...
+                {mode === "copy" ? "Menyalin..." : "Memindahkan..."}
               </>
             ) : (
-              "Pindahkan ke sini"
+              mode === "copy" ? "Salin ke sini" : "Pindahkan ke sini"
             )}
           </button>
         </div>

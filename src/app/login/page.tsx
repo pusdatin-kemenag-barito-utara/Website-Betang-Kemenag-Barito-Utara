@@ -44,8 +44,10 @@ export default function LoginPage() {
               Kementerian Agama Kabupaten Barito Utara
             </span>
           </div>
-          <h1 className="mt-2 sm:mt-3 text-2xl sm:text-4xl font-black tracking-tight text-slate-900">
-            SI BETANG
+          <h1 className="mt-2 sm:mt-3 text-2xl sm:text-4xl font-black tracking-tight text-slate-900 flex items-center justify-center">
+            SI BET
+            <Image src="/logo.png" alt="A" width={32} height={32} className="mx-[2px] -mt-[4px] object-contain sm:w-9 sm:h-9" />
+            NG
           </h1>
           <div className="mt-1 sm:mt-3 space-y-1.5 px-0 sm:px-4">
             <p className="text-[11px] min-[400px]:text-xs sm:text-sm font-medium text-slate-700 leading-tight flex flex-col gap-0.5 sm:gap-1">

@@ -4,13 +4,34 @@ import { useState } from "react"
 import { Toaster } from "sonner"
 import { Sidebar } from "@/components/Sidebar"
 import { TopNavbar } from "@/components/TopNavbar"
+import { useEffect } from "react"
 
 export function DashboardLayoutClient({
   children,
+  disableRightClick = true,
 }: {
   children: React.ReactNode
+  disableRightClick?: boolean
 }) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
+  // Context Menu Blocker
+  useEffect(() => {
+    if (!disableRightClick) return;
+
+    const handleContextMenu = (e: MouseEvent) => {
+      // Don't block context menu if it's on an input or textarea
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+        return;
+      }
+      e.preventDefault();
+    };
+
+    document.addEventListener("contextmenu", handleContextMenu);
+    return () => {
+      document.removeEventListener("contextmenu", handleContextMenu);
+    };
+  }, [disableRightClick]);
 
   return (
     <div className="flex h-screen w-full bg-[#F8FAFC] overflow-hidden">

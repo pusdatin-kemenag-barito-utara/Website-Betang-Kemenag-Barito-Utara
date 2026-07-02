@@ -7,34 +7,68 @@ import { formatFileSize } from "@/lib/utils"
 import { format } from "date-fns"
 import { id } from "date-fns/locale"
 
-export default async function FolderPage({ params }: { params: Promise<{ folderId: string }> | { folderId: string } }) {
+export const dynamic = 'force-dynamic'
+
+export default async function FolderPage({ 
+  params,
+  searchParams
+}: { 
+  params: Promise<{ folderId: string }>
+  searchParams: Promise<{ q?: string }>
+}) {
   // In Next.js 15, params is a Promise
   const resolvedParams = await params
   const { folderId } = resolvedParams
+
+  const resolvedSearchParams = await searchParams
+  const query = resolvedSearchParams.q || ""
   
   const supabase = await createClient()
   
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: metadata } = await supabase.from('users_metadata').select('bidang_id').eq('id', user.id).single()
+  const { data: metadata } = await supabase.from('users_metadata').select('bidang_id, role').eq('id', user.id).single()
   const userBidangId = metadata?.bidang_id || 'global'
+  const userRole = metadata?.role || ''
+
+  // If Admin Bidang tries to access the global root, redirect them to their own folder
+  if (folderId === 'root' && userRole === 'Admin Bidang' && metadata?.bidang_id) {
+    const { data: rootFolder } = await supabase
+      .from('folders')
+      .select('id')
+      .eq('bidang_id', metadata.bidang_id)
+      .is('parent_id', null)
+      .single()
+
+    if (rootFolder) {
+      redirect(`/folders/${rootFolder.id}`)
+    }
+  }
 
   // Fetch folders
   let foldersQuery = supabase.from('folders').select('*').is('deleted_at', null)
-  if (folderId === 'root') {
-    foldersQuery = foldersQuery.is('parent_id', null)
+  if (query) {
+    foldersQuery = foldersQuery.textSearch('fts_doc', query, { config: 'simple', type: 'websearch' })
   } else {
-    foldersQuery = foldersQuery.eq('parent_id', folderId)
+    if (folderId === 'root') {
+      foldersQuery = foldersQuery.is('parent_id', null)
+    } else {
+      foldersQuery = foldersQuery.eq('parent_id', folderId)
+    }
   }
   const { data: folders = [] } = await foldersQuery.order('name')
 
   // Fetch files
   let filesQuery = supabase.from('files').select('*').is('deleted_at', null)
-  if (folderId === 'root') {
-    filesQuery = filesQuery.is('folder_id', null)
+  if (query) {
+    filesQuery = filesQuery.textSearch('fts_doc', query, { config: 'simple', type: 'websearch' })
   } else {
-    filesQuery = filesQuery.eq('folder_id', folderId)
+    if (folderId === 'root') {
+      filesQuery = filesQuery.is('folder_id', null)
+    } else {
+      filesQuery = filesQuery.eq('folder_id', folderId)
+    }
   }
   const { data: files = [] } = await filesQuery.order('created_at', { ascending: false })
 
@@ -42,56 +76,18 @@ export default async function FolderPage({ params }: { params: Promise<{ folderI
     return format(new Date(dateStr), "d MMM yyyy", { locale: id })
   }
 
-  // Fetch all folders and files for size calculation and breadcrumbs (lightweight fetch)
-  const { data: allFoldersData } = await supabase.from('folders').select('id, parent_id, name').is('deleted_at', null)
-  const { data: allFilesData } = await supabase.from('files').select('folder_id, size_bytes').is('deleted_at', null)
-
-  const buildSizeMap = () => {
-    const sizeMap: Record<string, number> = {}
-    const childrenMap: Record<string, string[]> = {}
+  // Fetch folder sizes via single batch RPC to optimize page load times
+  const folderSizeMap: Record<string, number> = {}
+  if (folders && folders.length > 0) {
+    const folderIds = folders.map(f => f.id)
+    const { data: sizes } = await supabase.rpc('get_folders_size', { target_folder_ids: folderIds })
     
-    // Initialize
-    allFoldersData?.forEach(f => {
-      sizeMap[f.id] = 0
-      childrenMap[f.id] = []
-    })
-    
-    // Build tree
-    allFoldersData?.forEach(f => {
-      if (f.parent_id && childrenMap[f.parent_id]) {
-        childrenMap[f.parent_id].push(f.id)
-      }
-    })
-    
-    // Add file sizes directly to their folders
-    allFilesData?.forEach(file => {
-      if (file.folder_id && sizeMap[file.folder_id] !== undefined) {
-        sizeMap[file.folder_id] += (file.size_bytes || 0)
-      }
-    })
-    
-    // Compute total sizes bottom-up
-    const computed = new Set<string>()
-    const computeFolder = (fId: string): number => {
-      if (computed.has(fId)) return sizeMap[fId]
-      
-      let total = sizeMap[fId]
-      const children = childrenMap[fId] || []
-      for (const childId of children) {
-        total += computeFolder(childId)
-      }
-      
-      sizeMap[fId] = total
-      computed.add(fId)
-      return total
+    if (sizes && Array.isArray(sizes)) {
+      sizes.forEach((s: { folder_id: string; total_size: number | string }) => {
+        folderSizeMap[s.folder_id] = Number(s.total_size) || 0
+      })
     }
-    
-    allFoldersData?.forEach(f => computeFolder(f.id))
-    
-    return sizeMap
   }
-
-  const folderSizeMap = buildSizeMap()
 
   const items = [
     ...(folders || []).map(f => {
@@ -125,22 +121,13 @@ export default async function FolderPage({ params }: { params: Promise<{ folderI
   ]
   
   if (folderId !== 'root') {
-    const buildBreadcrumbs = (currentId: string) => {
-      const paths = []
-      let curr = allFoldersData?.find(f => f.id === currentId)
-      while (curr) {
-        paths.unshift({ id: curr.id, name: curr.name })
-        const parentId = curr.parent_id
-        if (parentId) {
-          curr = allFoldersData?.find(f => f.id === parentId)
-        } else {
-          break
-        }
-      }
-      return paths
+    const { data: paths, error } = await supabase.rpc('get_folder_path', { target_folder_id: folderId })
+    if (error) {
+      console.error("Error fetching breadcrumbs:", error)
     }
-    
-    breadcrumbs.push(...buildBreadcrumbs(folderId))
+    if (paths && paths.length > 0) {
+      breadcrumbs.push(...paths.reverse())
+    }
   }
 
   return (
@@ -156,6 +143,7 @@ export default async function FolderPage({ params }: { params: Promise<{ folderI
         initialItems={items} 
         breadcrumbs={breadcrumbs}
         userBidangId={userBidangId}
+        initialSearchQuery={query}
       />
     </div>
   )

@@ -13,8 +13,8 @@ export function TopNavbar({ onMenuClick }: { onMenuClick?: () => void }) {
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [isEditProfileOpen, setIsEditProfileOpen] = useState(false)
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false)
-  const [userName, setUserName] = useState("Admin Name")
-  const [userRole, setUserRole] = useState("Super Admin")
+  const [userName, setUserName] = useState("Memuat...")
+  const [userRole, setUserRole] = useState("")
   const [editName, setEditName] = useState("")
   const [newPassword, setNewPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
@@ -29,12 +29,21 @@ export function TopNavbar({ onMenuClick }: { onMenuClick?: () => void }) {
     async function getUser() {
       const { data: { user } } = await client.auth.getUser()
       if (user) {
-        const name = user.user_metadata?.full_name || user.email?.split('@')[0] || "Admin Name"
-        setUserName(name)
-        setEditName(name)
-        const { data: meta } = await client.from('users_metadata').select('role').eq('id', user.id).single()
+        const { data: meta } = await client.from('users_metadata').select('role, full_name').eq('id', user.id).single()
+        
+        if (meta?.full_name) {
+          setUserName(meta.full_name)
+          setEditName(meta.full_name)
+        } else {
+          const name = user.user_metadata?.full_name || user.email?.split('@')[0] || "Admin Name"
+          setUserName(name)
+          setEditName(name)
+        }
+
         if (meta?.role) {
           setUserRole(meta.role === 'super_admin' ? 'Super Admin' : meta.role === 'admin_bidang' ? 'Admin Bidang' : meta.role)
+        } else {
+          setUserRole("Pengguna")
         }
       }
     }

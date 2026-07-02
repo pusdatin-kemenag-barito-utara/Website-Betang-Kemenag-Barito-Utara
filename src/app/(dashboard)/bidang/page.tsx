@@ -2,9 +2,25 @@ import { PageBanner } from "@/components/ui/PageBanner"
 import { Building2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/server"
 import { BidangView } from "@/components/Bidang/BidangView"
+import { redirect } from "next/navigation"
 
 export default async function BidangManagementPage() {
   const supabase = await createClient()
+
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const { data: currentUserMeta } = await supabase
+    .from('users_metadata')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+
+  const isSuperAdmin = currentUserMeta?.role === 'Super Admin' || currentUserMeta?.role === 'super_admin'
+
+  if (!isSuperAdmin) {
+    redirect('/')
+  }
 
   // Fetch all active files to count them per bidang accurately
   let bidangData: { id: string; name: string; count: number; sort_order: number }[] = []
