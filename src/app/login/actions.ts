@@ -60,12 +60,12 @@ export async function loginAction(prevState: { error: string | null } | null, fo
     .rpc('get_pusdatin_user', { email_address: email })
 
   if (pusdatinError || !pusdatinUser) {
-    await supabase.auth.signOut()
+    await supabase.auth.signOut({ scope: 'local' })
     return { error: 'Akun Anda tidak terdaftar di sistem terpusat.' }
   }
 
   if (pusdatinUser.status !== 'active') {
-    await supabase.auth.signOut()
+    await supabase.auth.signOut({ scope: 'local' })
     return { error: 'Akun Anda sedang dinonaktifkan oleh Administrator.' }
   }
 
@@ -75,7 +75,7 @@ export async function loginAction(prevState: { error: string | null } | null, fo
   );
 
   if (!hasArsipAccess) {
-    await supabase.auth.signOut()
+    await supabase.auth.signOut({ scope: 'local' })
     return { error: 'Anda tidak memiliki hak akses untuk aplikasi E-Arsip.' }
   }
 
