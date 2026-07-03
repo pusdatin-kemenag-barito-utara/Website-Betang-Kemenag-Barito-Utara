@@ -11,6 +11,9 @@ export async function createClient() {
       db: {
         schema: 'kemenag_arsip',
       },
+      cookieOptions: {
+        name: 'earsip-auth',
+      },
       cookies: {
         getAll() {
           return cookieStore.getAll()

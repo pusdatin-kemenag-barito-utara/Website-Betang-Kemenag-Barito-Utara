@@ -15,14 +15,11 @@ export async function createFolder(name: string, parentId: string | null) {
 
     // Get user metadata to know which bidang this belongs to
     const { data: metadata, error: metaError } = await supabase
-      .from('users_metadata')
-      .select('bidang_id, role')
-      .eq('id', user.id)
-      .single()
+      .rpc('get_pusdatin_user', { email_address: user.email })
 
     if (metaError || !metadata) throw new Error("Metadata user tidak ditemukan")
 
-    let finalBidangId = metadata.bidang_id;
+    let finalBidangId = null;
     if (parentId && parentId !== 'root') {
       const { data: parentFolder } = await supabase.from('folders').select('bidang_id').eq('id', parentId).single();
       if (parentFolder && parentFolder.bidang_id) {
@@ -73,14 +70,11 @@ export async function saveFileMetadata({
 
     // Get user metadata
     const { data: metadata, error: metaError } = await supabase
-      .from('users_metadata')
-      .select('bidang_id, role')
-      .eq('id', user.id)
-      .single()
+      .rpc('get_pusdatin_user', { email_address: user.email })
 
     if (metaError || !metadata) throw new Error("Metadata user tidak ditemukan")
 
-    let finalBidangId = metadata.bidang_id;
+    let finalBidangId = null;
     if (folderId && folderId !== 'root') {
       const { data: parentFolder } = await supabase.from('folders').select('bidang_id').eq('id', folderId).single();
       if (parentFolder && parentFolder.bidang_id) {
@@ -414,14 +408,11 @@ export async function copyItem(itemId: string, itemType: "folder" | "file", targ
     }
 
     const { data: metadata, error: metaError } = await supabase
-      .from('users_metadata')
-      .select('bidang_id, role')
-      .eq('id', user.id)
-      .single()
+      .rpc('get_pusdatin_user', { email_address: user.email })
 
     if (metaError || !metadata) throw new Error("Metadata user tidak ditemukan")
 
-    let finalBidangId = metadata.bidang_id;
+    let finalBidangId = null;
     if (targetFolderId && targetFolderId !== 'root') {
       const { data: parentFolder } = await supabase.from('folders').select('bidang_id').eq('id', targetFolderId).single();
       if (parentFolder && parentFolder.bidang_id) {
@@ -461,10 +452,7 @@ export async function getFoldersByBidang() {
     if (authError || !user) throw new Error("Unauthorized")
 
     const { data: metadata, error: metaError } = await supabase
-      .from('users_metadata')
-      .select('bidang_id, role')
-      .eq('id', user.id)
-      .single()
+      .rpc('get_pusdatin_user', { email_address: user.email })
 
     if (metaError || !metadata) throw new Error("Metadata user tidak ditemukan")
 
@@ -472,12 +460,6 @@ export async function getFoldersByBidang() {
       .from('folders')
       .select('id, name, parent_id')
       .is('deleted_at', null)
-
-    // For safety, only show their bidang's folders (unless logic dictates otherwise)
-    // Actually SUPER_ADMIN might want to see all, but let's stick to what's mapped to them
-    if (metadata.bidang_id) {
-      query.eq('bidang_id', metadata.bidang_id)
-    }
 
     const { data, error } = await query
 
@@ -498,7 +480,8 @@ export async function getFileVersions(fileId: string) {
 
     const { data, error } = await supabase
       .from('file_versions')
-      .select('*, uploaded_by_user:users_metadata!uploaded_by(full_name)')
+      .select('*') // TODO: Map uploaded_by to pusdatin.users if needed
+
       .eq('file_id', fileId)
       .order('created_at', { ascending: false })
 

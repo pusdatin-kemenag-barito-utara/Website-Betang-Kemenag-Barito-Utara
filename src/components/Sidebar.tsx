@@ -6,8 +6,6 @@ import {
   FolderIcon,
   LayoutDashboard,
   Trash2,
-  Users,
-  Building2,
   Settings,
   X,
 } from "lucide-react";
@@ -23,8 +21,6 @@ const mainNavigation = [
 ];
 
 const archiveManagement = [
-  { name: "Manajemen Pengguna", href: "/users", icon: Users, requireSuperAdmin: true },
-  { name: "Manajemen Bidang", href: "/bidang", icon: Building2, requireSuperAdmin: true },
   { name: "Pengaturan Sistem", href: "/settings", icon: Settings, requireSuperAdmin: true },
   { name: "Recycle Bin", href: "/trash", icon: Trash2 },
 ];
@@ -38,7 +34,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
-        const { data: meta } = await supabase.from('users_metadata').select('role').eq('id', user.id).single();
+        const { data: meta } = await supabase.rpc('get_pusdatin_user', { email_address: user.email });
         if (meta?.role === 'super_admin' || meta?.role === 'Super Admin') {
           setIsSuperAdmin(true);
         }

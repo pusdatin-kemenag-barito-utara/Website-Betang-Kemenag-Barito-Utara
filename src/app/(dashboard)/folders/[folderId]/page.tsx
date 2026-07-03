@@ -28,23 +28,12 @@ export default async function FolderPage({
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: metadata } = await supabase.from('users_metadata').select('bidang_id, role').eq('id', user.id).single()
-  const userBidangId = metadata?.bidang_id || 'global'
-  const userRole = metadata?.role || ''
+  const { data: metadata } = await supabase.rpc('get_pusdatin_user', { email_address: user.email })
+  const userBidangId = 'global' // Replaced with global, as we are migrating away from kemenag_arsip.users_metadata 
 
   // If Admin Bidang tries to access the global root, redirect them to their own folder
-  if (folderId === 'root' && userRole === 'Admin Bidang' && metadata?.bidang_id) {
-    const { data: rootFolder } = await supabase
-      .from('folders')
-      .select('id')
-      .eq('bidang_id', metadata.bidang_id)
-      .is('parent_id', null)
-      .single()
-
-    if (rootFolder) {
-      redirect(`/folders/${rootFolder.id}`)
-    }
-  }
+  // Removed: Admin Bidang routing logic since bidang_id is deprecated and now managed by Pusdatin.
+  // We can re-implement this if we map app_permissions features.
 
   // Fetch folders
   let foldersQuery = supabase.from('folders').select('*').is('deleted_at', null)

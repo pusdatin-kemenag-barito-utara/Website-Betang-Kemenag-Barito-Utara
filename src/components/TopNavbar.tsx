@@ -29,19 +29,19 @@ export function TopNavbar({ onMenuClick }: { onMenuClick?: () => void }) {
     async function getUser() {
       const { data: { user } } = await client.auth.getUser()
       if (user) {
-        const { data: meta } = await client.from('users_metadata').select('role, full_name').eq('id', user.id).single()
+        const { data: meta } = await client.rpc('get_pusdatin_user', { email_address: user.email })
         
-        if (meta?.full_name) {
-          setUserName(meta.full_name)
-          setEditName(meta.full_name)
+        if (meta?.name) {
+          setUserName(meta.name)
+          setEditName(meta.name)
         } else {
-          const name = user.user_metadata?.full_name || user.email?.split('@')[0] || "Admin Name"
-          setUserName(name)
-          setEditName(name)
+          const fallbackName = user.user_metadata?.full_name || user.email?.split('@')[0] || "Admin Name"
+          setUserName(fallbackName)
+          setEditName(fallbackName)
         }
 
         if (meta?.role) {
-          setUserRole(meta.role === 'super_admin' ? 'Super Admin' : meta.role === 'admin_bidang' ? 'Admin Bidang' : meta.role)
+          setUserRole(meta.role === 'super_admin' ? 'Super Admin' : meta.role === 'operator' ? 'Operator' : meta.role)
         } else {
           setUserRole("Pengguna")
         }
@@ -62,7 +62,7 @@ export function TopNavbar({ onMenuClick }: { onMenuClick?: () => void }) {
   }, [])
 
   const handleLogout = async () => {
-    await supabase.auth.signOut()
+    await supabase.auth.signOut({ scope: 'local' })
     router.push("/login")
     router.refresh()
   }

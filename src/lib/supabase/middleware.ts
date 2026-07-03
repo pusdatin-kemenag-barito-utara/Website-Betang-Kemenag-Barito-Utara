@@ -13,6 +13,9 @@ export async function updateSession(request: NextRequest) {
       db: {
         schema: 'kemenag_arsip',
       },
+      cookieOptions: {
+        name: 'earsip-auth',
+      },
       cookies: {
         getAll() {
           return request.cookies.getAll()

@@ -11,10 +11,7 @@ export default async function BidangManagementPage() {
   if (!user) redirect('/login')
 
   const { data: currentUserMeta } = await supabase
-    .from('users_metadata')
-    .select('role')
-    .eq('id', user.id)
-    .single()
+    .rpc('get_pusdatin_user', { email_address: user.email })
 
   const isSuperAdmin = currentUserMeta?.role === 'Super Admin' || currentUserMeta?.role === 'super_admin'
 

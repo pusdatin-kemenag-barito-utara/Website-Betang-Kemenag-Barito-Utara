@@ -31,21 +31,19 @@ export default async function DashboardPage() {
   if (!user) return null
 
   const { data: metadata } = await supabase
-    .from('users_metadata')
-    .select('bidang_id, role')
-    .eq('id', user.id)
-    .single()
+    .rpc('get_pusdatin_user', { email_address: user.email })
 
   const isSuperAdmin = metadata?.role === 'super_admin'
 
-  // Query Files
-  let queryFiles = supabase
+  const queryFiles = supabase
     .from('files')
     .select('id, size_bytes, created_at, name, mime_type', { count: 'exact' })
     .is('deleted_at', null)
 
-  if (!isSuperAdmin && metadata?.bidang_id) {
-    queryFiles = queryFiles.eq('bidang_id', metadata.bidang_id)
+  // TODO: Implement bidang_id mapping if needed. For now, operators see all their allowed files (or we can filter by owner)
+  if (!isSuperAdmin) {
+    // Currently, without bidang_id, we might not filter or filter by user_id
+    // queryFiles = queryFiles.eq('user_id', user.id) // Example if we want to restrict
   }
 
   const { data: allFiles, count: totalFiles } = await queryFiles

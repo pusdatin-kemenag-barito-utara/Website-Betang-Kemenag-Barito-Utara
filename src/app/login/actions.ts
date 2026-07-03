@@ -46,13 +46,37 @@ export async function loginAction(prevState: { error: string | null } | null, fo
   // 2. Autentikasi dengan Supabase
   const supabase = await createClient()
 
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data: authData, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   })
 
-  if (error) {
+  if (error || !authData.user) {
     return { error: 'Email atau password yang Anda masukkan salah.' }
+  }
+
+  // 3. Verifikasi ketersediaan pengguna di database pusdatin
+  const { data: pusdatinUser, error: pusdatinError } = await supabase
+    .rpc('get_pusdatin_user', { email_address: email })
+
+  if (pusdatinError || !pusdatinUser) {
+    await supabase.auth.signOut()
+    return { error: 'Akun Anda tidak terdaftar di sistem terpusat.' }
+  }
+
+  if (pusdatinUser.status !== 'active') {
+    await supabase.auth.signOut()
+    return { error: 'Akun Anda sedang dinonaktifkan oleh Administrator.' }
+  }
+
+  // Verifikasi akses spesifik untuk E-Arsip
+  const hasArsipAccess = pusdatinUser.app_permissions?.some(
+    (p: { app_id: string; role: string }) => p.app_id === 'e-arsip-kemenag' && p.role !== 'none'
+  );
+
+  if (!hasArsipAccess) {
+    await supabase.auth.signOut()
+    return { error: 'Anda tidak memiliki hak akses untuk aplikasi E-Arsip.' }
   }
 
   const cookieStore = await cookies()

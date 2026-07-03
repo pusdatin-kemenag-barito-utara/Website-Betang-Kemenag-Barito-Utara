@@ -8,6 +8,9 @@ export function createClient() {
       db: {
         schema: 'kemenag_arsip',
       },
+      cookieOptions: {
+        name: 'earsip-auth',
+      },
     }
   )
 }

@@ -19,10 +19,7 @@ export default async function SettingsPage() {
 
   // Double check Super Admin status
   const { data: meta } = await supabase
-    .from('users_metadata')
-    .select('role')
-    .eq('id', user.id)
-    .single()
+    .rpc('get_pusdatin_user', { email_address: user.email })
 
   if (meta?.role !== 'super_admin' && meta?.role !== 'Super Admin') {
     redirect("/") // Redirect back to home if not super admin
