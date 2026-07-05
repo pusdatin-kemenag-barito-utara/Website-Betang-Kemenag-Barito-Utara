@@ -72,16 +72,8 @@ export async function deleteBidang(id: string) {
   const supabase = await createClient()
 
   // Validasi 1: Apakah ada pengguna yang terdaftar di bidang ini?
-  const { count: usersCount, error: userError } = await supabase
-    .from("users_metadata")
-    .select("id", { count: "exact", head: true })
-    .eq("bidang_id", id)
-
-  if (userError) return { success: false, error: userError.message }
-  
-  if (usersCount && usersCount > 0) {
-    return { success: false, error: `Tidak bisa menghapus bidang ini karena masih memiliki ${usersCount} pengguna yang terdaftar di dalamnya.` }
-  }
+  // (Pengecekan dihilangkan karena data user sekarang tersentralisasi di schema kemenag_pusdatin
+  // dan aplikasi Si Betang sekarang menggunakan bidang = 'global')
 
   // Validasi 2: Apakah ada dokumen/file yang terdaftar di bidang ini?
   const { count: filesCount, error: fileError } = await supabase
