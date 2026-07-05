@@ -34,6 +34,7 @@ export async function proxy(request: NextRequest) {
               <meta charset="utf-8">
               <meta name="viewport" content="width=device-width, initial-scale=1">
               <title>Sistem Sedang Pemeliharaan</title>
+              <link rel="icon" href="${pusdatinUrl}/branding/kemenag.svg" type="image/svg+xml">
               <style>
                 body { margin: 0; overflow: hidden; background-color: #f8fafc; }
                 iframe { width: 100vw; height: 100vh; border: none; }
