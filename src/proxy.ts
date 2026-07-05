@@ -2,6 +2,13 @@ import { type NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
 export async function proxy(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // Allow health endpoint without maintenance check (required for Coolify)
+  if (pathname === "/api/health") {
+    return NextResponse.next();
+  }
+
   // === MAINTENANCE CHECK ===
   try {
     const pusdatinUrl =
@@ -89,8 +96,6 @@ export async function proxy(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
-  const { pathname } = request.nextUrl;
 
   // Allow public routes
   if (
