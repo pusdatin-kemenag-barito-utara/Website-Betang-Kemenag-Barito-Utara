@@ -2,8 +2,7 @@
 
 import { RefreshCw, Trash2, AlertTriangle, Loader2 } from "lucide-react"
 import { useState } from "react"
-import { createClient } from "@/lib/supabase/client"
-import { useRouter } from "next/navigation"
+import { restoreTrashItem, permanentDeleteTrashItems } from "@/app/(dashboard)/trash/actions"
 import { toast } from "sonner"
 import { DeleteConfirmModal } from "../FileBrowser/DeleteConfirmModal"
 
@@ -27,26 +26,22 @@ export function TrashView({ initialData }: TrashViewProps) {
   const [itemsToDelete, setItemsToDelete] = useState<TrashItem[]>([])
   const [isDeleting, setIsDeleting] = useState(false)
   
-  const router = useRouter()
-  const supabase = createClient()
+
 
   const handleRestore = async (item: TrashItem) => {
     setLoadingId(item.id)
     setActionType("restore")
     try {
-      const table = item.type === "folder" ? "folders" : "files"
-      const { error } = await supabase
-        .from(table)
-        .update({ deleted_at: null, updated_at: new Date().toISOString() })
-        .eq("id", item.id)
+      const { success, error } = await restoreTrashItem(item.id, item.type)
 
-      if (error) throw error
+      if (!success) throw new Error(error || "Gagal merestore item")
+      
       setItems(prev => prev.filter(i => i.id !== item.id))
       window.dispatchEvent(new CustomEvent('storage-updated'))
-      router.refresh()
+      toast.success("Item berhasil dikembalikan.")
     } catch (error) {
       console.error("Restore failed:", error)
-      alert("Gagal merestore item.")
+      toast.error(error instanceof Error ? error.message : "Gagal merestore item.")
     } finally {
       setLoadingId(null)
       setActionType(null)
@@ -57,31 +52,17 @@ export function TrashView({ initialData }: TrashViewProps) {
     if (itemsToDelete.length === 0) return
     
     setIsDeleting(true)
-    let successCount = 0
     try {
-      // Execute deletions in parallel for better performance
-      const promises = itemsToDelete.map(async (item) => {
-        const table = item.type === "folder" ? "folders" : "files"
-        const { error } = await supabase.from(table).delete().eq("id", item.id)
-        if (!error) return item.id
-        return null
-      })
+      const itemsToDel = itemsToDelete.map(i => ({ id: i.id, type: i.type }))
+      const { success, error } = await permanentDeleteTrashItems(itemsToDel)
       
-      const results = await Promise.all(promises)
-      const successfulIds = results.filter(Boolean) as string[]
-      successCount = successfulIds.length
+      if (!success) throw new Error(error || "Gagal menghapus item permanen")
       
-      if (successCount > 0) {
-        setItems(prev => prev.filter(i => !successfulIds.includes(i.id)))
-        router.refresh()
-      }
-
-      if (successCount === itemsToDelete.length) {
-        toast.success(itemsToDelete.length > 1 ? "Recycle Bin berhasil dikosongkan." : "File berhasil dihapus permanen.")
-        window.dispatchEvent(new CustomEvent('storage-updated'))
-      } else {
-        toast.error("Sebagian item gagal dihapus. Silakan coba lagi.")
-      }
+      const deletedIds = itemsToDelete.map(i => i.id)
+      setItems(prev => prev.filter(i => !deletedIds.includes(i.id)))
+      
+      toast.success(itemsToDelete.length > 1 ? "Recycle Bin berhasil dikosongkan." : "File berhasil dihapus permanen.")
+      window.dispatchEvent(new CustomEvent('storage-updated'))
     } catch (error) {
       console.error("Delete failed:", error)
       toast.error("Gagal menghapus item secara permanen.")

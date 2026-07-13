@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
+import { logAudit } from "@/lib/audit"
 
 export async function getAppSettings() {
   try {
@@ -44,6 +45,11 @@ export async function updateDisableRightClick(disableRightClick: boolean) {
     if (error) throw error
 
     revalidatePath('/', 'layout') // Revalidate the whole layout
+    await logAudit({
+      action: "UPDATE",
+      target: "Pengaturan Aplikasi (Disable Right Click)",
+      afterState: { disableRightClick }
+    })
     return { success: true }
   } catch (error) {
     console.error("Error updating settings:", error)

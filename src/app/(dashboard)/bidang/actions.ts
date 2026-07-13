@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/server"
 import { revalidatePath } from "next/cache"
+import { logAudit } from "@/lib/audit"
 
 export async function createBidang(name: string, sort_order: number = 0) {
   const supabase = await createClient()
@@ -31,6 +32,10 @@ export async function createBidang(name: string, sort_order: number = 0) {
   }
 
   revalidatePath("/bidang")
+  await logAudit({
+    action: "INSERT",
+    target: `Bidang: ${name.trim()}`
+  })
   return { success: true }
 }
 
@@ -65,6 +70,10 @@ export async function updateBidang(id: string, name: string, sort_order: number 
   revalidatePath("/bidang")
   // User list dropdown depends on this, also revalidate /users
   revalidatePath("/users")
+  await logAudit({
+    action: "UPDATE",
+    target: `Bidang: ${name.trim()}`
+  })
   return { success: true }
 }
 
@@ -99,6 +108,10 @@ export async function deleteBidang(id: string) {
 
   revalidatePath("/bidang")
   revalidatePath("/users")
+  await logAudit({
+    action: "DELETE",
+    target: `Bidang ID: ${id}`
+  })
   return { success: true }
 }
 
@@ -121,5 +134,9 @@ export async function reorderBidang(items: { id: string, sort_order: number }[])
   }
 
   revalidatePath("/bidang")
+  await logAudit({
+    action: "UPDATE",
+    target: `Reorder Bidang`
+  })
   return { success: true }
 }

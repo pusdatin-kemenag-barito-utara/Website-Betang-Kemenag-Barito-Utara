@@ -1,24 +1,17 @@
 "use client"
 
-import { LogOut, Menu, Edit, Key, Eye, EyeOff } from "lucide-react"
+import { LogOut, Menu, ChevronDown } from "lucide-react"
 import { useState, useRef, useEffect } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
-import { toast } from "sonner"
 import Image from "next/image"
 import appIcon from "@/app/icon.svg"
 
 export function TopNavbar({ onMenuClick }: { onMenuClick?: () => void }) {
   const [dropdownOpen, setDropdownOpen] = useState(false)
-  const [isEditProfileOpen, setIsEditProfileOpen] = useState(false)
-  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false)
   const [userName, setUserName] = useState("Memuat...")
   const [userRole, setUserRole] = useState("")
-  const [editName, setEditName] = useState("")
-  const [newPassword, setNewPassword] = useState("")
-  const [showPassword, setShowPassword] = useState(false)
-  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const dropdownRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
@@ -33,11 +26,9 @@ export function TopNavbar({ onMenuClick }: { onMenuClick?: () => void }) {
         
         if (meta?.name) {
           setUserName(meta.name)
-          setEditName(meta.name)
         } else {
           const fallbackName = user.user_metadata?.full_name || user.email?.split('@')[0] || "Admin Name"
           setUserName(fallbackName)
-          setEditName(fallbackName)
         }
 
         if (meta?.role) {
@@ -97,6 +88,7 @@ export function TopNavbar({ onMenuClick }: { onMenuClick?: () => void }) {
               <span className="text-[13px] font-bold leading-none text-[#1e3a8a]">{userName}</span>
               <span className="text-[11px] text-slate-400 mt-1 font-medium">{userRole}</span>
             </div>
+            <ChevronDown className="ml-1 h-4 w-4 text-slate-400" />
           </button>
 
           <AnimatePresence>
@@ -113,30 +105,6 @@ export function TopNavbar({ onMenuClick }: { onMenuClick?: () => void }) {
                   <p className="text-[10px] text-slate-500">{userRole}</p>
                 </div>
                 <button
-                  onClick={() => {
-                    setEditName(userName)
-                    setIsEditProfileOpen(true)
-                    setDropdownOpen(false)
-                  }}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-emerald-600"
-                >
-                  <Edit className="h-4 w-4" />
-                  Edit Profil
-                </button>
-                <button
-                  onClick={() => {
-                    setNewPassword("")
-                    setShowPassword(false)
-                    setIsChangePasswordOpen(true)
-                    setDropdownOpen(false)
-                  }}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-emerald-600"
-                >
-                  <Key className="h-4 w-4" />
-                  Ubah Password
-                </button>
-                <div className="my-1 border-t border-slate-100" />
-                <button
                   onClick={handleLogout}
                   className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
                 >
@@ -148,134 +116,6 @@ export function TopNavbar({ onMenuClick }: { onMenuClick?: () => void }) {
           </AnimatePresence>
         </div>
       </div>
-
-      {/* Edit Profile Modal */}
-      <AnimatePresence>
-        {isEditProfileOpen && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
-            >
-              <h3 className="text-lg font-bold text-[#1e3a8a] mb-4">Edit Profil</h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Nama</label>
-                  <input 
-                    type="text" 
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-2 outline-none transition-colors focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
-                    placeholder="Masukkan nama baru"
-                  />
-                </div>
-                <div className="flex justify-end gap-3 mt-6">
-                  <button 
-                    onClick={() => setIsEditProfileOpen(false)}
-                    className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors"
-                  >
-                    Batal
-                  </button>
-                  <button 
-                    onClick={async () => {
-                      const { error } = await supabase.auth.updateUser({
-                        data: { full_name: editName }
-                      })
-                      if (!error) {
-                        setUserName(editName)
-                        setIsEditProfileOpen(false)
-                        toast.success("Nama berhasil diubah.")
-                      } else {
-                        toast.error("Gagal mengubah nama: " + error.message)
-                      }
-                    }}
-                    className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition-colors"
-                  >
-                    Simpan
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
-      {/* Change Password Modal */}
-      <AnimatePresence>
-        {isChangePasswordOpen && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl"
-            >
-              <h3 className="text-lg font-bold text-[#1e3a8a] mb-4">Ubah Password</h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Password Baru</label>
-                  <div className="relative">
-                    <input 
-                      type={showPassword ? "text" : "password"} 
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      className="w-full rounded-lg border border-slate-300 px-3 py-2 pr-10 outline-none transition-colors focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
-                      placeholder="Masukkan password baru"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
-                    >
-                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                  <p className="text-xs text-slate-500 mt-1">Minimal 6 karakter.</p>
-                </div>
-                <div className="flex justify-end gap-3 mt-6">
-                  <button 
-                    onClick={() => {
-                      setIsChangePasswordOpen(false)
-                      setNewPassword("")
-                      setShowPassword(false)
-                    }}
-                    className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 transition-colors"
-                  >
-                    Batal
-                  </button>
-                  <button 
-                    onClick={async () => {
-                      if (newPassword.length < 6) {
-                        toast.error("Password harus minimal 6 karakter")
-                        return
-                      }
-                      setIsSubmitting(true)
-                      const { error } = await supabase.auth.updateUser({
-                        password: newPassword
-                      })
-                      setIsSubmitting(false)
-                      if (!error) {
-                        setIsChangePasswordOpen(false)
-                        setNewPassword("")
-                        setShowPassword(false)
-                        toast.success("Password berhasil diubah")
-                      } else {
-                        toast.error("Gagal mengubah password: " + error.message)
-                      }
-                    }}
-                    disabled={isSubmitting}
-                    className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 transition-colors disabled:opacity-50"
-                  >
-                    {isSubmitting ? "Menyimpan..." : "Simpan"}
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
     </header>
   )
 }

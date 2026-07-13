@@ -33,6 +33,8 @@ import {
   Share2,
   History,
   Copy,
+  Loader2,
+  FileArchive,
 } from "lucide-react";
 
 import { FilePreviewModal } from "./FilePreviewModal";
@@ -187,7 +189,22 @@ export function FileTable({
   const handleDownloadItems = async (items: FileItem[]) => {
     if (items.length === 0) return;
     
-    const toastId = toast.loading(`Menyiapkan download untuk ${items.length} item...`);
+    const toastId = toast.custom(() => (
+      <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl border border-border overflow-hidden w-[350px] pointer-events-auto flex flex-col">
+        <div className="bg-slate-50 dark:bg-slate-800 px-4 py-2 flex justify-between items-center">
+          <h3 className="text-sm font-semibold text-foreground">Menyiapkan download...</h3>
+        </div>
+        <div className="p-4 flex items-center justify-between border-t border-border">
+          <div className="flex items-center space-x-3">
+            <div className="bg-blue-100 dark:bg-blue-900/50 p-2 rounded-md">
+              <FileArchive className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            </div>
+            <p className="text-sm font-medium text-foreground">Menyiapkan {items.length} item</p>
+          </div>
+          <Loader2 className="h-5 w-5 text-blue-500 animate-spin" />
+        </div>
+      </div>
+    ), { position: 'bottom-right', duration: 999999 });
     
     try {
       const { getDownloadUrlsForItems } = await import("@/app/(dashboard)/folders/actions");
@@ -198,7 +215,16 @@ export function FileTable({
       }
 
       if (result.files.length === 0) {
-        toast.error("Tidak ada file yang dapat diunduh (kosong).", { id: toastId });
+        toast.custom(() => (
+          <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl border border-border overflow-hidden w-[350px] pointer-events-auto flex flex-col">
+            <div className="bg-slate-50 dark:bg-slate-800 px-4 py-2 flex justify-between items-center">
+              <h3 className="text-sm font-semibold text-foreground">Download kosong</h3>
+            </div>
+            <div className="p-4 flex items-center justify-between border-t border-border">
+              <p className="text-sm text-muted-foreground">Tidak ada file yang dapat diunduh.</p>
+            </div>
+          </div>
+        ), { id: toastId, position: 'bottom-right', duration: 4000 });
         return;
       }
       
@@ -209,18 +235,47 @@ export function FileTable({
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        toast.success("Download dimulai.", { id: toastId });
+        toast.custom(() => (
+          <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl border border-border overflow-hidden w-[350px] pointer-events-auto flex flex-col">
+            <div className="bg-slate-50 dark:bg-slate-800 px-4 py-2 flex justify-between items-center">
+              <h3 className="text-sm font-semibold text-foreground">Download dimulai</h3>
+            </div>
+            <div className="p-4 flex items-center justify-between border-t border-border">
+              <div className="flex items-center space-x-3">
+                <div className="bg-emerald-100 dark:bg-emerald-900/50 p-2 rounded-md">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                <p className="text-sm font-medium text-foreground">File berhasil diunduh</p>
+              </div>
+            </div>
+          </div>
+        ), { id: toastId, position: 'bottom-right', duration: 3000 });
         return;
       }
       
       // ZIP path
-      toast.loading("Mengompresi file ke ZIP, mohon tunggu...", { id: toastId });
+      toast.custom(() => (
+        <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl border border-border overflow-hidden w-[350px] pointer-events-auto flex flex-col">
+          <div className="bg-slate-50 dark:bg-slate-800 px-4 py-2 flex justify-between items-center">
+            <h3 className="text-sm font-semibold text-foreground">Menyiapkan download</h3>
+          </div>
+          <div className="p-4 flex items-center justify-between border-t border-border">
+            <div className="flex items-center space-x-3">
+              <div className="bg-blue-100 dark:bg-blue-900/50 p-2 rounded-md">
+                <FileArchive className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              </div>
+              <p className="text-sm font-medium text-foreground">Mengompresi ke ZIP...</p>
+            </div>
+            <Loader2 className="h-5 w-5 text-blue-500 animate-spin" />
+          </div>
+        </div>
+      ), { id: toastId, position: 'bottom-right', duration: 999999 });
       
       const zip = new JSZip();
       
       await Promise.all(result.files.map(async (file) => {
         try {
-          const response = await fetch(file.url);
+          const response = await fetch(`/api/proxy-download?url=${encodeURIComponent(file.url)}`);
           if (response.ok) {
             const blob = await response.blob();
             zip.file(file.path, blob);
@@ -234,10 +289,33 @@ export function FileTable({
       const zipName = items.length === 1 ? `${items[0].name}.zip` : `Arsip_${new Date().getTime()}.zip`;
       saveAs(zipBlob, zipName);
       
-      toast.success("Download ZIP berhasil.", { id: toastId });
+      toast.custom(() => (
+        <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl border border-border overflow-hidden w-[350px] pointer-events-auto flex flex-col">
+          <div className="bg-slate-50 dark:bg-slate-800 px-4 py-2 flex justify-between items-center">
+            <h3 className="text-sm font-semibold text-foreground">Download selesai</h3>
+          </div>
+          <div className="p-4 flex items-center justify-between border-t border-border">
+            <div className="flex items-center space-x-3">
+              <div className="bg-emerald-100 dark:bg-emerald-900/50 p-2 rounded-md">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <p className="text-sm font-medium text-foreground">{items.length} item berhasil di-zip</p>
+            </div>
+          </div>
+        </div>
+      ), { id: toastId, position: 'bottom-right', duration: 4000 });
     } catch (error) {
       console.error("Download failed:", error);
-      toast.error("Gagal mengunduh item.", { id: toastId });
+      toast.custom(() => (
+        <div className="bg-white dark:bg-slate-900 rounded-lg shadow-xl border border-red-200 dark:border-red-900/50 overflow-hidden w-[350px] pointer-events-auto flex flex-col">
+          <div className="bg-red-50 dark:bg-red-900/20 px-4 py-2 flex justify-between items-center">
+            <h3 className="text-sm font-semibold text-red-700 dark:text-red-400">Download gagal</h3>
+          </div>
+          <div className="p-4 flex items-center justify-between border-t border-red-100 dark:border-red-900/30">
+            <p className="text-sm text-red-600 dark:text-red-400">Gagal mengunduh item. Silakan coba lagi.</p>
+          </div>
+        </div>
+      ), { id: toastId, position: 'bottom-right', duration: 5000 });
     }
   };
 
@@ -586,7 +664,7 @@ export function FileTable({
       sorting,
       rowSelection,
       columnVisibility: {
-        select: Object.keys(rowSelection).length > 0,
+        select: true,
       },
     },
     enableRowSelection: (row) => !row.original.isRestricted,

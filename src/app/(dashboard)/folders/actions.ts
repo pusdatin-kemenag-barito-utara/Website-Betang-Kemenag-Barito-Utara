@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache"
 import { getR2Client, R2_BUCKET_NAME } from "@/lib/r2"
 import { PutObjectCommand, GetObjectCommand, CopyObjectCommand, S3Client } from "@aws-sdk/client-s3"
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner"
+import { logAudit } from "@/lib/audit"
 
 export async function createFolder(name: string, parentId: string | null) {
   try {
@@ -42,6 +43,11 @@ export async function createFolder(name: string, parentId: string | null) {
     if (error) throw error
 
     revalidatePath(`/folders/${parentId || 'root'}`)
+    await logAudit({
+      action: "INSERT",
+      target: `Folder: ${name}`,
+      afterState: data
+    })
     return { success: true, data }
   } catch (error) {
     console.error("Error creating folder:", error)
@@ -139,6 +145,12 @@ export async function saveFileMetadata({
     }
 
     revalidatePath(`/folders/${folderId || 'root'}`)
+    await logAudit({
+      action: existingFile ? "UPDATE" : "INSERT",
+      target: `File: ${name}`,
+      beforeState: existingFile ? existingFile : null,
+      afterState: resultData
+    })
     return { success: true, data: resultData }
   } catch (error) {
     console.error("Error saving file metadata:", error)
@@ -211,6 +223,10 @@ export async function deleteItem(id: string, type: "folder" | "file", folderId: 
     if (error) throw error
 
     revalidatePath(`/folders/${folderId || 'root'}`)
+    await logAudit({
+      action: "DELETE",
+      target: `${type === "folder" ? "Folder" : "File"} ID: ${id}`
+    })
     return { success: true }
   } catch (error) {
     console.error(`Error deleting ${type}:`, error)
@@ -247,6 +263,10 @@ export async function deleteItemsBatch(items: { id: string, type: "folder" | "fi
     }
 
     revalidatePath(`/folders/${folderId || 'root'}`)
+    await logAudit({
+      action: "DELETE",
+      target: `Batch hapus ${items.length} item`
+    })
     return { success: true }
   } catch (error) {
     console.error(`Error deleting batch items:`, error)
@@ -274,6 +294,11 @@ export async function renameItem(id: string, type: "folder" | "file", newName: s
     if (error) throw error
 
     revalidatePath(`/folders/${folderId || 'root'}`)
+    await logAudit({
+      action: "UPDATE",
+      target: `Rename ${type === "folder" ? "Folder" : "File"} ke ${newName}`,
+      afterState: { id, newName }
+    })
     return { success: true }
   } catch (error) {
     console.error(`Error renaming ${type}:`, error)
@@ -311,6 +336,12 @@ export async function moveItem(itemId: string, itemType: "folder" | "file", targ
       revalidatePath(`/folders/${targetFolderId || 'root'}`)
     }
     
+    await logAudit({
+      action: "UPDATE",
+      target: `Move ${itemType} ke folder ${targetFolderId || 'root'}`,
+      afterState: { id: itemId, targetFolderId }
+    })
+
     return { success: true }
   } catch (error) {
     console.error(`Error moving ${itemType}:`, error)
@@ -437,6 +468,12 @@ export async function copyItem(itemId: string, itemType: "folder" | "file", targ
       revalidatePath(`/folders/${targetFolderId || 'root'}`)
     }
     
+    await logAudit({
+      action: "INSERT",
+      target: `Copy ${itemType} ke folder ${targetFolderId || 'root'}`,
+      afterState: { id: itemId, targetFolderId }
+    })
+
     return { success: true }
   } catch (error) {
     console.error(`Error copying ${itemType}:`, error)
@@ -540,6 +577,10 @@ export async function restoreFileVersion(fileId: string, versionId: string, fold
     if (updateError) throw updateError
 
     revalidatePath(`/folders/${folderId || 'root'}`)
+    await logAudit({
+      action: "UPDATE",
+      target: `Restore File Version untuk file ID: ${fileId}`
+    })
     return { success: true }
   } catch (error) {
     console.error(`Error restoring file version:`, error)

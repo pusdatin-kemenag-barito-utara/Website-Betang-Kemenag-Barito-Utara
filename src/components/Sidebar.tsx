@@ -86,7 +86,7 @@ export function Sidebar({ onClose }: { onClose?: () => void }) {
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white p-1">
             <Image
-              src="/logo.png"
+              src="/kemenag.svg"
               alt="Logo"
               width={32}
               height={32}

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { Upload, X, FileUp, AlertCircle, CheckCircle2, Loader2, Trash2, FolderUp } from "lucide-react"
+import { Upload, X, FileUp, AlertCircle, CheckCircle2, Loader2, Trash2, FolderUp, ChevronUp, ChevronDown } from "lucide-react"
 import { saveFileMetadata, getPresignedUploadUrl } from "@/app/(dashboard)/folders/actions"
 
 import { formatFileSize } from "@/lib/utils"
@@ -29,17 +29,23 @@ interface UploadItem {
 export function UploadFileModal({ isOpen, onClose, folderId, userBidangId, initialFiles, isFolderMode = false }: UploadFileModalProps) {
   const [uploadItems, setUploadItems] = useState<UploadItem[]>([])
   const [isUploading, setIsUploading] = useState(false)
+  const [isMinimized, setIsMinimized] = useState(false)
+  const [isCollapsed, setIsCollapsed] = useState(false)
   const [globalError, setGlobalError] = useState("")
   const [isDragging, setIsDragging] = useState(false)
   
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const cancelToken = useRef(false)
 
   useEffect(() => {
     if (!isOpen) {
       const timer = setTimeout(() => {
         setUploadItems([])
         setIsUploading(false)
+        setIsMinimized(false)
+        setIsCollapsed(false)
         setGlobalError("")
+        cancelToken.current = false
       }, 0)
       return () => clearTimeout(timer)
     }
@@ -168,11 +174,16 @@ export function UploadFileModal({ isOpen, onClose, folderId, userBidangId, initi
     if (pendingItems.length === 0) return
 
     setIsUploading(true)
+    setIsMinimized(true)
+    setIsCollapsed(false)
+    cancelToken.current = false
     setGlobalError("")
     let successCount = 0
 
     // Upload sequentially to avoid overloading DB/Storage
     for (const item of pendingItems) {
+      if (cancelToken.current) break;
+
       updateItemStatus(item.id, { status: 'uploading', progress: 10, error: undefined })
 
       try {
@@ -189,9 +200,10 @@ export function UploadFileModal({ isOpen, onClose, folderId, userBidangId, initi
           throw new Error(presignedError || "Gagal mendapatkan URL upload")
         }
 
+        if (cancelToken.current) break;
         updateItemStatus(item.id, { progress: 30 })
         
-        const uploadResponse = await fetch(presignedUrl, {
+        const uploadResponse = await fetch(`/api/proxy-upload?url=${encodeURIComponent(presignedUrl)}`, {
           method: 'PUT',
           body: item.file,
           headers: {
@@ -200,9 +212,11 @@ export function UploadFileModal({ isOpen, onClose, folderId, userBidangId, initi
         })
 
         if (!uploadResponse.ok) {
-          throw new Error("Gagal mengunggah file ke penyimpanan")
+          const errorMsg = await uploadResponse.text().catch(() => "Gagal mengunggah file ke penyimpanan");
+          throw new Error(errorMsg);
         }
         
+        if (cancelToken.current) break;
         updateItemStatus(item.id, { progress: 70 })
 
         const result = await saveFileMetadata({
@@ -228,14 +242,98 @@ export function UploadFileModal({ isOpen, onClose, folderId, userBidangId, initi
 
     setIsUploading(false)
 
-    if (successCount > 0) {
+    if (!cancelToken.current && successCount > 0) {
       toast.success(`${successCount} file berhasil diunggah.`)
       window.dispatchEvent(new CustomEvent('storage-updated'))
     }
   }
 
-  const allSuccess = uploadItems.length > 0 && uploadItems.every(i => i.status === 'success')
+  const handleCancel = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    cancelToken.current = true;
+    onClose();
+  }
+
+  const allSuccess = uploadItems.length > 0 && uploadItems.every(i => i.status === 'success' || i.status === 'error')
   const hasFiles = uploadItems.length > 0
+
+  const totalItems = uploadItems.length;
+  const completedItems = uploadItems.filter(i => i.status === 'success' || i.status === 'error').length;
+  const overallProgress = totalItems === 0 ? 0 : Math.round((uploadItems.reduce((acc, item) => acc + item.progress, 0)) / (totalItems * 100) * 100);
+
+  if (isMinimized) {
+    return (
+      <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end pointer-events-none">
+        <div className="w-[360px] animate-in slide-in-from-bottom-5 bg-white shadow-2xl rounded-xl border border-slate-200 overflow-hidden pointer-events-auto flex flex-col">
+          {/* Header */}
+          <div className="bg-slate-800 text-white px-4 py-3 flex items-center justify-between cursor-pointer" onClick={() => setIsCollapsed(!isCollapsed)}>
+            <div className="flex items-center gap-3">
+              {allSuccess ? (
+                <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+              ) : (
+                <Loader2 className="h-5 w-5 text-blue-400 animate-spin" />
+              )}
+              <h3 className="text-sm font-semibold">
+                {allSuccess ? `${completedItems} upload selesai` : `Mengunggah ${completedItems} dari ${totalItems} item`}
+              </h3>
+            </div>
+            <div className="flex items-center gap-2">
+              <button 
+                onClick={(e) => { e.stopPropagation(); setIsCollapsed(!isCollapsed); }} 
+                className="p-1.5 hover:bg-slate-700 rounded-md transition-colors"
+              >
+                {isCollapsed ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </button>
+              <button 
+                onClick={handleCancel} 
+                className="p-1.5 hover:bg-slate-700 rounded-md transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Overall Progress (visible when collapsed if not 100%) */}
+          {isCollapsed && !allSuccess && (
+            <div className="h-1 w-full bg-slate-200">
+              <div className="h-full bg-blue-500 transition-all duration-300" style={{ width: `${overallProgress}%` }} />
+            </div>
+          )}
+
+          {/* Body */}
+          {!isCollapsed && (
+            <div className="max-h-[300px] overflow-y-auto custom-scrollbar bg-slate-50">
+              {uploadItems.map(item => (
+                <div key={item.id} className="p-3 border-b border-slate-100 flex items-center justify-between gap-3 bg-white">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div className="flex-shrink-0">
+                      {item.status === 'pending' && <FileUp className="h-5 w-5 text-slate-400" />}
+                      {item.status === 'uploading' && <Loader2 className="h-5 w-5 text-blue-500 animate-spin" />}
+                      {item.status === 'success' && <CheckCircle2 className="h-5 w-5 text-emerald-500" />}
+                      {item.status === 'error' && <AlertCircle className="h-5 w-5 text-rose-500" />}
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-slate-700">{item.file.name}</p>
+                      {item.status === 'error' ? (
+                        <p className="text-xs font-medium text-rose-500 truncate" title={item.error}>{item.error}</p>
+                      ) : (
+                        <div className="flex items-center gap-2 mt-1">
+                          <div className="h-1.5 flex-1 bg-slate-100 rounded-full overflow-hidden">
+                            <div className="h-full bg-blue-500 transition-all duration-300" style={{ width: `${item.progress}%` }} />
+                          </div>
+                          <span className="text-[10px] text-slate-400 font-bold w-6">{item.progress}%</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
