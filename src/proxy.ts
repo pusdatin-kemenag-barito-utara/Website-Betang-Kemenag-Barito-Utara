@@ -19,39 +19,25 @@ export async function proxy(request: NextRequest) {
     const maintenanceRes = await fetch(
       `${pusdatinUrl}/api/public/apps/${appId}/status`,
       {
-        next: { revalidate: 30 },
+        cache: "no-store",
       },
     );
 
     if (maintenanceRes.ok) {
       const data = await maintenanceRes.json();
-      if (data.status === "maintenance") {
-        return new NextResponse(
-          `
-          <!DOCTYPE html>
-          <html lang="id">
-            <head>
-              <meta charset="utf-8">
-              <meta name="viewport" content="width=device-width, initial-scale=1">
-              <title>Sistem Sedang Pemeliharaan</title>
-              <link rel="icon" href="${pusdatinUrl}/branding/kemenag.svg" type="image/svg+xml">
-              <style>
-                body { margin: 0; overflow: hidden; background-color: #f8fafc; }
-                iframe { width: 100vw; height: 100vh; border: none; }
-              </style>
-            </head>
-            <body>
-              <iframe src="${pusdatinUrl}/maintenance?app=Si+Betang+(E-Arsip)" title="Maintenance"></iframe>
-            </body>
-          </html>
-        `,
-          {
-            status: 503,
-            headers: {
-              "Content-Type": "text/html; charset=utf-8",
-            },
-          },
-        );
+      const isMaintenance = data.status === "maintenance";
+
+      if (isMaintenance) {
+        // If not already on /maintenance, redirect to /maintenance
+        if (pathname !== "/maintenance") {
+          return NextResponse.redirect(new URL("/maintenance", request.url));
+        }
+        return NextResponse.next();
+      } else {
+        // If system is normal but user visits /maintenance, redirect to home
+        if (pathname === "/maintenance") {
+          return NextResponse.redirect(new URL("/", request.url));
+        }
       }
     }
   } catch (error) {
@@ -101,6 +87,7 @@ export async function proxy(request: NextRequest) {
   // Allow public routes
   if (
     pathname === "/login" ||
+    pathname === "/maintenance" ||
     pathname.startsWith("/api/auth") ||
     pathname === "/api/health"
   ) {
