@@ -14,6 +14,7 @@ export async function request<T = any>(
     credentials: "include",
     headers: {
       "Content-Type": "application/json",
+      "Cache-Control": "no-cache, no-store",
       ...(options.headers || {}),
     },
   });
@@ -33,6 +34,12 @@ export async function request<T = any>(
     body = await res.json();
   } catch {
     body = null;
+  }
+
+  // 304 Not Modified dari ETag middleware berarti konten tidak berubah —
+  // ini bukan error, tapi body kosong. Abaikan saja.
+  if (res.status === 304) {
+    return { success: true, data: null, notModified: true } as T;
   }
 
   if (!res.ok || !body?.success) {

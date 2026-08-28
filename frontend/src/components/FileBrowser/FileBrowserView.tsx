@@ -110,7 +110,7 @@ export function FileBrowserView({
 
       if (contentsRes.success && contentsRes.data) {
         setItems(formatFolderContentsToItems(contentsRes.data));
-      } else {
+      } else if (!contentsRes.success) {
         toast.error("Gagal memuat isi folder");
       }
 
