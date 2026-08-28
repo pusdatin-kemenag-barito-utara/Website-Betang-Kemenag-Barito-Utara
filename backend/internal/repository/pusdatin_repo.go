@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -73,10 +74,19 @@ func (r *PusdatinRepo) GetUserByEmail(ctx context.Context, email string) (*domai
 // LogAudit mencatat aktivitas pengguna ke tabel audit pusdatin
 // (RPC public.log_pusdatin_audit).
 func (r *PusdatinRepo) LogAudit(ctx context.Context, action, target, targetSchema, performedBy string, beforeState, afterState any, ip string) error {
+	ip = strings.TrimSpace(ip)
+	if strings.Contains(ip, ":") && !strings.Contains(ip, "::") {
+		parts := strings.Split(ip, ":")
+		if len(parts) == 2 {
+			ip = parts[0]
+		}
+	}
+
 	query := `
 		SELECT public.log_pusdatin_audit(
 			$1::text, $2::text, $3::text, $4::text,
-			$5::jsonb, $6::jsonb, $7::inet
+			$5::jsonb, $6::jsonb,
+			CASE WHEN $7::text IS NOT NULL AND $7::text != '' THEN $7::inet ELSE NULL END
 		)`
 	var ipArg any
 	if ip != "" {
