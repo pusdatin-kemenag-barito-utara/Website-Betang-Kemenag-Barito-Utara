@@ -13,21 +13,27 @@ interface Props {
 const { title, description, image } = Astro.props;
 const currentPath = Astro.url.pathname;
 
-// Ambil sesi pengguna & pengaturan global (blokir klik kanan) secara paralel dengan cache
-const cookie = Astro.request.headers.get("cookie") || "";
-const [auth, settings] = await Promise.all([
-  requireUser(cookie),
-  apiGet("/settings", cookie, true),
-]);
+let auth: any = { ok: false, user: null };
+let settings: any = { ok: false, body: null };
 
-const isSuperAdmin = auth.ok && auth.user?.isSuperAdmin === true;
-const initialUser = auth.ok && auth.user ? {
+try {
+  const cookie = Astro.request.headers.get("cookie") || "";
+  [auth, settings] = await Promise.all([
+    requireUser(cookie),
+    apiGet("/settings", cookie, true),
+  ]);
+} catch (e) {
+  console.error("DashboardLayout SSR Error:", e);
+}
+
+const isSuperAdmin = auth?.ok && auth?.user?.isSuperAdmin === true;
+const initialUser = auth?.ok && auth?.user ? {
   name: auth.user.email?.split("@")[0] || "Admin",
   role: auth.user.role || (isSuperAdmin ? "super_admin" : "user"),
   email: auth.user.email,
 } : undefined;
 
-const disableRightClick = settings.ok ? (settings.body?.data?.disable_right_click ?? true) : true;
+const disableRightClick = settings?.ok ? (settings.body?.data?.disable_right_click ?? true) : true;
 ---
 
 <BaseLayout title={title} description={description} image={image}>

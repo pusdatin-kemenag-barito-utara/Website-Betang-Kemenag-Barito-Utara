@@ -5,13 +5,20 @@ import { Trash2 } from "lucide-react";
 import { TrashView } from "@/components/Trash/TrashView";
 import { apiGet, requireUser } from "@/lib/server";
 
-const cookie = Astro.request.headers.get("cookie") || "";
-const [auth, res] = await Promise.all([
-  requireUser(cookie),
-  apiGet("/trash", cookie),
-]);
+let auth: any = { ok: false, user: null };
+let res: any = { ok: false, body: null };
 
-if (!auth.ok) {
+try {
+  const cookie = Astro.request.headers.get("cookie") || "";
+  [auth, res] = await Promise.all([
+    requireUser(cookie),
+    apiGet("/trash", cookie),
+  ]);
+} catch (e) {
+  console.error("Trash SSR Error:", e);
+}
+
+if (!auth?.ok) {
   return Astro.redirect("/login");
 }
 
@@ -21,7 +28,7 @@ const trashRaw: {
   type: "folder" | "file";
   deleted_at: string;
   expires_at: string;
-}[] = res.ok ? (res.body?.data ?? []) : [];
+}[] = res?.ok ? (res.body?.data ?? []) : [];
 
 const trashItems = trashRaw.map((t) => {
   let formattedDeletedAt = "-";

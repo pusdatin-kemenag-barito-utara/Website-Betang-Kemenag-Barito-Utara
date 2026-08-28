@@ -26,18 +26,25 @@ function getIconClassForMimeType(mimeType: string | null) {
   return "text-slate-500"
 }
 
-const cookie = Astro.request.headers.get("cookie") || "";
-const [auth, statsRes] = await Promise.all([
-  requireUser(cookie),
-  apiGet("/stats", cookie),
-]);
+let auth: any = { ok: false, user: null };
+let statsRes: any = { ok: false, body: null };
 
-if (!auth.ok) {
+try {
+  const cookie = Astro.request.headers.get("cookie") || "";
+  [auth, statsRes] = await Promise.all([
+    requireUser(cookie),
+    apiGet("/stats", cookie),
+  ]);
+} catch (e) {
+  console.error("Index SSR Error:", e);
+}
+
+if (!auth?.ok) {
   return Astro.redirect("/login");
 }
 
-const isSuperAdmin = auth.user?.isSuperAdmin ?? false;
-const stats = statsRes.ok ? statsRes.body?.data : null;
+const isSuperAdmin = auth?.user?.isSuperAdmin ?? false;
+const stats = statsRes?.ok ? statsRes.body?.data : null;
 
 const totalFiles = stats?.total_files ?? 0;
 const totalStorage = stats?.total_storage ?? 0;

@@ -8,18 +8,25 @@ import { formatFileSize } from "@/lib/utils";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
 
-const cookie = Astro.request.headers.get("cookie") || "";
-const [auth, starredRes] = await Promise.all([
-  requireUser(cookie),
-  apiGet("/starred", cookie),
-]);
+let auth: any = { ok: false, user: null };
+let starredRes: any = { ok: false, body: null };
 
-if (!auth.ok) {
+try {
+  const cookie = Astro.request.headers.get("cookie") || "";
+  [auth, starredRes] = await Promise.all([
+    requireUser(cookie),
+    apiGet("/starred", cookie),
+  ]);
+} catch (e) {
+  console.error("Starred SSR Error:", e);
+}
+
+if (!auth?.ok) {
   return Astro.redirect("/login");
 }
 
 const userBidangId = "global";
-const contents = starredRes.ok ? starredRes.body?.data : null;
+const contents = starredRes?.ok ? starredRes.body?.data : null;
 const folders: any[] = contents?.folders ?? [];
 const files: any[] = contents?.files ?? [];
 

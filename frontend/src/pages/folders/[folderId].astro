@@ -11,21 +11,29 @@ import { id } from "date-fns/locale";
 const folderId = Astro.params.folderId || "root";
 const q = Astro.url.searchParams.get("q") || "";
 
-const cookie = Astro.request.headers.get("cookie") || "";
-const [auth, contentsRes, breadcrumbsRes] = await Promise.all([
-  requireUser(cookie),
-  apiGet(`/folders/${encodeURIComponent(folderId)}${q ? `?q=${encodeURIComponent(q)}` : ""}`, cookie),
-  apiGet(`/folders/${encodeURIComponent(folderId)}/breadcrumbs`, cookie),
-]);
+let auth: any = { ok: false, user: null };
+let contentsRes: any = { ok: false, body: null };
+let breadcrumbsRes: any = { ok: false, body: null };
 
-if (!auth.ok) {
+try {
+  const cookie = Astro.request.headers.get("cookie") || "";
+  [auth, contentsRes, breadcrumbsRes] = await Promise.all([
+    requireUser(cookie),
+    apiGet(`/folders/${encodeURIComponent(folderId)}${q ? `?q=${encodeURIComponent(q)}` : ""}`, cookie),
+    apiGet(`/folders/${encodeURIComponent(folderId)}/breadcrumbs`, cookie),
+  ]);
+} catch (e) {
+  console.error("Folder SSR Error:", e);
+}
+
+if (!auth?.ok) {
   return Astro.redirect("/login");
 }
 
 // Bidang deprecated: seluruh pengguna memakai global (migrasi dari Pusdatin).
 const userBidangId = "global";
 
-const contents = contentsRes.ok ? contentsRes.body?.data : null;
+const contents = contentsRes?.ok ? contentsRes.body?.data : null;
 const folders: any[] = contents?.folders ?? [];
 const files: any[] = contents?.files ?? [];
 

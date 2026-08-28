@@ -5,23 +5,30 @@ import { Settings, ShieldCheck, Database, Cloud, UserCheck, CheckCircle2 } from 
 import { SettingsClient } from "@/components/Settings/SettingsClient";
 import { apiGet, requireUser } from "@/lib/server";
 
-const cookie = Astro.request.headers.get("cookie") || "";
-const [auth, settingsRes] = await Promise.all([
-  requireUser(cookie),
-  apiGet("/settings", cookie, true),
-]);
+let auth: any = { ok: false, user: null };
+let settingsRes: any = { ok: false, body: null };
 
-if (!auth.ok) {
+try {
+  const cookie = Astro.request.headers.get("cookie") || "";
+  [auth, settingsRes] = await Promise.all([
+    requireUser(cookie),
+    apiGet("/settings", cookie, true),
+  ]);
+} catch (e) {
+  console.error("Settings SSR Error:", e);
+}
+
+if (!auth?.ok) {
   return Astro.redirect("/login");
 }
 
 // Hanya super admin yang boleh mengakses pengaturan sistem.
-const isSuperAdmin = auth.user?.isSuperAdmin ?? false;
+const isSuperAdmin = auth?.user?.isSuperAdmin ?? false;
 if (!isSuperAdmin) {
   return Astro.redirect("/");
 }
 
-const disableRightClick = settingsRes.ok
+const disableRightClick = settingsRes?.ok
   ? (settingsRes.body?.data?.disable_right_click ?? true)
   : true;
 ---
