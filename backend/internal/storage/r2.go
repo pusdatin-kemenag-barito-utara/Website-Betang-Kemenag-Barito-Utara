@@ -46,15 +46,32 @@ func NewR2Storage(accountID, accessKeyID, secretAccessKey, bucket string) (*R2St
 func (r *R2Storage) PresignUpload(ctx context.Context, key, contentType string, expiresIn time.Duration) (string, error) {
 	presigner := s3.NewPresignClient(r.client)
 	input := &s3.PutObjectInput{
-		Bucket:      aws.String(r.bucket),
-		Key:         aws.String(key),
-		ContentType: aws.String(contentType),
+		Bucket: aws.String(r.bucket),
+		Key:    aws.String(key),
 	}
 	presigned, err := presigner.PresignPutObject(ctx, input, s3.WithPresignExpires(expiresIn))
 	if err != nil {
 		return "", fmt.Errorf("gagal membuat presigned URL upload: %w", err)
 	}
 	return presigned.URL, nil
+}
+
+// PutObject mengunggah stream objek langsung ke Cloudflare R2.
+func (r *R2Storage) PutObject(ctx context.Context, key string, body io.Reader, sizeBytes int64, contentType string) error {
+	input := &s3.PutObjectInput{
+		Bucket:      aws.String(r.bucket),
+		Key:         aws.String(key),
+		Body:        body,
+		ContentType: aws.String(contentType),
+	}
+	if sizeBytes > 0 {
+		input.ContentLength = aws.Int64(sizeBytes)
+	}
+	_, err := r.client.PutObject(ctx, input)
+	if err != nil {
+		return fmt.Errorf("gagal menyimpan objek %s ke R2: %w", key, err)
+	}
+	return nil
 }
 
 // PresignDownload membuat URL GET presigned untuk unduh/pratinjau file.

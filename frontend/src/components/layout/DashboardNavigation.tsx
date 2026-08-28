@@ -21,29 +21,21 @@ export function DashboardNavigation({ currentPath, isSuperAdmin }: DashboardNavi
     };
   }, []);
 
-  return (
-    <>
-      {/* Sidebar Desktop */}
-      <div className="hidden md:flex md:w-72 md:flex-col h-full flex-shrink-0">
-        <Sidebar currentPath={currentPath} isSuperAdmin={isSuperAdmin} />
-      </div>
+  if (!mobileOpen) return null;
 
-      {/* Sidebar Mobile (overlay) */}
-      {mobileOpen && (
-        <div className="fixed inset-0 z-40 flex md:hidden">
-          <div
-            className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm transition-opacity"
-            onClick={() => setMobileOpen(false)}
-          />
-          <div className="relative flex w-full max-w-xs flex-1 transform transition-transform duration-300 ease-in-out">
-            <Sidebar
-              currentPath={currentPath}
-              isSuperAdmin={isSuperAdmin}
-              onClose={() => setMobileOpen(false)}
-            />
-          </div>
-        </div>
-      )}
-    </>
+  return (
+    <div className="fixed inset-0 z-50 flex md:hidden">
+      <div
+        className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm transition-opacity"
+        onClick={() => setMobileOpen(false)}
+      />
+      <div className="relative flex w-full max-w-xs flex-1 transform transition-transform duration-300 ease-in-out">
+        <Sidebar
+          currentPath={currentPath}
+          isSuperAdmin={isSuperAdmin}
+          onClose={() => setMobileOpen(false)}
+        />
+      </div>
+    </div>
   );
 }

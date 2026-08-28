@@ -1,0 +1,123 @@
+---
+interface BreadcrumbItem {
+  name: string;
+  url: string;
+}
+
+interface Props {
+  siteUrl: string;
+  canonicalUrl: string;
+  description: string;
+  breadcrumbs?: BreadcrumbItem[];
+}
+
+const { siteUrl, canonicalUrl, description, breadcrumbs = [] } = Astro.props;
+
+const jsonLdGraph: any[] = [
+  {
+    "@type": "GovernmentOrganization",
+    "@id": `${siteUrl}#organization`,
+    name: "Kantor Kementerian Agama Kabupaten Barito Utara",
+    alternateName: ["Kemenag Barito Utara", "Kemenag Batara"],
+    url: "https://kemenag-baritoutara.com",
+    logo: {
+      "@type": "ImageObject",
+      url: `${siteUrl}/logo.png`,
+      width: 512,
+      height: 512,
+      caption: "Logo Resmi Kementerian Agama RI",
+    },
+    parentOrganization: {
+      "@type": "GovernmentOrganization",
+      name: "Kementerian Agama Republik Indonesia",
+      url: "https://kemenag.go.id",
+    },
+    address: {
+      "@type": "PostalAddress",
+      streetAddress: "Jl. A. Yani No. 85",
+      addressLocality: "Muara Teweh",
+      addressRegion: "Kalimantan Tengah",
+      postalCode: "73811",
+      addressCountry: "ID",
+    },
+    contactPoint: {
+      "@type": "ContactPoint",
+      telephone: "+62-519-21013",
+      contactType: "customer support",
+      areaServed: "ID",
+      availableLanguage: ["id", "en"],
+    },
+  },
+  {
+    "@type": "WebSite",
+    "@id": `${siteUrl}#website`,
+    url: siteUrl,
+    name: "SI BETANG - E-Arsip Digital",
+    description: description,
+    publisher: {
+      "@id": `${siteUrl}#organization`,
+    },
+    inLanguage: "id-ID",
+    potentialAction: {
+      "@type": "SearchAction",
+      target: {
+        "@type": "EntryPoint",
+        urlTemplate: `${siteUrl}/folders/root?q={search_term_string}`,
+      },
+      "query-input": "required name=search_term_string",
+    },
+  },
+  {
+    "@type": "WebApplication",
+    "@id": `${siteUrl}#webapp`,
+    name: "SI BETANG (Sistem Informasi Berkas & Tata Kelola Digital)",
+    url: siteUrl,
+    applicationCategory: "BusinessApplication",
+    applicationSubCategory: "Document Management System",
+    operatingSystem: "All (Web, Android, iOS, Windows, macOS, Linux)",
+    browserRequirements: "Requires JavaScript. Requires HTML5 Canvas.",
+    softwareVersion: "2.0.0-enterprise",
+    description: description,
+    offers: {
+      "@type": "Offer",
+      price: "0",
+      priceCurrency: "IDR",
+    },
+    screenshot: [
+      `${siteUrl}/pwa-screenshot-desktop.png`,
+      `${siteUrl}/pwa-screenshot-mobile.png`,
+    ],
+    featureList: [
+      "Penyimpanan Cloudflare R2 Berkecepatan Tinggi",
+      "Penampil Dokumen PDF & Gambar Resolusi Tinggi",
+      "Manajemen Folder Hirarkis dan Riwayat Versi Berkas",
+      "Unduh Berkas Batch dalam Format ZIP",
+      "PWA Offline Mode & Push Notifications Support",
+      "Autentikasi Aman Berbasis Supabase Auth",
+    ],
+    publisher: {
+      "@id": `${siteUrl}#organization`,
+    },
+  },
+];
+
+if (breadcrumbs && breadcrumbs.length > 0) {
+  jsonLdGraph.push({
+    "@type": "BreadcrumbList",
+    "@id": `${canonicalUrl}#breadcrumbs`,
+    itemListElement: breadcrumbs.map((crumb, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: crumb.name,
+      item: new URL(crumb.url, siteUrl).toString(),
+    })),
+  });
+}
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": jsonLdGraph,
+};
+---
+
+<script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />

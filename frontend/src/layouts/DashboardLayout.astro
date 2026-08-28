@@ -1,5 +1,6 @@
 ---
 import BaseLayout from "./BaseLayout.astro";
+import { Sidebar } from "@/components/layout/Sidebar";
 import { DashboardNavigation } from "@/components/layout/DashboardNavigation";
 import { TopNavbar } from "@/components/layout/TopNavbar";
 import { apiGet, requireUser } from "@/lib/server";
@@ -42,19 +43,30 @@ const disableRightClick = settings?.ok ? (settings.body?.data?.disable_right_cli
     id="dashboard-root"
     data-disable-right-click={disableRightClick.toString()}
   >
+    <!-- Sidebar Desktop: Berada di container native Astro agar 100% solid dan tidak pernah menciut -->
+    <aside class="hidden md:flex md:w-72 md:flex-col h-full flex-shrink-0 bg-white border-r border-slate-200/80 z-30">
+      <Sidebar
+        client:load
+        currentPath={currentPath}
+        isSuperAdmin={isSuperAdmin}
+      />
+    </aside>
+
+    <!-- Sidebar Mobile: Drawer overlay untuk perangkat mobile -->
     <DashboardNavigation
       client:load
       currentPath={currentPath}
       isSuperAdmin={isSuperAdmin}
-      transition:persist="sidebar-navigation"
     />
 
-    <div class="flex flex-1 flex-col overflow-hidden">
-      <TopNavbar
-        client:load
-        initialUser={initialUser}
-        transition:persist="top-navbar"
-      />
+    <!-- Main Content Area -->
+    <div class="flex flex-1 flex-col overflow-hidden min-w-0">
+      <div class="w-full flex-shrink-0 z-20">
+        <TopNavbar
+          client:load
+          initialUser={initialUser}
+        />
+      </div>
 
       <main class="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8">
         <div class="mx-auto w-full">
@@ -69,6 +81,11 @@ const disableRightClick = settings?.ok ? (settings.body?.data?.disable_right_cli
       document.addEventListener("contextmenu", function (e) {
         // Biarkan input dan textarea tetap bisa copy/paste browser native
         if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+          return;
+        }
+
+        // Biarkan area file browser membuka menu custom context menu
+        if (e.target.closest("table") || e.target.closest(".group") || e.target.closest("[data-context-menu]")) {
           return;
         }
 

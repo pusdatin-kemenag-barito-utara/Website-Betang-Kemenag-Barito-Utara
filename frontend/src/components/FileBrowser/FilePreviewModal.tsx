@@ -50,11 +50,13 @@ export function FilePreviewModal({
   };
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/85 backdrop-blur-md p-0 sm:p-4 md:p-6">
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/65 backdrop-blur-sm p-2 sm:p-4 md:p-6"
+      onClick={onClose}
+    >
       <div
-        className={`relative flex h-full w-full flex-col animate-in zoom-in-95 bg-white shadow-2xl ring-1 ring-slate-200 overflow-hidden ${
-          isPdf ? "h-screen sm:h-full max-h-screen sm:max-h-[96vh] max-w-7xl rounded-none sm:rounded-2xl" : "max-h-[90vh] max-w-5xl rounded-2xl sm:rounded-3xl"
-        }`}
+        onClick={(e) => e.stopPropagation()}
+        className="relative flex h-[92vh] max-h-[960px] w-full max-w-[96vw] lg:max-w-6xl xl:max-w-7xl flex-col animate-in zoom-in-95 bg-white shadow-2xl ring-1 ring-slate-200/90 rounded-2xl sm:rounded-3xl overflow-hidden"
       >
         {/* Header - Hanya untuk gambar atau berkas umum (Khusus PDF memiliki Unified Toolbar mandiri) */}
         {!isPdf && (

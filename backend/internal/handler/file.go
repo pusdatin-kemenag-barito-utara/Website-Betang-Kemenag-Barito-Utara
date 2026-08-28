@@ -66,6 +66,43 @@ func (h *FileHandler) SaveMetadata(c fiber.Ctx) error {
 	return writeOK(c, created)
 }
 
+// Upload mengunggah file via multipart form langsung ke Cloudflare R2.
+func (h *FileHandler) Upload(c fiber.Ctx) error {
+	fileHeader, err := c.FormFile("file")
+	if err != nil {
+		return writeFail(c, fiber.StatusBadRequest, "File wajib disertakan.")
+	}
+
+	folderID := c.FormValue("folderId")
+	name := c.FormValue("name")
+	if name == "" {
+		name = fileHeader.Filename
+	}
+
+	var pFolderID *string
+	if folderID != "" && folderID != "root" {
+		pFolderID = &folderID
+	}
+
+	file, err := fileHeader.Open()
+	if err != nil {
+		return writeFail(c, fiber.StatusInternalServerError, "Gagal membaca file.")
+	}
+	defer file.Close()
+
+	user := currentUser(c)
+	mimeType := fileHeader.Header.Get("Content-Type")
+	if mimeType == "" {
+		mimeType = "application/octet-stream"
+	}
+
+	created, err := h.svc.DirectUpload(c.Context(), name, pFolderID, file, fileHeader.Size, mimeType, user.ID, user.Email, clientIP(c))
+	if err != nil {
+		return writeError(c, err)
+	}
+	return writeOK(c, created)
+}
+
 // PresignDownload membuat URL GET presigned; query `download=1` memaksa
 // unduhan (attachment), tanpa itu berarti pratinjau inline.
 func (h *FileHandler) PresignDownload(c fiber.Ctx) error {

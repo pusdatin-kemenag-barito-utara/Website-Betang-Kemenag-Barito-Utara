@@ -1,0 +1,61 @@
+---
+interface Props {
+  fullTitle: string;
+  description: string;
+  canonicalUrl: string;
+  ogImageUrl: string;
+  noindex?: boolean;
+}
+
+const { fullTitle, description, canonicalUrl, ogImageUrl, noindex = false } = Astro.props;
+---
+
+<!-- 🏷️ Primary Meta Tags -->
+<title>{fullTitle}</title>
+<meta name="title" content={fullTitle} />
+<meta name="description" content={description} />
+<meta
+  name="keywords"
+  content="SI BETANG, E-Arsip Kemenag, Kemenag Barito Utara, Arsip Digital, Kementerian Agama, Muara Teweh, Sistem Informasi Berkas, Cloudflare R2"
+/>
+<meta name="author" content="Pusdatin Kemenag Barito Utara" />
+<link rel="canonical" href={canonicalUrl} />
+
+{noindex ? (
+  <meta name="robots" content="noindex, nofollow, noarchive" />
+) : (
+  <meta
+    name="robots"
+    content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1"
+  />
+)}
+
+<!-- 📱 Mobile & PWA Optimization -->
+<meta name="theme-color" content="#059669" />
+<meta name="color-scheme" content="light" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="SI BETANG" />
+<meta name="format-detection" content="telephone=no, date=no, address=no, email=no" />
+
+<!-- 🌐 Open Graph / Facebook / WhatsApp Meta Tags -->
+<meta property="og:type" content="website" />
+<meta property="og:url" content={canonicalUrl} />
+<meta property="og:site_name" content="SI BETANG - E-Arsip Kemenag Barito Utara" />
+<meta property="og:title" content={fullTitle} />
+<meta property="og:description" content={description} />
+<meta property="og:image" content={ogImageUrl} />
+<meta property="og:image:secure_url" content={ogImageUrl} />
+<meta property="og:image:type" content="image/png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="SI BETANG E-Arsip Digital Kemenag Barito Utara" />
+<meta property="og:locale" content="id_ID" />
+
+<!-- 🐦 Twitter Cards Meta Tags -->
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content={fullTitle} />
+<meta name="twitter:description" content={description} />
+<meta name="twitter:image" content={ogImageUrl} />
+<meta name="twitter:image:alt" content="SI BETANG E-Arsip Kemenag Barito Utara" />

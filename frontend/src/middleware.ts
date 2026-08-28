@@ -14,11 +14,13 @@ function buildCSP() {
   try {
     const rawPusdatin = PUSDATIN_URL.startsWith("http") ? PUSDATIN_URL : `https://${PUSDATIN_URL}`;
     const pusdatinHost = new URL(rawPusdatin).host;
+    const isDev = import.meta.env.DEV;
+    const devConnect = isDev ? "ws://localhost:* ws://127.0.0.1:* http://localhost:* http://127.0.0.1:*" : "";
     const csp = [
       "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://challenges.cloudflare.com https://www.googletagmanager.com https://www.google-analytics.com https://ssl.google-analytics.com",
       `frame-src https://challenges.cloudflare.com https://${pusdatinHost} https://*.kemenag-baritoutara.com`,
-      `connect-src 'self' https://challenges.cloudflare.com https://db.kemenag-baritoutara.com https://${pusdatinHost} https://*.kemenag-baritoutara.com http://localhost:8080 http://127.0.0.1:8080 http://backend:8080 https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com https://region1.google-analytics.com`,
-      "worker-src blob:",
+      `connect-src 'self' ${devConnect} https://challenges.cloudflare.com https://db.kemenag-baritoutara.com https://${pusdatinHost} https://*.kemenag-baritoutara.com http://localhost:8080 http://127.0.0.1:8080 http://backend:8080 https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com https://region1.google-analytics.com`,
+      "worker-src blob: 'self'",
     ].join("; ");
     return `default-src 'self'; ${csp}; img-src 'self' data: blob: https: https://www.google-analytics.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'`;
   } catch {

@@ -1,0 +1,38 @@
+---
+---
+
+<!-- 📊 Google Tag (gtag.js) - GA4 & GTM -->
+<script is:inline async src="https://www.googletagmanager.com/gtag/js?id=G-K02LW54C8P"></script>
+<script is:inline>
+  window.dataLayer = window.dataLayer || [];
+  function gtag() {
+    window.dataLayer.push(arguments);
+  }
+  window.gtag = gtag;
+  gtag("js", new Date());
+  gtag("config", "G-K02LW54C8P", {
+    send_page_view: true,
+  });
+  gtag("config", "GT-NBQNNM4B");
+
+  document.addEventListener("DOMContentLoaded", function () {
+    document.addEventListener(
+      "click",
+      function (event) {
+        const target = event.target;
+        if (!target) return;
+        const btn = target.closest("button") || target.closest("a");
+        if (btn) {
+          const text = btn.innerText || btn.getAttribute("aria-label") || btn.title || "";
+          if (text.trim()) {
+            gtag("event", "ui_click", {
+              element_text: text.trim().substring(0, 50),
+              element_tag: btn.tagName.toLowerCase(),
+            });
+          }
+        }
+      },
+      { passive: true },
+    );
+  });
+</script>

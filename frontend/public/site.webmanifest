@@ -1,0 +1,83 @@
+{
+  "name": "SI BETANG - E-Arsip Kemenag Barito Utara",
+  "short_name": "SI BETANG",
+  "description": "Sistem Informasi Manajemen dan Pengarsipan Digital Terpadu Kantor Kementerian Agama Kabupaten Barito Utara",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0f172a",
+  "theme_color": "#059669",
+  "categories": ["productivity", "utilities", "business", "government"],
+  "lang": "id-ID",
+  "dir": "ltr",
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/kemenag.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "File Browser",
+      "short_name": "Arsip",
+      "description": "Jelajahi berkas dan folder arsip digital",
+      "url": "/folders/root",
+      "icons": [
+        {
+          "src": "/pwa-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Recycle Bin",
+      "short_name": "Sampah",
+      "description": "Kelola berkas yang terhapus",
+      "url": "/trash",
+      "icons": [
+        {
+          "src": "/pwa-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/pwa-screenshot-desktop.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Antarmuka Dashboard & File Browser SI BETANG"
+    },
+    {
+      "src": "/pwa-screenshot-mobile.png",
+      "sizes": "750x1334",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Tampilan Mobile Ramah Sentuhan SI BETANG"
+    }
+  ]
+}

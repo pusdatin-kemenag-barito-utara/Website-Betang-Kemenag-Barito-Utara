@@ -2,7 +2,7 @@
 // serta notifikasi alert & toaster saat berhasil masuk ke sistem.
 import { KeyRound, Mail, AlertCircle, Eye, EyeOff, CheckCircle2, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { Turnstile } from "@marsidev/react-turnstile";
+import { LoginTurnstile } from "./LoginTurnstile";
 import { loginAction } from "@/lib/api";
 import { trackEvent, setAnalyticsUser } from "@/lib/analytics";
 import { toast } from "sonner";
@@ -209,18 +209,12 @@ export function LoginForm({ siteKey }: LoginFormProps) {
       </div>
 
       {/* Cloudflare Turnstile */}
-      <div className="flex justify-center min-h-[65px] items-center">
-        {mounted && activeSiteKey ? (
-          <Turnstile
-            siteKey={activeSiteKey}
-            onSuccess={(token) => setTurnstileToken(token)}
-            onError={() => setTurnstileToken("")}
-            onExpire={() => setTurnstileToken("")}
-            options={{ theme: "light" }}
-          />
-        ) : (
-          <p className="text-[11px] text-slate-400">Verifikasi keamanan...</p>
-        )}
+      <div className="flex justify-center min-h-[65px] items-center w-full">
+        <LoginTurnstile
+          mounted={mounted}
+          siteKey={activeSiteKey}
+          onTokenChange={(token) => setTurnstileToken(token || "")}
+        />
       </div>
 
       <button

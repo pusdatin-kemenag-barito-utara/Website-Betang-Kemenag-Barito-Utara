@@ -1,12 +1,10 @@
 package service
 
 import (
-	"archive/zip"
 	"context"
 	"errors"
 	"fmt"
 	"io"
-	"path"
 	"strings"
 	"time"
 
@@ -35,6 +33,28 @@ func (s *FileService) PresignUpload(ctx context.Context, objectKey, contentType 
 		contentType = "application/octet-stream"
 	}
 	return s.r2.PresignUpload(ctx, objectKey, contentType, time.Hour)
+}
+
+// DirectUpload mengunggah file langsung ke Cloudflare R2 via backend dan menyimpan metadata ke DB.
+func (s *FileService) DirectUpload(ctx context.Context, name string, folderID *string, body io.Reader, sizeBytes int64, mimeType string, actorID, actorEmail, ip string) (*domain.File, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, errors.New("Nama file tidak boleh kosong.")
+	}
+
+	cleanName := sanitizeFileName(name)
+	timestamp := time.Now().UnixNano() / int64(time.Millisecond)
+	folderSegment := "root"
+	if folderID != nil && *folderID != "" && *folderID != "root" {
+		folderSegment = *folderID
+	}
+	key := fmt.Sprintf("arsip/global/%s/%d-%s", folderSegment, timestamp, cleanName)
+
+	if err := s.r2.PutObject(ctx, key, body, sizeBytes, mimeType); err != nil {
+		return nil, fmt.Errorf("Gagal menyimpan ke Cloudflare R2: %w", err)
+	}
+
+	return s.SaveMetadata(ctx, name, folderID, key, mimeType, sizeBytes, actorID, actorEmail, ip)
 }
 
 // SaveMetadata menyimpan metadata file setelah upload ke R2 selesai.
@@ -100,97 +120,6 @@ func (s *FileService) GetObjectStream(ctx context.Context, objectKey string) (*s
 	return s.r2.GetObject(ctx, objectKey)
 }
 
-// Versions mengambil riwayat versi sebuah file.
-func (s *FileService) Versions(ctx context.Context, fileID string) ([]domain.FileVersion, error) {
-	return s.files.ListVersions(ctx, fileID)
-}
-
-// RestoreVersion mengembalikan file ke versi tertentu (versi saat ini
-// disimpan lebih dulu sebagai versi baru).
-func (s *FileService) RestoreVersion(ctx context.Context, fileID, versionID string, actorID, actorEmail, ip string) error {
-	version, err := s.files.GetVersionByID(ctx, versionID)
-	if err != nil {
-		return err
-	}
-	if version == nil {
-		return ErrNotFound
-	}
-	current, err := s.files.GetByID(ctx, fileID)
-	if err != nil {
-		return err
-	}
-	if current == nil {
-		return ErrNotFound
-	}
-
-	if err := s.files.InsertVersion(ctx, current.ID, current.R2ObjectKey, current.SizeBytes, &actorID); err != nil {
-		return err
-	}
-	if err := s.files.UpdateObjectKey(ctx, fileID, version.R2ObjectKey, current.MimeType, version.SizeBytes, &actorID); err != nil {
-		return err
-	}
-	InvalidateFolderCache()
-	_ = s.audits.LogAudit(ctx, actorEmail, "UPDATE", "Restore File Version untuk file ID: "+fileID, nil, map[string]any{"version_id": versionID}, ip)
-	return nil
-}
-
-// DownloadItems menyusun daftar file yang harus dimasukkan ke ZIP.
-func (s *FileService) DownloadItems(ctx context.Context, items []domain.DownloadFileRequest) ([]domain.DownloadFile, error) {
-	result := []domain.DownloadFile{}
-	for _, item := range items {
-		if item.Type == "file" {
-			f, err := s.files.GetByID(ctx, item.ID)
-			if err != nil {
-				return nil, err
-			}
-			if f == nil {
-				continue
-			}
-			result = append(result, domain.DownloadFile{R2ObjectKey: f.R2ObjectKey, Path: f.Name})
-		} else if item.Type == "folder" {
-			nested, err := s.folders.GetAllFilesInFolder(ctx, item.ID)
-			if err != nil {
-				return nil, err
-			}
-			result = append(result, nested...)
-		}
-	}
-	return result, nil
-}
-
-// ZipDownload menuliskan seluruh file ke dalam satu arsip ZIP yang di-stream
-// langsung ke writer. Menggantikan pendekatan lama (JSZip di browser).
-func (s *FileService) ZipDownload(ctx context.Context, items []domain.DownloadFileRequest, w io.Writer) error {
-	files, err := s.DownloadItems(ctx, items)
-	if err != nil {
-		return err
-	}
-
-	zw := zip.NewWriter(w)
-	for _, f := range files {
-		rc, err := s.r2.OpenObject(ctx, f.R2ObjectKey)
-		if err != nil {
-			continue // file mungkin sudah tidak ada di R2; lewati.
-		}
-		header := &zip.FileHeader{
-			Name:   sanitizeZipPath(f.Path),
-			Method: zip.Deflate,
-		}
-		header.SetModTime(time.Now())
-		entry, err := zw.CreateHeader(header)
-		if err != nil {
-			rc.Close()
-			return err
-		}
-		if _, err := io.Copy(entry, rc); err != nil {
-			rc.Close()
-			return err
-		}
-		rc.Close()
-	}
-	return zw.Close()
-}
-
 // Rename mengganti nama file.
 func (s *FileService) Rename(ctx context.Context, id, newName, actorEmail, ip string) error {
 	newName = strings.TrimSpace(newName)
@@ -225,113 +154,10 @@ func (s *FileService) SoftDelete(ctx context.Context, id, actorEmail, ip string)
 	return nil
 }
 
-// Copy menyalin file ke folder lain (object R2 ikut disalin).
-func (s *FileService) Copy(ctx context.Context, id string, targetFolderID *string, actorID, actorEmail, ip string) error {
-	source, err := s.files.GetByID(ctx, id)
-	if err != nil {
-		return err
-	}
-	if source == nil {
-		return ErrNotFound
-	}
-	if err := s.copyFile(ctx, source, targetFolderID, true, actorID); err != nil {
-		return err
-	}
-	InvalidateFolderCache()
-	_ = s.audits.LogAudit(ctx, actorEmail, "INSERT", "Copy File ke folder "+fmtTarget(targetFolderID), nil, map[string]any{"id": id}, ip)
-	return nil
-}
-
-// copyFile menyalin satu object R2 dan membuat baris file baru.
-func (s *FileService) copyFile(ctx context.Context, source *domain.File, targetFolderID *string, isTopLevel bool, actorID string) error {
-	newName := source.Name
-	if isTopLevel {
-		exists, err := s.files.FindByNameInFolder(ctx, newName, targetFolderID)
-		if err != nil {
-			return err
-		}
-		if exists != nil {
-			ext := path.Ext(source.Name)
-			base := strings.TrimSuffix(source.Name, ext)
-			newName = base + " - Salinan" + ext
-		}
-	}
-
-	newObjectKey := fmt.Sprintf("%s%s", randomObjectID(), path.Ext(source.Name))
-	if err := s.r2.CopyObject(ctx, source.R2ObjectKey, newObjectKey); err != nil {
-		return err
-	}
-
-	bidangID, err := s.BidangIDForFolder(ctx, targetFolderID)
-	if err != nil {
-		return err
-	}
-
-	_, err = s.files.Create(ctx, &domain.File{
-		Name:        newName,
-		FolderID:    targetFolderID,
-		BidangID:    bidangID,
-		R2ObjectKey: newObjectKey,
-		MimeType:    source.MimeType,
-		SizeBytes:   source.SizeBytes,
-		UploadedBy:  &actorID,
-	})
-	return err
-}
-
-func fmtTarget(target *string) string {
-	if target == nil || *target == "" {
-		return "root"
-	}
-	return *target
-}
-
 // BidangIDForFolder mengambil bidang dari folder parent (nil jika root).
 func (s *FileService) BidangIDForFolder(ctx context.Context, folderID *string) (*string, error) {
 	if folderID == nil || *folderID == "" {
 		return nil, nil
 	}
 	return s.folders.GetBidangID(ctx, *folderID)
-}
-
-// sanitizeZipPath memastikan path aman di dalam arsip ZIP.
-func sanitizeZipPath(p string) string {
-	p = strings.ReplaceAll(p, "\\", "/")
-	p = strings.TrimPrefix(p, "/")
-	if strings.Contains(p, "..") {
-		return path.Base(p)
-	}
-	return p
-}
-
-// Stats menghitung ringkasan statistik dashboard.
-func (s *FileService) Stats(ctx context.Context) (*domain.DashboardStats, error) {
-	totalFiles, totalStorage, recent24h, thisMonth, recent, err := s.files.Stats(ctx)
-	if err != nil {
-		return nil, err
-	}
-	return &domain.DashboardStats{
-		TotalFiles:     totalFiles,
-		TotalStorage:   totalStorage,
-		Recent24hCount: recent24h,
-		ThisMonthCount: thisMonth,
-		RecentUploads:  recent,
-	}, nil
-}
-
-// ToggleStar mengubah status bintang sebuah file.
-func (s *FileService) ToggleStar(ctx context.Context, fileID string, isStarred bool) error {
-	return s.files.ToggleStar(ctx, fileID, isStarred)
-}
-
-// GenerateShareLink membuat tautan unduh/pratinjau presigned dengan durasi kustom (misal: 1h, 24h, 7d).
-func (s *FileService) GenerateShareLink(ctx context.Context, fileID string, expiryDuration time.Duration) (string, error) {
-	f, err := s.files.GetByID(ctx, fileID)
-	if err != nil {
-		return "", err
-	}
-	if f == nil {
-		return "", ErrNotFound
-	}
-	return s.r2.PresignDownload(ctx, f.R2ObjectKey, &f.Name, expiryDuration)
 }
