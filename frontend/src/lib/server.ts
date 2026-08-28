@@ -1,8 +1,12 @@
 // Helper sisi server (Astro SSR): memanggil backend Go dengan cookie sesi
 // dari request dengan in-memory cache untuk performa navigasi instan.
 
-/** Origin backend; kosong berarti fallback ke http://127.0.0.1:8080. */
-const API_ORIGIN = (import.meta.env.PUBLIC_API_URL || "http://127.0.0.1:8080").replace(/\/+$/, "")
+/** Origin backend untuk SSR server-to-server; selalu mengarah ke Go backend internal (127.0.0.1:8080). */
+const API_ORIGIN = (
+  import.meta.env.BACKEND_INTERNAL_URL ||
+  process.env.BACKEND_INTERNAL_URL ||
+  "http://127.0.0.1:8080"
+).replace(/\/+$/, "");
 
 export interface ApiResponse {
   ok: boolean

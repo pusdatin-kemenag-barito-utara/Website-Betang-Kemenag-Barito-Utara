@@ -1,9 +1,11 @@
 // Endpoint health check komprehensif untuk Coolify, Docker, dan Uptime Kuma.
 import type { APIRoute } from "astro";
 
-export const prerender = false;
-
-const API_ORIGIN = (import.meta.env.PUBLIC_API_URL || "http://127.0.0.1:8080").replace(/\/+$/, "");
+const API_ORIGIN = (
+  import.meta.env.BACKEND_INTERNAL_URL ||
+  process.env.BACKEND_INTERNAL_URL ||
+  "http://127.0.0.1:8080"
+).replace(/\/+$/, "");
 
 export const GET: APIRoute = async () => {
   const startedAt = Date.now();

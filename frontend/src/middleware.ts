@@ -4,7 +4,11 @@ import type { APIContext, MiddlewareNext } from "astro";
 
 const PUSDATIN_URL =
   import.meta.env.PUBLIC_PUSDATIN_URL || "https://pusdatin.kemenag-baritoutara.com";
-const API_ORIGIN = (import.meta.env.PUBLIC_API_URL || "http://127.0.0.1:8080").replace(/\/+$/, "");
+const API_ORIGIN = (
+  import.meta.env.BACKEND_INTERNAL_URL ||
+  process.env.BACKEND_INTERNAL_URL ||
+  "http://127.0.0.1:8080"
+).replace(/\/+$/, "");
 const APP_ID = "e-arsip-kemenag";
 
 // Aset statis tidak perlu diperiksa.
