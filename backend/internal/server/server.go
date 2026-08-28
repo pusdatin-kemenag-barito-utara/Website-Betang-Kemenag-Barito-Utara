@@ -96,6 +96,14 @@ func Build(ctx context.Context, cfg *config.Config) (*fiber.App, func(), error) 
 	app.Use(apiLimiter)
 
 	// Kelompok route tanpa autentikasi.
+	app.Get("/", func(c fiber.Ctx) error {
+		return c.JSON(fiber.Map{
+			"status":  "ok",
+			"service": "SI BETANG Go API Backend",
+			"version": "1.0.0",
+		})
+	})
+	app.Get("/health", handlers.Health.Check)
 	app.Get("/api/v1/health", handlers.Health.Check)
 	app.Post("/api/v1/auth/login", authLimiter, handlers.Auth.Login)
 
