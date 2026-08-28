@@ -12,9 +12,9 @@ function getCandidateOrigins(): string[] {
     process.env.BACKEND_URL;
   const urls: string[] = [];
   if (custom) urls.push(custom.replace(/\/+$/, ""));
-  urls.push("http://backend:8080");
   urls.push("http://127.0.0.1:8080");
   urls.push("http://localhost:8080");
+  urls.push("http://backend:8080");
   return Array.from(new Set(urls));
 }
 
