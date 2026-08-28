@@ -17,14 +17,15 @@ function buildCSP() {
     const isDev = import.meta.env.DEV;
     const devConnect = isDev ? "ws://localhost:* ws://127.0.0.1:* http://localhost:* http://127.0.0.1:*" : "";
     const csp = [
-      "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://challenges.cloudflare.com https://www.googletagmanager.com https://www.google-analytics.com https://ssl.google-analytics.com",
+      "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://challenges.cloudflare.com https://static.cloudflareinsights.com https://www.googletagmanager.com https://www.google-analytics.com https://ssl.google-analytics.com",
       `frame-src https://challenges.cloudflare.com https://${pusdatinHost} https://*.kemenag-baritoutara.com`,
-      `connect-src 'self' ${devConnect} https://challenges.cloudflare.com https://db.kemenag-baritoutara.com https://${pusdatinHost} https://*.kemenag-baritoutara.com http://localhost:8080 http://127.0.0.1:8080 http://backend:8080 https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com https://region1.google-analytics.com`,
+      `connect-src 'self' ${devConnect} https://challenges.cloudflare.com https://db.kemenag-baritoutara.com https://${pusdatinHost} https://*.kemenag-baritoutara.com https://*.r2.cloudflarestorage.com http://localhost:8080 http://127.0.0.1:8080 http://backend:8080 https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com https://region1.google-analytics.com`,
       "worker-src blob: 'self'",
+      "font-src 'self' data: https:",
     ].join("; ");
-    return `default-src 'self'; ${csp}; img-src 'self' data: blob: https: https://www.google-analytics.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'`;
+    return `default-src 'self'; ${csp}; img-src 'self' data: blob: https: https://*.r2.cloudflarestorage.com https://www.google-analytics.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'`;
   } catch {
-    return "default-src 'self'; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://challenges.cloudflare.com";
+    return "default-src 'self'; font-src 'self' data: https:; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://challenges.cloudflare.com https://static.cloudflareinsights.com";
   }
 }
 
