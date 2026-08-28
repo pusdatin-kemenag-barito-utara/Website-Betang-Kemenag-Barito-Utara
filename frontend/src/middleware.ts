@@ -7,8 +7,8 @@ const PUSDATIN_URL =
   import.meta.env.PUBLIC_PUSDATIN_URL || "https://pusdatin.kemenag-baritoutara.com";
 const APP_ID = "e-arsip-kemenag";
 
-// Aset statis tidak perlu diperiksa.
-const STATIC_PATTERN = /\.(svg|png|jpg|jpeg|gif|webp|ico|webmanifest|css|js)$/;
+// Aset statis tidak perlu diperiksa sesi.
+const STATIC_PATTERN = /\.(svg|png|jpg|jpeg|gif|webp|ico|webmanifest|css|js|xml|txt|json)$/;
 
 function buildCSP() {
   try {
@@ -79,7 +79,16 @@ export async function onRequest(context: APIContext, next: MiddlewareNext) {
 
     // === SESSION CHECK ===
     const isPublicPath =
-      pathname === "/login" || pathname === "/maintenance" || pathname === "/_image";
+      pathname === "/login" ||
+      pathname === "/maintenance" ||
+      pathname === "/_image" ||
+      pathname === "/offline" ||
+      pathname === "/robots.txt" ||
+      pathname === "/sitemap.xml" ||
+      pathname === "/sitemap-index.xml" ||
+      pathname === "/manifest.webmanifest" ||
+      pathname === "/site.webmanifest" ||
+      pathname === "/humans.txt";
 
     const cookie = context.request.headers.get("cookie") || "";
     const hasAuthCookie = cookie.includes("earsip-auth=");

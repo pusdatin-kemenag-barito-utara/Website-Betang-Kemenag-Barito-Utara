@@ -2,68 +2,67 @@ import type { APIRoute } from "astro";
 
 export const prerender = false;
 
-interface SitemapItem {
-  url: string;
+interface SitemapEntry {
+  loc: string;
+  lastmod?: string;
   changefreq: "always" | "hourly" | "daily" | "weekly" | "monthly" | "yearly" | "never";
   priority: number;
-  lastmod?: string;
 }
 
-export const GET: APIRoute = async ({ url, site }) => {
-  const baseUrl = (site?.toString() || url.origin).replace(/\/+$/, "");
-  const today = new Date().toISOString().split("T")[0];
+export const GET: APIRoute = async ({ site, url }) => {
+  const baseUrl = (site?.toString() || url.origin || "https://arsip.kemenag-baritoutara.com").replace(/\/+$/, "");
+  const currentDate = new Date().toISOString().split("T")[0];
 
-  const routes: SitemapItem[] = [
+  const entries: SitemapEntry[] = [
     {
-      url: `${baseUrl}/`,
+      loc: `${baseUrl}/`,
+      lastmod: currentDate,
       changefreq: "daily",
       priority: 1.0,
-      lastmod: today,
     },
     {
-      url: `${baseUrl}/login`,
-      changefreq: "monthly",
+      loc: `${baseUrl}/login`,
+      lastmod: currentDate,
+      changefreq: "weekly",
       priority: 0.8,
-      lastmod: today,
     },
     {
-      url: `${baseUrl}/folders/root`,
-      changefreq: "daily",
-      priority: 0.9,
-      lastmod: today,
+      loc: `${baseUrl}/starred`,
+      lastmod: currentDate,
+      changefreq: "weekly",
+      priority: 0.7,
     },
     {
-      url: `${baseUrl}/offline`,
-      changefreq: "yearly",
-      priority: 0.3,
-      lastmod: today,
+      loc: `${baseUrl}/offline`,
+      lastmod: currentDate,
+      changefreq: "monthly",
+      priority: 0.5,
     },
   ];
 
   const sitemapXml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"
         xsi:schemaLocation="http://www.sitemaps.org/schemas/sitemap/0.9
         http://www.sitemaps.org/schemas/sitemap/0.9/sitemap.xsd">
-${routes
+${entries
   .map(
-    (item) => `  <url>
-    <loc>${item.url}</loc>
-    <lastmod>${item.lastmod || today}</lastmod>
-    <changefreq>${item.changefreq}</changefreq>
-    <priority>${item.priority.toFixed(1)}</priority>
+    (e) => `  <url>
+    <loc>${e.loc}</loc>
+    <lastmod>${e.lastmod || currentDate}</lastmod>
+    <changefreq>${e.changefreq}</changefreq>
+    <priority>${e.priority.toFixed(1)}</priority>
   </url>`,
   )
   .join("\n")}
 </urlset>`;
 
-  return new Response(sitemapXml, {
+  return new Response(sitemapXml.trim(), {
     status: 200,
     headers: {
       "Content-Type": "application/xml; charset=utf-8",
-      "Cache-Control": "public, max-age=3600, s-maxage=86400",
-      "X-Robots-Tag": "noindex, follow",
+      "X-Content-Type-Options": "nosniff",
+      "Cache-Control": "public, max-age=3600, s-maxage=3600",
     },
   });
 };
