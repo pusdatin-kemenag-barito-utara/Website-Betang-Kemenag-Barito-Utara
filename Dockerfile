@@ -23,7 +23,7 @@ RUN npm run build --workspace=betang-kemenag-frontend
 # --- Stage 3: Production Runtime ---
 FROM node:22-alpine AS runtime
 
-RUN apk add --no-cache ca-certificates wget bash
+RUN apk add --no-cache ca-certificates wget curl bash
 
 WORKDIR /app
 

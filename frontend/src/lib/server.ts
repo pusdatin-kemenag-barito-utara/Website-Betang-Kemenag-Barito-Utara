@@ -1,43 +1,73 @@
 // Helper sisi server (Astro SSR): memanggil backend Go dengan cookie sesi
 // dari request dengan in-memory cache untuk performa navigasi instan.
 
-/** Origin backend untuk SSR server-to-server; selalu mengarah ke Go backend internal (127.0.0.1:8080). */
-const API_ORIGIN = (
-  import.meta.env.BACKEND_INTERNAL_URL ||
-  process.env.BACKEND_INTERNAL_URL ||
-  "http://127.0.0.1:8080"
-).replace(/\/+$/, "");
+function getBackendUrls(): string[] {
+  const custom =
+    import.meta.env.BACKEND_INTERNAL_URL ||
+    process.env.BACKEND_INTERNAL_URL ||
+    import.meta.env.BACKEND_URL ||
+    process.env.BACKEND_URL;
+  const urls: string[] = [];
+  if (custom) urls.push(custom.replace(/\/+$/, ""));
+  urls.push("http://backend:8080");
+  urls.push("http://127.0.0.1:8080");
+  urls.push("http://localhost:8080");
+  return Array.from(new Set(urls));
+}
+
+let activeBackendOrigin = "";
+
+export async function fetchFromBackend(path: string, options: RequestInit = {}): Promise<Response> {
+  const candidateUrls = activeBackendOrigin
+    ? [activeBackendOrigin, ...getBackendUrls().filter((u) => u !== activeBackendOrigin)]
+    : getBackendUrls();
+
+  let lastError: any = null;
+  for (const origin of candidateUrls) {
+    try {
+      const res = await fetch(`${origin}/api/v1${path}`, {
+        ...options,
+        signal: options.signal || AbortSignal.timeout(3500),
+      });
+      activeBackendOrigin = origin;
+      return res;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw lastError || new Error("Backend Go tidak dapat dihubungi");
+}
 
 export interface ApiResponse {
-  ok: boolean
-  status: number
-  body: any
+  ok: boolean;
+  status: number;
+  body: any;
 }
 
 // In-memory cache per cookie untuk respon cepat (TTL 20 detik)
-const userSessionCache = new Map<string, { user: any; expiresAt: number }>()
-const serverCache = new Map<string, { response: ApiResponse; expiresAt: number }>()
+const userSessionCache = new Map<string, { user: any; expiresAt: number }>();
+const serverCache = new Map<string, { response: ApiResponse; expiresAt: number }>();
 
 /** GET ke endpoint API backend dengan cookie sesi pengguna. */
 export async function apiGet(path: string, cookie: string, useCache = false): Promise<ApiResponse> {
-  const cacheKey = `${path}:${cookie}`
-  const now = Date.now()
+  const cacheKey = `${path}:${cookie}`;
+  const now = Date.now();
 
   if (useCache) {
-    const cached = serverCache.get(cacheKey)
+    const cached = serverCache.get(cacheKey);
     if (cached && cached.expiresAt > now) {
-      return cached.response
+      return cached.response;
     }
   }
 
-  let res: Response
+  let res: Response;
   try {
-    res = await fetch(`${API_ORIGIN}/api/v1${path}`, {
+    res = await fetchFromBackend(path, {
       headers: { cookie: cookie || "" },
       cache: "no-store",
-    })
+    });
   } catch {
-    return { ok: false, status: 0, body: null }
+    return { ok: false, status: 0, body: null };
   }
 
   let body: any = null

@@ -1,14 +1,10 @@
 // Middleware Astro: maintenance check, proteksi sesi, dan header CSP.
 // Pengganti proxy.ts + next.config.ts headers dari aplikasi lama.
 import type { APIContext, MiddlewareNext } from "astro";
+import { fetchFromBackend } from "@/lib/server";
 
 const PUSDATIN_URL =
   import.meta.env.PUBLIC_PUSDATIN_URL || "https://pusdatin.kemenag-baritoutara.com";
-const API_ORIGIN = (
-  import.meta.env.BACKEND_INTERNAL_URL ||
-  process.env.BACKEND_INTERNAL_URL ||
-  "http://127.0.0.1:8080"
-).replace(/\/+$/, "");
 const APP_ID = "e-arsip-kemenag";
 
 // Aset statis tidak perlu diperiksa.
@@ -21,7 +17,7 @@ function buildCSP() {
     const csp = [
       "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://challenges.cloudflare.com https://www.googletagmanager.com https://www.google-analytics.com https://ssl.google-analytics.com",
       `frame-src https://challenges.cloudflare.com https://${pusdatinHost} https://*.kemenag-baritoutara.com`,
-      `connect-src 'self' https://challenges.cloudflare.com https://db.kemenag-baritoutara.com https://${pusdatinHost} https://*.kemenag-baritoutara.com http://localhost:8080 http://127.0.0.1:8080 https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com https://region1.google-analytics.com`,
+      `connect-src 'self' https://challenges.cloudflare.com https://db.kemenag-baritoutara.com https://${pusdatinHost} https://*.kemenag-baritoutara.com http://localhost:8080 http://127.0.0.1:8080 http://backend:8080 https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com https://region1.google-analytics.com`,
       "worker-src blob:",
     ].join("; ");
     return `default-src 'self'; ${csp}; img-src 'self' data: blob: https: https://www.google-analytics.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'`;
@@ -124,7 +120,7 @@ async function hasValidSession(request: Request): Promise<boolean> {
     return false;
   }
   try {
-    const res = await fetch(`${API_ORIGIN}/api/v1/auth/me`, {
+    const res = await fetchFromBackend("/auth/me", {
       headers: { cookie },
       signal: AbortSignal.timeout(3000),
     });

@@ -18,6 +18,8 @@ RUN npm run build --workspace=betang-kemenag-frontend
 # --- Stage produksi ---
 FROM node:22-alpine AS runtime
 
+RUN apk add --no-cache ca-certificates wget curl
+
 WORKDIR /app
 
 ENV NODE_ENV=production

@@ -1,11 +1,6 @@
 // Endpoint health check komprehensif untuk Coolify, Docker, dan Uptime Kuma.
 import type { APIRoute } from "astro";
-
-const API_ORIGIN = (
-  import.meta.env.BACKEND_INTERNAL_URL ||
-  process.env.BACKEND_INTERNAL_URL ||
-  "http://127.0.0.1:8080"
-).replace(/\/+$/, "");
+import { fetchFromBackend } from "@/lib/server";
 
 export const GET: APIRoute = async () => {
   const startedAt = Date.now();
@@ -14,7 +9,7 @@ export const GET: APIRoute = async () => {
 
   try {
     const t0 = Date.now();
-    const res = await fetch(`${API_ORIGIN}/api/v1/health`, {
+    const res = await fetchFromBackend("/health", {
       signal: AbortSignal.timeout(2500),
     });
     backendLatencyMs = Date.now() - t0;
