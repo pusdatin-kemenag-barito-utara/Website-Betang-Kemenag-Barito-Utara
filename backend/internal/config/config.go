@@ -67,7 +67,7 @@ func Load() (*Config, error) {
 		R2AccountID:        getEnvFirst([]string{"R2_ACCOUNT_ID", "CLOUDFLARE_ACCOUNT_ID", "CF_ACCOUNT_ID"}, ""),
 		R2AccessKeyID:      getEnvFirst([]string{"R2_ACCESS_KEY_ID", "CLOUDFLARE_ACCESS_KEY_ID", "CF_ACCESS_KEY_ID"}, ""),
 		R2SecretAccessKey:  getEnvFirst([]string{"R2_SECRET_ACCESS_KEY", "CLOUDFLARE_SECRET_ACCESS_KEY", "CF_SECRET_ACCESS_KEY"}, ""),
-		R2BucketName:       getEnvFirst([]string{"R2_BUCKET_NAME", "R2_BUCKET_ARSIP", "R2_BUCKET"}, "e-arsip-betang"),
+		R2BucketName:       getEnvFirst([]string{"R2_BUCKET_NAME", "R2_BUCKET_ARSIP", "R2_BUCKET"}, "data-arsip"),
 		TurnstileSecretKey: getEnvFirst([]string{"TURNSTILE_SECRET_KEY", "CLOUDFLARE_TURNSTILE_SECRET_KEY"}, ""),
 		PusdatinURL:        getEnvFirst([]string{"PUSDATIN_URL", "NEXT_PUBLIC_PUSDATIN_URL", "PUBLIC_PUSDATIN_URL"}, "https://pusdatin.kemenag-baritoutara.com"),
 		PusdatinAppID:      getEnvFirst([]string{"PUSDATIN_APP_ID"}, "e-arsip-kemenag"),
