@@ -155,7 +155,11 @@ func (h *FileHandler) StreamFile(c fiber.Ctx) error {
 // Versions mengambil riwayat versi sebuah file.
 func (h *FileHandler) Versions(c fiber.Ctx) error {
 	fileID := c.Params("fileId")
-	versions, err := h.svc.Versions(c.Context(), fileID)
+	cleanID := cleanUUID(fileID)
+	if cleanID == nil {
+		return writeOK(c, []domain.FileVersion{})
+	}
+	versions, err := h.svc.Versions(c.Context(), *cleanID)
 	if err != nil {
 		return writeFail(c, fiber.StatusInternalServerError, "Gagal memuat versi file.")
 	}
@@ -171,8 +175,13 @@ func (h *FileHandler) RestoreVersion(c fiber.Ctx) error {
 	if err := c.Bind().Body(&req); err != nil {
 		return writeFail(c, fiber.StatusBadRequest, "Data permintaan tidak valid.")
 	}
+	cleanFileID := cleanUUID(req.FileID)
+	cleanVersionID := cleanUUID(req.VersionID)
+	if cleanFileID == nil || cleanVersionID == nil {
+		return writeFail(c, fiber.StatusBadRequest, "ID berkas atau versi tidak valid.")
+	}
 	user := currentUser(c)
-	if err := h.svc.RestoreVersion(c.Context(), req.FileID, req.VersionID, user.ID, user.Email, clientIP(c)); err != nil {
+	if err := h.svc.RestoreVersion(c.Context(), *cleanFileID, *cleanVersionID, user.ID, user.Email, clientIP(c)); err != nil {
 		return writeError(c, err)
 	}
 	return writeOK(c, nil)
