@@ -52,7 +52,7 @@ const disableRightClick = settingsRes?.ok
       </div>
 
       <div class="p-6">
-        <SettingsClient client:load initialDisableRightClick={disableRightClick} />
+        <SettingsClient client:only="react" initialDisableRightClick={disableRightClick} />
       </div>
     </div>
 

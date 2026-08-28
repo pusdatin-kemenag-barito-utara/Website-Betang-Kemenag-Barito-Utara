@@ -26,8 +26,11 @@ export function LoginForm({ siteKey }: LoginFormProps) {
   const [rememberMe, setRememberMe] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState("");
 
+  const [mounted, setMounted] = useState(false);
+
   // Muat email yang disimpan jika sebelumnya memilih Ingat Saya
   useEffect(() => {
+    setMounted(true);
     try {
       const savedEmail = localStorage.getItem("betang_remember_email");
       if (savedEmail) {
@@ -207,7 +210,7 @@ export function LoginForm({ siteKey }: LoginFormProps) {
 
       {/* Cloudflare Turnstile */}
       <div className="flex justify-center min-h-[65px] items-center">
-        {activeSiteKey ? (
+        {mounted && activeSiteKey ? (
           <Turnstile
             siteKey={activeSiteKey}
             onSuccess={(token) => setTurnstileToken(token)}
@@ -216,7 +219,7 @@ export function LoginForm({ siteKey }: LoginFormProps) {
             options={{ theme: "light" }}
           />
         ) : (
-          <p className="text-[11px] text-slate-400">Verifikasi tidak tersedia — lanjutkan login.</p>
+          <p className="text-[11px] text-slate-400">Verifikasi keamanan...</p>
         )}
       </div>
 

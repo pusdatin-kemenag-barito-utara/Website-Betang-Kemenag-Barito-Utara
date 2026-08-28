@@ -43,7 +43,7 @@ const disableRightClick = settings?.ok ? (settings.body?.data?.disable_right_cli
     data-disable-right-click={disableRightClick.toString()}
   >
     <DashboardNavigation
-      client:load
+      client:only="react"
       currentPath={currentPath}
       isSuperAdmin={isSuperAdmin}
       transition:persist="sidebar-navigation"
@@ -51,7 +51,7 @@ const disableRightClick = settings?.ok ? (settings.body?.data?.disable_right_cli
 
     <div class="flex flex-1 flex-col overflow-hidden">
       <TopNavbar
-        client:load
+        client:only="react"
         initialUser={initialUser}
         transition:persist="top-navbar"
       />
