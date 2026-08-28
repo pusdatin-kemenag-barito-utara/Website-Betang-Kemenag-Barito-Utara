@@ -4,6 +4,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -43,11 +44,21 @@ func Connect(ctx context.Context, databaseURL, searchPath string) (*pgxpool.Pool
 	if err != nil {
 		return nil, fmt.Errorf("membuat pool gagal: %w", err)
 	}
-	if err := pool.Ping(ctx); err != nil {
-		pool.Close()
-		return nil, fmt.Errorf("ping database gagal: %w", err)
+
+	var lastPingErr error
+	for attempt := 1; attempt <= 5; attempt++ {
+		pingCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+		err := pool.Ping(pingCtx)
+		cancel()
+		if err == nil {
+			return pool, nil
+		}
+		lastPingErr = err
+		time.Sleep(1 * time.Second)
 	}
-	return pool, nil
+
+	pool.Close()
+	return nil, fmt.Errorf("ping database gagal setelah 5 percobaan: %w", lastPingErr)
 }
 
 // New membuat seluruh repository dari pool yang sama.

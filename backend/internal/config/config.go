@@ -58,18 +58,18 @@ func Load() (*Config, error) {
 
 	cfg := &Config{
 		Port:               backendPort,
-		SupabaseURL:        getEnvFirst([]string{"SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL"}, ""),
-		SupabaseAnonKey:    getEnvFirst([]string{"SUPABASE_ANON_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY"}, ""),
-		SupabaseJWTSecret:  getEnvFirst([]string{"SUPABASE_JWT_SECRET", "SUPABASE_SERVICE_ROLE_KEY"}, ""),
-		DatabaseURL:        getEnvFirst([]string{"DATABASE_URL", "DIRECT_URL"}, ""),
+		SupabaseURL:        getEnvFirst([]string{"SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL", "PUBLIC_SUPABASE_URL"}, "https://db.kemenag-baritoutara.com"),
+		SupabaseAnonKey:    getEnvFirst([]string{"SUPABASE_ANON_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "PUBLIC_SUPABASE_ANON_KEY"}, ""),
+		SupabaseJWTSecret:  getEnvFirst([]string{"SUPABASE_JWT_SECRET", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEY"}, ""),
+		DatabaseURL:        getEnvFirst([]string{"DATABASE_URL", "DIRECT_URL", "POSTGRES_URL", "POSTGRESQL_URL"}, ""),
 		DBSChema:           getEnvFirst([]string{"DB_SCHEMA"}, "kemenag_arsip"),
 		PusdatinSchema:     getEnvFirst([]string{"PUSDATIN_SCHEMA"}, "kemenag_pusdatin"),
-		R2AccountID:        getEnvFirst([]string{"R2_ACCOUNT_ID", "CLOUDFLARE_ACCOUNT_ID"}, ""),
-		R2AccessKeyID:      getEnvFirst([]string{"R2_ACCESS_KEY_ID"}, ""),
-		R2SecretAccessKey:  getEnvFirst([]string{"R2_SECRET_ACCESS_KEY"}, ""),
-		R2BucketName:       getEnvFirst([]string{"R2_BUCKET_NAME", "R2_BUCKET_ARSIP"}, "data-arsip"),
-		TurnstileSecretKey: getEnvFirst([]string{"TURNSTILE_SECRET_KEY"}, ""),
-		PusdatinURL:        getEnvFirst([]string{"PUSDATIN_URL", "NEXT_PUBLIC_PUSDATIN_URL"}, "https://pusdatin.kemenag-baritoutara.com"),
+		R2AccountID:        getEnvFirst([]string{"R2_ACCOUNT_ID", "CLOUDFLARE_ACCOUNT_ID", "CF_ACCOUNT_ID"}, ""),
+		R2AccessKeyID:      getEnvFirst([]string{"R2_ACCESS_KEY_ID", "CLOUDFLARE_ACCESS_KEY_ID", "CF_ACCESS_KEY_ID"}, ""),
+		R2SecretAccessKey:  getEnvFirst([]string{"R2_SECRET_ACCESS_KEY", "CLOUDFLARE_SECRET_ACCESS_KEY", "CF_SECRET_ACCESS_KEY"}, ""),
+		R2BucketName:       getEnvFirst([]string{"R2_BUCKET_NAME", "R2_BUCKET_ARSIP", "R2_BUCKET"}, "e-arsip-betang"),
+		TurnstileSecretKey: getEnvFirst([]string{"TURNSTILE_SECRET_KEY", "CLOUDFLARE_TURNSTILE_SECRET_KEY"}, ""),
+		PusdatinURL:        getEnvFirst([]string{"PUSDATIN_URL", "NEXT_PUBLIC_PUSDATIN_URL", "PUBLIC_PUSDATIN_URL"}, "https://pusdatin.kemenag-baritoutara.com"),
 		PusdatinAppID:      getEnvFirst([]string{"PUSDATIN_APP_ID"}, "e-arsip-kemenag"),
 		CookieName:         getEnvFirst([]string{"COOKIE_NAME"}, "earsip-auth"),
 		CookieDomain:       getEnvFirst([]string{"COOKIE_DOMAIN"}, ""),
@@ -94,22 +94,10 @@ func Load() (*Config, error) {
 	return cfg, nil
 }
 
-// validate memastikan seluruh variabel wajib terisi.
+// validate memastikan konfigurasi penting database terisi.
 func (c *Config) validate() error {
-	required := map[string]string{
-		"SUPABASE_URL":          c.SupabaseURL,
-		"SUPABASE_ANON_KEY":     c.SupabaseAnonKey,
-		"SUPABASE_JWT_SECRET":   c.SupabaseJWTSecret,
-		"DATABASE_URL":          c.DatabaseURL,
-		"R2_ACCOUNT_ID":         c.R2AccountID,
-		"R2_ACCESS_KEY_ID":      c.R2AccessKeyID,
-		"R2_SECRET_ACCESS_KEY":  c.R2SecretAccessKey,
-		"TURNSTILE_SECRET_KEY":  c.TurnstileSecretKey,
-	}
-	for name, value := range required {
-		if value == "" {
-			return fmt.Errorf("environment variable %s wajib diisi", name)
-		}
+	if c.DatabaseURL == "" {
+		return fmt.Errorf("environment variable DATABASE_URL (atau DIRECT_URL) wajib diisi")
 	}
 	return nil
 }
