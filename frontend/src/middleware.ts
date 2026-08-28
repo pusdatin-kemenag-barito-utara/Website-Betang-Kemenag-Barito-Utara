@@ -15,14 +15,19 @@ const APP_ID = "e-arsip-kemenag";
 const STATIC_PATTERN = /\.(svg|png|jpg|jpeg|gif|webp|ico|webmanifest|css|js)$/;
 
 function buildCSP() {
-  const pusdatinHost = new URL(PUSDATIN_URL).host;
-  const csp = [
-    "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://challenges.cloudflare.com https://www.googletagmanager.com https://www.google-analytics.com https://ssl.google-analytics.com",
-    `frame-src https://challenges.cloudflare.com https://${pusdatinHost} https://*.kemenag-baritoutara.com`,
-    `connect-src 'self' https://challenges.cloudflare.com https://db.kemenag-baritoutara.com https://${pusdatinHost} https://*.kemenag-baritoutara.com http://localhost:8080 http://127.0.0.1:8080 https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com https://region1.google-analytics.com`,
-    "worker-src blob:",
-  ].join("; ");
-  return `default-src 'self'; ${csp}; img-src 'self' data: blob: https: https://www.google-analytics.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'`;
+  try {
+    const rawPusdatin = PUSDATIN_URL.startsWith("http") ? PUSDATIN_URL : `https://${PUSDATIN_URL}`;
+    const pusdatinHost = new URL(rawPusdatin).host;
+    const csp = [
+      "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://challenges.cloudflare.com https://www.googletagmanager.com https://www.google-analytics.com https://ssl.google-analytics.com",
+      `frame-src https://challenges.cloudflare.com https://${pusdatinHost} https://*.kemenag-baritoutara.com`,
+      `connect-src 'self' https://challenges.cloudflare.com https://db.kemenag-baritoutara.com https://${pusdatinHost} https://*.kemenag-baritoutara.com http://localhost:8080 http://127.0.0.1:8080 https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com https://region1.google-analytics.com`,
+      "worker-src blob:",
+    ].join("; ");
+    return `default-src 'self'; ${csp}; img-src 'self' data: blob: https: https://www.google-analytics.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'`;
+  } catch {
+    return "default-src 'self'; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://challenges.cloudflare.com";
+  }
 }
 
 // In-memory cache untuk status maintenance (TTL: 30 detik) agar tidak membebani network roundtrip.
@@ -51,56 +56,65 @@ async function checkMaintenance(): Promise<boolean> {
 }
 
 export async function onRequest(context: APIContext, next: MiddlewareNext) {
-  const { pathname } = context.url;
+  try {
+    const { pathname } = context.url;
 
-  // Endpoint API (termasuk /api/health dan /api/v1/*) diteruskan langsung.
-  if (pathname.startsWith("/api/")) {
-    return next();
-  }
+    // Endpoint API (termasuk /api/health dan /api/v1/*) diteruskan langsung.
+    if (pathname.startsWith("/api/")) {
+      return next();
+    }
 
-  // Lewati pemeriksaan untuk aset statis.
-  if (STATIC_PATTERN.test(pathname)) {
-    return next();
-  }
+    // Lewati pemeriksaan untuk aset statis.
+    if (STATIC_PATTERN.test(pathname)) {
+      return next();
+    }
 
-  // === MAINTENANCE CHECK (Cached) ===
-  const isMaintenance = await checkMaintenance();
-  if (isMaintenance && pathname !== "/maintenance") {
-    return context.redirect("/maintenance");
-  }
-  if (!isMaintenance && pathname === "/maintenance") {
-    return context.redirect("/");
-  }
-
-  // === SESSION CHECK ===
-  const isPublicPath =
-    pathname === "/login" || pathname === "/maintenance" || pathname === "/_image";
-
-  const cookie = context.request.headers.get("cookie") || "";
-  const hasAuthCookie = cookie.includes("earsip-auth=");
-
-  if (!isPublicPath && !hasAuthCookie) {
-    return context.redirect("/login");
-  }
-
-  if (pathname === "/login" && hasAuthCookie) {
-    const ok = await hasValidSession(context.request);
-    if (ok) {
+    // === MAINTENANCE CHECK (Cached) ===
+    const isMaintenance = await checkMaintenance();
+    if (isMaintenance && pathname !== "/maintenance") {
+      return context.redirect("/maintenance");
+    }
+    if (!isMaintenance && pathname === "/maintenance") {
       return context.redirect("/");
     }
+
+    // === SESSION CHECK ===
+    const isPublicPath =
+      pathname === "/login" || pathname === "/maintenance" || pathname === "/_image";
+
+    const cookie = context.request.headers.get("cookie") || "";
+    const hasAuthCookie = cookie.includes("earsip-auth=");
+
+    if (!isPublicPath && !hasAuthCookie) {
+      return context.redirect("/login");
+    }
+
+    if (pathname === "/login" && hasAuthCookie) {
+      const ok = await hasValidSession(context.request);
+      if (ok) {
+        return context.redirect("/");
+      }
+    }
+
+    const response = await next();
+    try {
+      response.headers.set("Content-Security-Policy", buildCSP());
+      response.headers.set("X-Frame-Options", "SAMEORIGIN");
+      response.headers.set("X-Content-Type-Options", "nosniff");
+      response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+      response.headers.set("Alt-Svc", 'h3=":443"; ma=86400, h3-29=":443"; ma=86400');
+      response.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
+      response.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), browsing-topics=()");
+      response.headers.set("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
+    } catch {
+      // Abaikan jika header sudah terkunci
+    }
+
+    return response;
+  } catch (err) {
+    console.error("[MIDDLEWARE CATCH]:", err);
+    return next();
   }
-
-  const response = await next();
-  response.headers.set("Content-Security-Policy", buildCSP());
-  response.headers.set("X-Frame-Options", "SAMEORIGIN");
-  response.headers.set("X-Content-Type-Options", "nosniff");
-  response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
-  response.headers.set("Alt-Svc", 'h3=":443"; ma=86400, h3-29=":443"; ma=86400');
-  response.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
-  response.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=(), browsing-topics=()");
-  response.headers.set("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
-
-  return response;
 }
 
 /** Verifikasi sesi dengan memanggil /auth/me pada backend. */

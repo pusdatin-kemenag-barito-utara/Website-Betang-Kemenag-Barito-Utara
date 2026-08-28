@@ -8,8 +8,10 @@ import { VitePWA } from "vite-plugin-pwa";
 // Konfigurasi Astro: SSR (output server) dengan adapter Node.
 // PWA dinonaktifkan saat development agar tidak mengganggu hot-reload.
 export default defineConfig({
+  site: "https://arsip.kemenag-baritoutara.com",
   server: {
     port: 3000,
+    host: "0.0.0.0",
   },
   output: "server",
   adapter: node({ mode: "standalone" }),
