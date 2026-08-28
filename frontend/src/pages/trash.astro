@@ -1,0 +1,61 @@
+---
+import DashboardLayout from "@/layouts/DashboardLayout.astro";
+import PageBanner from "@/components/ui/PageBanner.astro";
+import { Trash2 } from "lucide-react";
+import { TrashView } from "@/components/Trash/TrashView";
+import { apiGet, requireUser } from "@/lib/server";
+
+const cookie = Astro.request.headers.get("cookie") || "";
+const [auth, res] = await Promise.all([
+  requireUser(cookie),
+  apiGet("/trash", cookie),
+]);
+
+if (!auth.ok) {
+  return Astro.redirect("/login");
+}
+
+const trashRaw: {
+  id: string;
+  name: string;
+  type: "folder" | "file";
+  deleted_at: string;
+  expires_at: string;
+}[] = res.ok ? (res.body?.data ?? []) : [];
+
+const trashItems = trashRaw.map((t) => {
+  let formattedDeletedAt = "-";
+  if (t.deleted_at) {
+    const d = new Date(t.deleted_at);
+    if (!isNaN(d.getTime())) {
+      formattedDeletedAt = d.toLocaleDateString("id-ID", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+    }
+  }
+  return {
+    id: t.id,
+    name: t.name,
+    type: t.type,
+    deletedAt: formattedDeletedAt,
+    expiresAt: t.expires_at,
+  };
+});
+---
+
+<DashboardLayout title="Recycle Bin (Trash)">
+  <div class="flex flex-col gap-6 pb-10">
+    <PageBanner
+      title="Recycle Bin (Trash)"
+      description="Dokumen yang dihapus akan tersimpan di sini sebelum dihapus permanen"
+    >
+      <Trash2 className="h-8 w-8 text-white" slot="icon" />
+    </PageBanner>
+
+    <TrashView client:load initialData={trashItems} />
+  </div>
+</DashboardLayout>

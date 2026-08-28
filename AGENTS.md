@@ -1,5 +1,7 @@
-<!-- BEGIN:nextjs-agent-rules -->
-# This is NOT the Next.js you know
+# SI BETANG - Architecture Guidelines
 
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
-<!-- END:nextjs-agent-rules -->
+Repositori ini menggunakan arsitektur monorepo:
+- **Frontend** (`frontend/`): Astro v7 (SSR mode: standalone) + React Islands + Tailwind CSS v4.
+- **Backend** (`backend/`): Go (Fiber v3) + PostgreSQL (pgx v5) + Supabase Auth.
+
+Jangan gunakan konvensi Next.js lama karena codebase telah di-rewrite penuh ke Astro dan Go.

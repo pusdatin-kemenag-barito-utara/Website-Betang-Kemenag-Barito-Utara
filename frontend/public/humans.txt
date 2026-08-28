@@ -1,0 +1,11 @@
+/* TEAM */
+  Developer: Tim Pusdatin & Pengelola TI
+  Organization: Kantor Kementerian Agama Kabupaten Barito Utara
+  Location: Muara Teweh, Kalimantan Tengah, Indonesia
+  Website: https://kemenag-baritoutara.com
+
+/* SITE */
+  Standards: HTML5, CSS3, ES2026, Schema.org
+  Frameworks: Astro v7 (SSR), React 19, Tailwind CSS v4, Go Fiber v3
+  Storage: Cloudflare R2 (S3-Compatible)
+  Security: Supabase Auth, Strict CSP, HTTP/3 QUIC

@@ -1,0 +1,79 @@
+---
+import BaseLayout from "./BaseLayout.astro";
+import { DashboardNavigation } from "@/components/layout/DashboardNavigation";
+import { TopNavbar } from "@/components/layout/TopNavbar";
+import { apiGet, requireUser } from "@/lib/server";
+
+interface Props {
+  title?: string;
+  description?: string;
+  image?: string;
+}
+
+const { title, description, image } = Astro.props;
+const currentPath = Astro.url.pathname;
+
+// Ambil sesi pengguna & pengaturan global (blokir klik kanan) secara paralel dengan cache
+const cookie = Astro.request.headers.get("cookie") || "";
+const [auth, settings] = await Promise.all([
+  requireUser(cookie),
+  apiGet("/settings", cookie, true),
+]);
+
+const isSuperAdmin = auth.ok && auth.user?.isSuperAdmin === true;
+const initialUser = auth.ok && auth.user ? {
+  name: auth.user.email?.split("@")[0] || "Admin",
+  role: auth.user.role || (isSuperAdmin ? "super_admin" : "user"),
+  email: auth.user.email,
+} : undefined;
+
+const disableRightClick = settings.ok ? (settings.body?.data?.disable_right_click ?? true) : true;
+---
+
+<BaseLayout title={title} description={description} image={image}>
+  <div
+    class="flex h-screen w-full bg-[#F8FAFC] overflow-hidden"
+    id="dashboard-root"
+    data-disable-right-click={disableRightClick.toString()}
+  >
+    <DashboardNavigation
+      client:load
+      currentPath={currentPath}
+      isSuperAdmin={isSuperAdmin}
+      transition:persist="sidebar-navigation"
+    />
+
+    <div class="flex flex-1 flex-col overflow-hidden">
+      <TopNavbar
+        client:load
+        initialUser={initialUser}
+        transition:persist="top-navbar"
+      />
+
+      <main class="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8">
+        <div class="mx-auto w-full">
+          <slot />
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script is:inline>
+    function setupContextMenuGuard() {
+      document.addEventListener("contextmenu", function (e) {
+        // Biarkan input dan textarea tetap bisa copy/paste browser native
+        if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+          return;
+        }
+
+        const root = document.getElementById("dashboard-root");
+        if (root && root.dataset.disableRightClick === "true") {
+          e.preventDefault();
+        }
+      });
+    }
+
+    setupContextMenuGuard();
+    document.addEventListener("astro:page-load", setupContextMenuGuard);
+  </script>
+</BaseLayout>

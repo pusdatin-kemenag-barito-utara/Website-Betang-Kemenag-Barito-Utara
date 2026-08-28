@@ -1,0 +1,136 @@
+---
+import DashboardLayout from "@/layouts/DashboardLayout.astro";
+import PageBanner from "@/components/ui/PageBanner.astro";
+import { Settings, ShieldCheck, Database, Cloud, UserCheck, CheckCircle2 } from "lucide-react";
+import { SettingsClient } from "@/components/Settings/SettingsClient";
+import { apiGet, requireUser } from "@/lib/server";
+
+const cookie = Astro.request.headers.get("cookie") || "";
+const [auth, settingsRes] = await Promise.all([
+  requireUser(cookie),
+  apiGet("/settings", cookie, true),
+]);
+
+if (!auth.ok) {
+  return Astro.redirect("/login");
+}
+
+// Hanya super admin yang boleh mengakses pengaturan sistem.
+const isSuperAdmin = auth.user?.isSuperAdmin ?? false;
+if (!isSuperAdmin) {
+  return Astro.redirect("/");
+}
+
+const disableRightClick = settingsRes.ok
+  ? (settingsRes.body?.data?.disable_right_click ?? true)
+  : true;
+---
+
+<DashboardLayout title="Pengaturan Sistem">
+  <div class="flex flex-col gap-6 w-full max-w-5xl mx-auto pb-10">
+    <PageBanner
+      title="Pengaturan Sistem"
+      description="Konfigurasi sistem keamanan dan perilaku antarmuka aplikasi secara global."
+    >
+      <Settings className="h-8 w-8 text-white" slot="icon" />
+    </PageBanner>
+
+    {/* Panel Keamanan & Antarmuka */}
+    <div class="rounded-3xl bg-white shadow-sm ring-1 ring-slate-100 overflow-hidden">
+      <div class="border-b border-slate-100 bg-slate-50/50 px-6 py-4">
+        <h2 class="font-bold text-slate-800">Keamanan & Antarmuka</h2>
+        <p class="text-xs text-slate-500 mt-1">
+          Pengaturan di bawah ini akan diterapkan secara global untuk semua pengguna aplikasi.
+        </p>
+      </div>
+
+      <div class="p-6">
+        <SettingsClient client:load initialDisableRightClick={disableRightClick} />
+      </div>
+    </div>
+
+    {/* Panel Informasi Sistem & Integrasi */}
+    <div class="rounded-3xl bg-white shadow-sm ring-1 ring-slate-100 overflow-hidden">
+      <div class="border-b border-slate-100 bg-slate-50/50 px-6 py-4">
+        <h2 class="font-bold text-slate-800">Informasi Sistem & Integrasi</h2>
+        <p class="text-xs text-slate-500 mt-1">
+          Status konektivitas backend, basis data, dan penyimpanan awan.
+        </p>
+      </div>
+
+      <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Database Status */}
+        <div class="flex items-start gap-4 p-4 rounded-2xl border border-slate-100 bg-slate-50/50">
+          <div class="h-10 w-10 shrink-0 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+            <Database className="h-5 w-5" />
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold text-slate-800">Database Supabase</h3>
+              <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-full">
+                <CheckCircle2 className="h-3 w-3" /> Terhubung
+              </span>
+            </div>
+            <p class="text-xs text-slate-500 mt-1">
+              Schema: <code class="bg-slate-200/60 px-1 py-0.5 rounded text-slate-700 font-mono">kemenag_arsip</code>
+            </p>
+          </div>
+        </div>
+
+        {/* Cloudflare R2 */}
+        <div class="flex items-start gap-4 p-4 rounded-2xl border border-slate-100 bg-slate-50/50">
+          <div class="h-10 w-10 shrink-0 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+            <Cloud className="h-5 w-5" />
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold text-slate-800">Cloud Storage R2</h3>
+              <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-full">
+                <CheckCircle2 className="h-3 w-3" /> Aktif
+              </span>
+            </div>
+            <p class="text-xs text-slate-500 mt-1">
+              Bucket: <code class="bg-slate-200/60 px-1 py-0.5 rounded text-slate-700 font-mono">e-arsip-betang</code>
+            </p>
+          </div>
+        </div>
+
+        {/* Pusdatin SSO */}
+        <div class="flex items-start gap-4 p-4 rounded-2xl border border-slate-100 bg-slate-50/50">
+          <div class="h-10 w-10 shrink-0 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+            <ShieldCheck className="h-5 w-5" />
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold text-slate-800">Sistem Pusdatin Terpusat</h3>
+              <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 bg-emerald-100/70 px-2 py-0.5 rounded-full">
+                <CheckCircle2 className="h-3 w-3" /> Sinkron
+              </span>
+            </div>
+            <p class="text-xs text-slate-500 mt-1">
+              App ID: <code class="bg-slate-200/60 px-1 py-0.5 rounded text-slate-700 font-mono">e-arsip-kemenag</code>
+            </p>
+          </div>
+        </div>
+
+        {/* Super Admin Session */}
+        <div class="flex items-start gap-4 p-4 rounded-2xl border border-slate-100 bg-slate-50/50">
+          <div class="h-10 w-10 shrink-0 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center">
+            <UserCheck className="h-5 w-5" />
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center justify-between">
+              <h3 class="text-sm font-bold text-slate-800">Administrator Aktif</h3>
+              <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-700 bg-amber-100/70 px-2 py-0.5 rounded-full">
+                Super Admin
+              </span>
+            </div>
+            <p class="text-xs text-slate-500 mt-1 truncate">
+              {auth.user?.name} ({auth.user?.email})
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</DashboardLayout>

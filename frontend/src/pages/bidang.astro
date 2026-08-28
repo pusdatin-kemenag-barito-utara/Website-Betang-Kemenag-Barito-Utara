@@ -1,0 +1,46 @@
+---
+import DashboardLayout from "@/layouts/DashboardLayout.astro";
+import PageBanner from "@/components/ui/PageBanner.astro";
+import { Building2 } from "lucide-react";
+import { BidangView } from "@/components/Bidang/BidangView";
+import { apiGet, requireUser } from "@/lib/server";
+
+const cookie = Astro.request.headers.get("cookie") || "";
+const auth = await requireUser(cookie);
+if (!auth.ok) {
+  return Astro.redirect("/login");
+}
+
+const isSuperAdmin = auth.user?.isSuperAdmin ?? false;
+if (!isSuperAdmin) {
+  return Astro.redirect("/");
+}
+
+const res = await apiGet("/bidang", cookie);
+const bidangRaw: {
+  id: string;
+  name: string;
+  sort_order: number;
+  doc_count: number;
+}[] = res.ok ? (res.body?.data ?? []) : [];
+
+const bidangData = bidangRaw.map((b) => ({
+  id: b.id,
+  name: b.name,
+  count: b.doc_count ?? 0,
+  sort_order: b.sort_order ?? 0,
+}));
+---
+
+<DashboardLayout title="Manajemen Bidang / Seksi">
+  <div class="flex flex-col gap-6 pb-10">
+    <PageBanner
+      title="Manajemen Bidang / Seksi"
+      description="Kelola daftar seksi dan bidang yang terdaftar dalam sistem E-Arsip"
+    >
+      <Building2 className="h-8 w-8 text-white" slot="icon" />
+    </PageBanner>
+
+    <BidangView client:load bidangData={bidangData} />
+  </div>
+</DashboardLayout>

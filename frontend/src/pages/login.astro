@@ -1,0 +1,76 @@
+---
+// Halaman login — paritas dari app/login/page.tsx lama.
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { LoginForm } from "@/components/auth/LoginForm";
+
+const turnstileSiteKey =
+  import.meta.env.PUBLIC_TURNSTILE_SITE_KEY ||
+  import.meta.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ||
+  "";
+const year = new Date().getFullYear();
+---
+
+<BaseLayout title="Masuk">
+  <div class="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-[#F8FAFC] p-4 sm:p-8">
+    {/* Premium Background Gradients */}
+    <div class="absolute inset-0 z-0 overflow-hidden">
+      <div class="absolute -left-[20%] top-[-10%] h-[70vh] w-[70vw] rounded-full bg-emerald-100/50 blur-[120px]" />
+      <div class="absolute -right-[20%] bottom-[-10%] h-[70vh] w-[70vw] rounded-full bg-emerald-50/50 blur-[120px]" />
+    </div>
+
+    <div class="relative z-10 w-full max-w-[440px]">
+      {/* Header Section */}
+      <div class="mb-8 flex flex-col items-center text-center">
+        <div class="mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-white p-3 shadow-sm ring-1 ring-emerald-100">
+          <img
+            src="/kemenag.svg"
+            alt="Logo Kemenag"
+            class="h-full w-full object-contain"
+            width="80"
+            height="80"
+            fetchpriority="high"
+            loading="eager"
+            decoding="async"
+          />
+        </div>
+        <div class="flex items-center gap-2">
+          <div class="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          <span class="text-[10px] min-[400px]:text-[11px] sm:text-xs font-bold tracking-widest sm:tracking-[0.2em] text-emerald-600 uppercase text-center leading-tight">
+            Kementerian Agama Kabupaten Barito Utara
+          </span>
+        </div>
+        <h1 class="mt-2 sm:mt-3 text-2xl sm:text-4xl font-black tracking-tight text-slate-900 flex items-center justify-center">
+          SI BET
+          <img
+            src="/logo.png"
+            alt="A"
+            class="mx-[2px] -mt-[4px] h-8 w-8 object-contain sm:h-9 sm:w-9"
+            width="36"
+            height="36"
+            fetchpriority="high"
+            loading="eager"
+            decoding="async"
+          />
+          NG
+        </h1>
+        <div class="mt-1 sm:mt-3 space-y-1.5 px-0 sm:px-4">
+          <p class="text-[11px] min-[400px]:text-xs sm:text-sm font-medium text-slate-700 leading-tight flex flex-col gap-0.5 sm:gap-1">
+            <span><span class="font-bold text-slate-900">S</span>istem <span class="font-bold text-slate-900">I</span>nformasi</span>
+            <span><span class="font-bold text-slate-900">B</span>asis <span class="font-bold text-slate-900">E</span>lektronik <span class="font-bold text-slate-900">T</span>ata <span class="font-bold text-slate-900">A</span>rsip dan <span class="font-bold text-slate-900">N</span>askah <span class="font-bold text-slate-900">G</span>abungan.</span>
+          </p>
+        </div>
+      </div>
+
+      {/* Main Card */}
+      <div class="overflow-hidden rounded-[2.5rem] bg-white p-8 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] ring-1 ring-slate-100 sm:p-10">
+        <LoginForm client:load siteKey={turnstileSiteKey} />
+      </div>
+    </div>
+
+    <div class="relative z-10 mt-12 text-center">
+      <p class="text-[10px] font-bold tracking-[0.2em] text-slate-400 uppercase">
+        © {year} SI BETANG Kemenag Barito Utara
+      </p>
+    </div>
+  </div>
+</BaseLayout>

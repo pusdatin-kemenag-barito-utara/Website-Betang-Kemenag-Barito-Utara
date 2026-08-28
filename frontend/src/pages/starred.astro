@@ -1,0 +1,95 @@
+---
+import DashboardLayout from "@/layouts/DashboardLayout.astro";
+import PageBanner from "@/components/ui/PageBanner.astro";
+import { Star } from "lucide-react";
+import { FileBrowserView } from "@/components/FileBrowser/FileBrowserView";
+import { apiGet, requireUser } from "@/lib/server";
+import { formatFileSize } from "@/lib/utils";
+import { format } from "date-fns";
+import { id } from "date-fns/locale";
+
+const cookie = Astro.request.headers.get("cookie") || "";
+const [auth, starredRes] = await Promise.all([
+  requireUser(cookie),
+  apiGet("/starred", cookie),
+]);
+
+if (!auth.ok) {
+  return Astro.redirect("/login");
+}
+
+const userBidangId = "global";
+const contents = starredRes.ok ? starredRes.body?.data : null;
+const folders: any[] = contents?.folders ?? [];
+const files: any[] = contents?.files ?? [];
+
+const formatDate = (dateStr: string | null | undefined) => {
+  if (!dateStr) return "-";
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return "-";
+    return format(d, "d MMM yyyy", { locale: id });
+  } catch {
+    return "-";
+  }
+};
+
+const items = [
+  ...(folders || []).map((f: any) => {
+    const folderSize = f.total_size || 0;
+    const dateVal = f.updated_at || f.created_at;
+    return {
+      id: f.id,
+      name: f.name,
+      type: "folder" as const,
+      size: folderSize > 0 ? formatFileSize(folderSize) : "-",
+      rawSizeBytes: folderSize,
+      updatedAt: formatDate(dateVal),
+      rawDate: dateVal,
+      createdAt: formatDate(f.created_at),
+      isRestricted: f.is_restricted || false,
+      isStarred: true,
+      color: f.color || null,
+    };
+  }),
+  ...(files || []).map((f: any) => {
+    const dateVal = f.updated_at || f.created_at;
+    return {
+      id: f.id,
+      name: f.name,
+      type: "file" as const,
+      mimeType: f.mime_type,
+      size: formatFileSize(f.size_bytes),
+      rawSizeBytes: f.size_bytes,
+      updatedAt: formatDate(dateVal),
+      rawDate: dateVal,
+      createdAt: formatDate(f.created_at),
+      uploadedBy: f.uploaded_by,
+      isRestricted: f.is_restricted || false,
+      isStarred: true,
+      objectKey: f.r2_object_key,
+    };
+  }),
+];
+
+const breadcrumbs = [{ id: "starred", name: "Berbintang" }];
+---
+
+<DashboardLayout title="Dokumen Berbintang" description="Akses cepat ke seluruh berkas dan folder penting yang telah Anda tandai sebagai favorit">
+  <div class="flex flex-col gap-6 pb-10">
+    <PageBanner
+      title="Dokumen Berbintang"
+      description="Akses instan ke berkas dan folder favorit Anda tanpa mencari di hirarki folder"
+    >
+      <Star className="h-8 w-8 text-amber-300 fill-amber-300" slot="icon" />
+    </PageBanner>
+
+    <FileBrowserView
+      client:load
+      folderId="starred"
+      initialItems={items}
+      breadcrumbs={breadcrumbs}
+      userBidangId={userBidangId}
+    />
+  </div>
+</DashboardLayout>

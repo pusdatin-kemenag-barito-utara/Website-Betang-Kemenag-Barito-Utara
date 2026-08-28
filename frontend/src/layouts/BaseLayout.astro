@@ -1,0 +1,315 @@
+---
+import "@fontsource-variable/plus-jakarta-sans";
+import "@/styles/global.css";
+import { MaintenanceListener } from "@/components/layout/MaintenanceListener";
+import { ToasterIsland } from "@/components/layout/ToasterIsland";
+import { PwaInstallPrompt } from "@/components/layout/PwaInstallPrompt";
+import { ClientRouter } from "astro:transitions";
+
+interface BreadcrumbItem {
+  name: string;
+  url: string;
+}
+
+interface Props {
+  title?: string;
+  description?: string;
+  image?: string;
+  breadcrumbs?: BreadcrumbItem[];
+  noindex?: boolean;
+}
+
+const {
+  title = "SI BETANG - E-Arsip Kemenag Barito Utara",
+  description = "Sistem Informasi Manajemen dan Pengarsipan Digital Terpadu Kantor Kementerian Agama Kabupaten Barito Utara",
+  image = "/og-image.png",
+  breadcrumbs = [],
+  noindex = false,
+} = Astro.props;
+
+const fullTitle =
+  title === "SI BETANG - E-Arsip Kemenag Barito Utara" ? title : `${title} | SI BETANG`;
+const siteUrl = (Astro.site?.toString() || Astro.url.origin).replace(/\/+$/, "");
+const canonicalUrl = new URL(Astro.url.pathname, siteUrl).toString();
+const ogImageUrl = new URL(image, siteUrl).toString();
+
+// Schema.org Enterprise JSON-LD Graph
+const jsonLdGraph: any[] = [
+  {
+    "@type": "GovernmentOrganization",
+    "@id": `${siteUrl}#organization`,
+    name: "Kantor Kementerian Agama Kabupaten Barito Utara",
+    alternateName: ["Kemenag Barito Utara", "Kemenag Batara"],
+    url: "https://kemenag-baritoutara.com",
+    logo: {
+      "@type": "ImageObject",
+      url: `${siteUrl}/logo.png`,
+      width: 512,
+      height: 512,
+      caption: "Logo Resmi Kementerian Agama RI",
+    },
+    parentOrganization: {
+      "@type": "GovernmentOrganization",
+      name: "Kementerian Agama Republik Indonesia",
+      url: "https://kemenag.go.id",
+    },
+    address: {
+      "@type": "PostalAddress",
+      streetAddress: "Jl. A. Yani No. 85",
+      addressLocality: "Muara Teweh",
+      addressRegion: "Kalimantan Tengah",
+      postalCode: "73811",
+      addressCountry: "ID",
+    },
+    contactPoint: {
+      "@type": "ContactPoint",
+      telephone: "+62-519-21013",
+      contactType: "customer support",
+      areaServed: "ID",
+      availableLanguage: ["id", "en"],
+    },
+  },
+  {
+    "@type": "WebSite",
+    "@id": `${siteUrl}#website`,
+    url: siteUrl,
+    name: "SI BETANG - E-Arsip Digital",
+    description: description,
+    publisher: {
+      "@id": `${siteUrl}#organization`,
+    },
+    inLanguage: "id-ID",
+    potentialAction: {
+      "@type": "SearchAction",
+      target: {
+        "@type": "EntryPoint",
+        urlTemplate: `${siteUrl}/folders/root?q={search_term_string}`,
+      },
+      "query-input": "required name=search_term_string",
+    },
+  },
+  {
+    "@type": "WebApplication",
+    "@id": `${siteUrl}#webapp`,
+    name: "SI BETANG (Sistem Informasi Berkas & Tata Kelola Digital)",
+    url: siteUrl,
+    applicationCategory: "BusinessApplication",
+    applicationSubCategory: "Document Management System",
+    operatingSystem: "All (Web, Android, iOS, Windows, macOS, Linux)",
+    browserRequirements: "Requires JavaScript. Requires HTML5 Canvas.",
+    softwareVersion: "2.0.0-enterprise",
+    description: description,
+    offers: {
+      "@type": "Offer",
+      price: "0",
+      priceCurrency: "IDR",
+    },
+    screenshot: [
+      `${siteUrl}/pwa-screenshot-desktop.png`,
+      `${siteUrl}/pwa-screenshot-mobile.png`,
+    ],
+    featureList: [
+      "Penyimpanan Cloudflare R2 Berkecepatan Tinggi",
+      "Penampil Dokumen PDF & Gambar Resolusi Tinggi",
+      "Manajemen Folder Hirarkis dan Riwayat Versi Berkas",
+      "Unduh Berkas Batch dalam Format ZIP",
+      "PWA Offline Mode & Push Notifications Support",
+      "Autentikasi Aman Berbasis Supabase Auth",
+    ],
+    publisher: {
+      "@id": `${siteUrl}#organization`,
+    },
+  },
+];
+
+if (breadcrumbs && breadcrumbs.length > 0) {
+  jsonLdGraph.push({
+    "@type": "BreadcrumbList",
+    "@id": `${canonicalUrl}#breadcrumbs`,
+    itemListElement: breadcrumbs.map((crumb, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      name: crumb.name,
+      item: new URL(crumb.url, siteUrl).toString(),
+    })),
+  });
+}
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@graph": jsonLdGraph,
+};
+---
+
+<!doctype html>
+<html lang="id" class="h-full">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="generator" content={Astro.generator} />
+
+    <!-- 🚀 Priority Hints & Preload Critical Assets -->
+    <link rel="preconnect" href="https://challenges.cloudflare.com" crossorigin />
+    <link rel="preconnect" href="https://www.googletagmanager.com" crossorigin />
+    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="dns-prefetch" href="https://challenges.cloudflare.com" />
+    <link rel="dns-prefetch" href="https://c98eb02b668a13c16b14ebff0ef6a37c.r2.cloudflarestorage.com" />
+
+    <link rel="preload" href="/kemenag.svg" as="image" type="image/svg+xml" fetchpriority="high" />
+    <link rel="preload" href="/logo.png" as="image" type="image/png" fetchpriority="high" />
+
+    <!-- 🌐 Canonical URL & SEO Basics -->
+    <title>{fullTitle}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonicalUrl} />
+    <meta name="author" content="Pusdatin Kemenag Barito Utara" />
+    <link rel="author" href="/humans.txt" />
+
+    <!-- 🤖 Googlebot & Search Crawlers Advanced Directives -->
+    {
+      noindex ? (
+        <meta name="robots" content="noindex, nofollow" />
+      ) : (
+        <>
+          <meta name="robots" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+          <meta name="googlebot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+          <meta name="bingbot" content="index, follow, max-snippet:-1, max-image-preview:large, max-video-preview:-1" />
+        </>
+      )
+    }
+
+    <!-- 📍 Geographical Local SEO (Barito Utara, Kalimantan Tengah) -->
+    <meta name="geo.region" content="ID-KT" />
+    <meta name="geo.placename" content="Muara Teweh" />
+    <meta name="geo.position" content="-0.9634;114.8967" />
+    <meta name="ICBM" content="-0.9634, 114.8967" />
+
+    <!-- 🎨 Favicons & Progressive Web App (PWA) Manifest -->
+    <link rel="icon" type="image/svg+xml" href="/kemenag.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/pwa-192x192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/pwa-512x512.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <!-- 📱 PWA Meta Directives -->
+    <meta name="theme-color" content="#059669" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0f172a" media="(prefers-color-scheme: dark)" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="SI BETANG" />
+    <meta name="application-name" content="SI BETANG" />
+    <meta name="format-detection" content="telephone=no" />
+
+    <!-- 🔗 Open Graph / Facebook / WhatsApp Meta Tags -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="SI BETANG - Kemenag Barito Utara" />
+    <meta property="og:title" content={fullTitle} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonicalUrl} />
+    <meta property="og:image" content={ogImageUrl} />
+    <meta property="og:image:secure_url" content={ogImageUrl} />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="SI BETANG E-Arsip Digital Kemenag Barito Utara" />
+    <meta property="og:locale" content="id_ID" />
+
+    <!-- 🐦 Twitter Cards Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={fullTitle} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImageUrl} />
+    <meta name="twitter:image:alt" content="SI BETANG E-Arsip Kemenag Barito Utara" />
+
+    <!-- 📜 JSON-LD Structured Data -->
+    <script is:inline type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+
+    <!-- ⚡ Astro ClientRouter Transitions -->
+    <ClientRouter />
+
+    <!-- 📊 Google Tag (gtag.js) - GA4 & GTM -->
+    <script is:inline async src="https://www.googletagmanager.com/gtag/js?id=G-K02LW54C8P"></script>
+    <script is:inline>
+      window.dataLayer = window.dataLayer || [];
+      function gtag() {
+        window.dataLayer.push(arguments);
+      }
+      window.gtag = gtag;
+      gtag("js", new Date());
+      gtag("config", "G-K02LW54C8P", {
+        send_page_view: true,
+      });
+      gtag("config", "GT-NBQNNM4B");
+
+      document.addEventListener("DOMContentLoaded", function () {
+        document.addEventListener(
+          "click",
+          function (event) {
+            const target = event.target;
+            if (!target || !(target instanceof Element)) return;
+
+            const clickable = target.closest(
+              "button, a, input[type='submit'], [role='button'], [role='switch'], [data-track]",
+            );
+            if (!clickable) return;
+
+            const tagName = clickable.tagName.toLowerCase();
+            const elementText = (
+              clickable.innerText ||
+              clickable.textContent ||
+              clickable.getAttribute("aria-label") ||
+              clickable.getAttribute("title") ||
+              ""
+            )
+              .trim()
+              .substring(0, 100);
+            const elementId = clickable.id || "";
+            const href = clickable.getAttribute("href") || "";
+
+            if (window.dataLayer && Array.isArray(window.dataLayer)) {
+              window.dataLayer.push({
+                event: "element_click",
+                click_tag: tagName,
+                click_text: elementText,
+                click_id: elementId,
+                click_url: href,
+                page_location: window.location.href,
+                page_path: window.location.pathname,
+              });
+            }
+
+            if (typeof window.gtag === "function") {
+              window.gtag("event", "element_click", {
+                click_tag: tagName,
+                click_text: elementText,
+                click_id: elementId,
+                click_url: href,
+              });
+            }
+          },
+          { passive: true, capture: true },
+        );
+      });
+    </script>
+
+    <!-- 📱 PWA Service Worker Registration -->
+    <script is:inline>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker
+            .register("/sw.js", { scope: "/" })
+            .catch((err) => console.log("PWA Service Worker:", err));
+        });
+      }
+    </script>
+  </head>
+  <body class="h-full bg-slate-50 text-slate-900 antialiased selection:bg-emerald-500 selection:text-white">
+    <slot />
+    <ToasterIsland client:load transition:persist="toaster-island" />
+    <PwaInstallPrompt client:load transition:persist="pwa-install-prompt" />
+    <MaintenanceListener client:load />
+  </body>
+</html>

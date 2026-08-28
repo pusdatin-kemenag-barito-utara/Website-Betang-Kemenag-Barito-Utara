@@ -1,45 +1,24 @@
 {
-  "name": "my-app",
-  "version": "0.1.0",
+  "name": "betang-kemenag",
+  "version": "1.0.0",
   "private": true,
+  "description": "SI BETANG - Sistem Informasi Basis Elektronik Tata Arsip dan Naskah Gabungan Kementerian Agama Kabupaten Barito Utara",
+  "workspaces": [
+    "frontend"
+  ],
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint",
-    "type-check": "tsc --noEmit"
+    "dev": "concurrently -n \"Backend,FrontEnd\" -c \"magenta.bold,cyan.bold\" --kill-others-on-fail \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:frontend": "npm run dev --workspace=frontend",
+    "dev:backend": "cd backend && air",
+    "dev:backend:go": "cd backend && go run ./cmd/api",
+    "build:frontend": "npm run build --workspace=frontend",
+    "build:backend": "cd backend && go build -o bin/betang-api ./cmd/api",
+    "build": "npm run build:backend && npm run build:frontend"
   },
-  "dependencies": {
-    "@aws-sdk/client-s3": "^3.1073.0",
-    "@aws-sdk/s3-request-presigner": "^3.1073.0",
-    "@ducanh2912/next-pwa": "^10.2.9",
-    "@marsidev/react-turnstile": "^1.5.3",
-    "@supabase/ssr": "^0.12.0",
-    "@supabase/supabase-js": "^2.108.2",
-    "@tanstack/react-table": "^8.21.3",
-    "@tanstack/react-virtual": "^3.14.3",
-    "clsx": "^2.1.1",
-    "date-fns": "^4.4.0",
-    "file-saver": "^2.0.5",
-    "framer-motion": "^12.40.0",
-    "jszip": "^3.10.1",
-    "lucide-react": "^1.21.0",
-    "next": "16.2.9",
-    "react": "19.2.4",
-    "react-dom": "19.2.4",
-    "sonner": "^2.0.7",
-    "tailwind-merge": "^3.6.0",
-    "zustand": "^5.0.14"
+  "engines": {
+    "node": ">=20"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4",
-    "@types/file-saver": "^2.0.7",
-    "@types/node": "^20",
-    "@types/react": "^19",
-    "@types/react-dom": "^19",
-    "eslint": "^9",
-    "eslint-config-next": "16.2.9",
-    "tailwindcss": "^4",
-    "typescript": "^5"
+    "concurrently": "^10.0.5"
   }
 }

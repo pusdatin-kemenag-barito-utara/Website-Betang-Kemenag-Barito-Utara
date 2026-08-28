@@ -1,0 +1,46 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: betang-backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - PORT=${BE_PORT:-8080}
+    ports:
+      - "${BE_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/api/v1/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - betang-net
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: betang-frontend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - PORT=${FE_PORT:-3000}
+      - PUBLIC_API_URL=${PUBLIC_API_URL}
+      - PUBLIC_PUSDATIN_URL=${PUBLIC_PUSDATIN_URL}
+      - PUBLIC_TURNSTILE_SITE_KEY=${PUBLIC_TURNSTILE_SITE_KEY}
+    ports:
+      - "${FE_PORT:-3000}:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - betang-net
+
+networks:
+  betang-net:
+    driver: bridge

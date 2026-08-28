@@ -1,60 +1,100 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# ==============================================================================
+# SI BETANG - Monorepo .gitignore (Go Fiber v3 + Astro v7)
+# ==============================================================================
 
-# dependencies
-/node_modules
-/.pnp
+# ------------------------------------------------------------------------------
+# Dependencies
+# ------------------------------------------------------------------------------
+node_modules/
+.pnp
 .pnp.*
-.yarn/*
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
+package-lock.json.bak
 
-# testing & reports
-/coverage
-test-results/
-playwright-report/
+# ------------------------------------------------------------------------------
+# Environment Variables & Secrets (CRITICAL)
+# ------------------------------------------------------------------------------
+.env
+.env.*
+*.env
+backend/.env
+frontend/.env
+!*.env.example
+!*.env.template
 
-# next.js & build
-/.next/
-/out/
-/build
+# ------------------------------------------------------------------------------
+# Frontend (Astro v7 + Vite + React)
+# ------------------------------------------------------------------------------
+.astro/
+frontend/.astro/
 dist/
-.cache/
-.turbo/
+frontend/dist/
+out/
+build/
+.vite/
+frontend/.vite/
+*.tsbuildinfo
+.next/
 
-# misc & OS
-.DS_Store
-Thumbs.db
-*.pem
+# ------------------------------------------------------------------------------
+# Backend (Go + Fiber v3 + Air)
+# ------------------------------------------------------------------------------
+bin/
+backend/bin/
+tmp/
+backend/tmp/
+*.test
+*.out
+*.exe
+*.dll
+*.so
+*.dylib
+betang-api
+api
 
-# debug
+# ------------------------------------------------------------------------------
+# Logs & Process
+# ------------------------------------------------------------------------------
+*.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-.pnpm-debug.log*
+pnpm-debug.log*
 
-# env files (can opt-in for committing if needed)
-.env*
-.env.local
-.env*.local
+# ------------------------------------------------------------------------------
+# Testing & Code Coverage
+# ------------------------------------------------------------------------------
+coverage/
+.coverage/
+test-results/
+playwright-report/
 
-# vercel
-.vercel
+# ------------------------------------------------------------------------------
+# Operating System Files
+# ------------------------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-
-# IDE & Editor settings
-.vscode/
+# ------------------------------------------------------------------------------
+# IDEs & Editors
+# ------------------------------------------------------------------------------
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
 .idea/
+*.sublime-project
+*.sublime-workspace
 
-# AI Assistants & Temporary / Scratchpad scripts
+# ------------------------------------------------------------------------------
+# AI Assistants, Scratchpads & Temporary Workspaces
+# ------------------------------------------------------------------------------
 .claude/
 .opencode/
 .antigravitycli/
 .gemini/
 scratch/
 scripts/
-

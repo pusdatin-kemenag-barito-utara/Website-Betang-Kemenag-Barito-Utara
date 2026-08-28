@@ -1,0 +1,17 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+
+const pusdatinUrl =
+  import.meta.env.PUBLIC_PUSDATIN_URL ||
+  "https://pusdatin.kemenag-baritoutara.com";
+---
+
+<BaseLayout title="Sistem Sedang Pemeliharaan">
+  <div class="w-screen h-screen overflow-hidden bg-slate-50 flex flex-col">
+    <iframe
+      src={`${pusdatinUrl}/maintenance?app=Si+Betang+(E-Arsip)`}
+      title="Sistem Sedang Pemeliharaan"
+      class="w-full h-full border-none"
+    />
+  </div>
+</BaseLayout>

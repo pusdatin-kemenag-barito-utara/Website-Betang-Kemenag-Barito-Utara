@@ -1,0 +1,58 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { WifiOff, RefreshCw, ArrowLeft } from "lucide-react";
+---
+
+<BaseLayout
+  title="Koneksi Terputus (Mode Offline)"
+  description="Anda sedang berada dalam mode offline. Periksa kembali sambungan internet Anda."
+>
+  <main class="flex min-h-screen w-full flex-col items-center justify-center p-4 sm:p-6 bg-slate-950 text-white relative overflow-hidden">
+    <!-- Ambient glow -->
+    <div class="absolute top-1/4 -left-20 h-72 w-72 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none"></div>
+    <div class="absolute bottom-1/4 -right-20 h-72 w-72 rounded-full bg-emerald-600/10 blur-3xl pointer-events-none"></div>
+
+    <div class="relative z-10 flex flex-col items-center text-center max-w-md w-full p-8 rounded-3xl bg-slate-900/80 border border-slate-800 backdrop-blur-xl shadow-2xl">
+      <div class="flex h-20 w-20 items-center justify-center rounded-3xl bg-emerald-950/60 text-emerald-400 border border-emerald-500/30 mb-6 shadow-inner animate-pulse">
+        <WifiOff className="h-10 w-10 text-emerald-400" />
+      </div>
+
+      <h1 class="text-2xl sm:text-3xl font-black text-white tracking-tight">Koneksi Terputus</h1>
+      <p class="mt-3 text-sm text-slate-400 leading-relaxed">
+        Aplikasi <strong class="text-emerald-400">SI BETANG</strong> mendeteksi perangkat Anda sedang tidak terhubung ke jaringan internet.
+      </p>
+
+      <div class="mt-8 flex flex-col sm:flex-row w-full items-center gap-3">
+        <button
+          type="button"
+          onclick="window.location.reload()"
+          class="w-full flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-900/30 hover:bg-emerald-500 transition-all cursor-pointer"
+        >
+          <RefreshCw className="h-4 w-4" />
+          <span>Muat Ulang Halaman</span>
+        </button>
+
+        <button
+          type="button"
+          onclick="window.history.back()"
+          class="w-full flex items-center justify-center gap-2 rounded-xl bg-slate-800 px-5 py-3 text-sm font-bold text-slate-300 hover:bg-slate-700 transition-all cursor-pointer"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          <span>Kembali</span>
+        </button>
+      </div>
+
+      <div class="mt-8 pt-6 border-t border-slate-800/80 w-full flex items-center justify-center gap-2 text-xs text-slate-500 font-medium">
+        <span class="h-2 w-2 rounded-full bg-amber-500 animate-ping"></span>
+        <span>Menunggu koneksi tersambung kembali...</span>
+      </div>
+    </div>
+  </main>
+
+  <script is:inline>
+    // Otomatis refresh saat jaringan kembali online
+    window.addEventListener("online", () => {
+      window.location.reload();
+    });
+  </script>
+</BaseLayout>

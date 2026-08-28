@@ -1,0 +1,40 @@
+# ==============================================================================
+# Enterprise Robots.txt - SI BETANG (E-Arsip Kemenag Barito Utara)
+# ==============================================================================
+
+User-agent: *
+Allow: /
+Allow: /login
+Allow: /offline
+Allow: /kemenag.svg
+Allow: /logo.png
+Allow: /og-image.png
+Allow: /manifest.webmanifest
+
+# Disallow sensitive internal endpoints and raw data streams
+Disallow: /api/
+Disallow: /_image
+Disallow: /settings
+Disallow: /trash
+
+# Specific Search Engine Crawlers Optimization
+User-agent: Googlebot
+Allow: /
+Allow: /login
+Allow: /offline
+Disallow: /api/
+
+User-agent: Googlebot-Image
+Allow: /logo.png
+Allow: /og-image.png
+Allow: /kemenag.svg
+Allow: /pwa-*.png
+Disallow: /api/
+
+User-agent: Bingbot
+Allow: /
+Disallow: /api/
+
+# Sitemap Location
+Sitemap: https://betang.kemenag-baritoutara.com/sitemap.xml
+Sitemap: http://localhost:3000/sitemap.xml
