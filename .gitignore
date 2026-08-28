@@ -48,8 +48,9 @@ backend/tmp/
 *.dll
 *.so
 *.dylib
-betang-api
-api
+/app/betang-api
+/build/bin/
+
 
 # ------------------------------------------------------------------------------
 # Logs & Process
