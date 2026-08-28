@@ -63,7 +63,7 @@ const year = new Date().getFullYear();
 
       {/* Main Card */}
       <div class="overflow-hidden rounded-[2.5rem] bg-white p-8 shadow-[0_20px_40px_-15px_rgba(0,0,0,0.05)] ring-1 ring-slate-100 sm:p-10">
-        <LoginForm client:only="react" siteKey={turnstileSiteKey} />
+        <LoginForm client:load siteKey={turnstileSiteKey} />
       </div>
     </div>
 

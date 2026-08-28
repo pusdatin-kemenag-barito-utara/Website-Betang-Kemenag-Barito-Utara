@@ -63,6 +63,6 @@ const trashItems = trashRaw.map((t) => {
       <Trash2 className="h-8 w-8 text-white" slot="icon" />
     </PageBanner>
 
-    <TrashView client:only="react" initialData={trashItems} />
+    <TrashView client:load initialData={trashItems} />
   </div>
 </DashboardLayout>

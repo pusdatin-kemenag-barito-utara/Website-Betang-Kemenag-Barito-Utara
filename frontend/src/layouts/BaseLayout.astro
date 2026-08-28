@@ -308,8 +308,8 @@ const jsonLd = {
   </head>
   <body class="h-full bg-slate-50 text-slate-900 antialiased selection:bg-emerald-500 selection:text-white">
     <slot />
-    <ToasterIsland client:only="react" transition:persist="toaster-island" />
-    <PwaInstallPrompt client:only="react" transition:persist="pwa-install-prompt" />
-    <MaintenanceListener client:only="react" />
+    <ToasterIsland client:load transition:persist="toaster-island" />
+    <PwaInstallPrompt client:load transition:persist="pwa-install-prompt" />
+    <MaintenanceListener client:load />
   </body>
 </html>

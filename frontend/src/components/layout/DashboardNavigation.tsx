@@ -24,7 +24,7 @@ export function DashboardNavigation({ currentPath, isSuperAdmin }: DashboardNavi
   return (
     <>
       {/* Sidebar Desktop */}
-      <div className="hidden md:block h-full">
+      <div className="hidden md:flex md:w-72 md:flex-col h-full flex-shrink-0">
         <Sidebar currentPath={currentPath} isSuperAdmin={isSuperAdmin} />
       </div>
 
