@@ -86,6 +86,12 @@ export function FileBrowserView({
   const [breadcrumbsList, setBreadcrumbsList] = useState<{ id: string; name: string }[]>(initialBreadcrumbs);
   const [isLoadingFolder, setIsLoadingFolder] = useState<boolean>(false);
 
+  useEffect(() => {
+    setCurrentFolderId(initialFolderId || "root");
+    setItems(initialItems);
+    setBreadcrumbsList(initialBreadcrumbs);
+  }, [initialFolderId, initialItems, initialBreadcrumbs]);
+
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isFolderMode, setIsFolderMode] = useState(false);

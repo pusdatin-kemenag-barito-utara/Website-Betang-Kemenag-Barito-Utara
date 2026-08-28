@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"strconv"
+	"strings"
 
 	"github.com/kemenag-baritoutara/betang-kemenag/internal/domain"
 )
@@ -38,10 +39,21 @@ func (r *FolderRepo) Search(ctx context.Context, query string) ([]domain.Folder,
 // GetFolderSizes menghitung ukuran total (rekursif) sekumpulan folder via RPC.
 // total_size bertipe NUMERIC sehingga di-scan sebagai string.
 func (r *FolderRepo) GetFolderSizes(ctx context.Context, ids []string) (map[string]int64, error) {
+	validIDs := make([]string, 0, len(ids))
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id != "" && id != "root" && id != "undefined" && id != "null" && len(id) == 36 {
+			validIDs = append(validIDs, id)
+		}
+	}
+	if len(validIDs) == 0 {
+		return map[string]int64{}, nil
+	}
+
 	rows, err := r.pool.Query(ctx, `
-		SELECT folder_id, total_size::text FROM kemenag_arsip.get_folders_size($1::uuid[])`, ids)
+		SELECT folder_id, total_size::text FROM kemenag_arsip.get_folders_size($1::uuid[])`, validIDs)
 	if err != nil {
-		return nil, err
+		return map[string]int64{}, nil
 	}
 	defer rows.Close()
 
@@ -50,20 +62,25 @@ func (r *FolderRepo) GetFolderSizes(ctx context.Context, ids []string) (map[stri
 		var folderID string
 		var totalSize string
 		if err := rows.Scan(&folderID, &totalSize); err != nil {
-			return nil, err
+			continue
 		}
 		size, _ := strconv.ParseInt(totalSize, 10, 64)
 		result[folderID] = size
 	}
-	return result, rows.Err()
+	return result, nil
 }
 
 // GetFolderPath mengambil jalur folder [daun -> akar] via RPC.
 func (r *FolderRepo) GetFolderPath(ctx context.Context, id string) ([]domain.Breadcrumb, error) {
+	id = strings.TrimSpace(id)
+	if id == "" || id == "root" || id == "undefined" || id == "null" || len(id) != 36 {
+		return []domain.Breadcrumb{}, nil
+	}
+
 	rows, err := r.pool.Query(ctx, `
 		SELECT id, name FROM kemenag_arsip.get_folder_path($1::uuid)`, id)
 	if err != nil {
-		return nil, err
+		return []domain.Breadcrumb{}, nil
 	}
 	defer rows.Close()
 
@@ -71,11 +88,11 @@ func (r *FolderRepo) GetFolderPath(ctx context.Context, id string) ([]domain.Bre
 	for rows.Next() {
 		var b domain.Breadcrumb
 		if err := rows.Scan(&b.ID, &b.Name); err != nil {
-			return nil, err
+			continue
 		}
 		items = append(items, b)
 	}
-	return items, rows.Err()
+	return items, nil
 }
 
 // GetAllFilesInFolder mengambil seluruh file aktif di dalam folder beserta
