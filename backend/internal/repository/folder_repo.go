@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -34,6 +35,9 @@ func (r *FolderRepo) ListByParent(ctx context.Context, parentID *string) ([]doma
 	if parentID == nil || *parentID == "" || *parentID == "root" {
 		query = `SELECT ` + folderColumns + ` FROM kemenag_arsip.folders WHERE deleted_at IS NULL AND parent_id IS NULL ORDER BY name ASC`
 	} else {
+		if len(*parentID) != 36 {
+			return []domain.Folder{}, nil
+		}
 		query = `SELECT ` + folderColumns + ` FROM kemenag_arsip.folders WHERE deleted_at IS NULL AND parent_id = $1::uuid ORDER BY name ASC`
 		args = append(args, *parentID)
 	}
@@ -125,6 +129,10 @@ func (r *FolderRepo) UpdateParent(ctx context.Context, id string, parentID *stri
 
 // GetBidangID mengambil bidang_id sebuah folder.
 func (r *FolderRepo) GetBidangID(ctx context.Context, id string) (*string, error) {
+	id = strings.TrimSpace(id)
+	if id == "" || id == "root" || id == "undefined" || id == "null" || len(id) != 36 {
+		return nil, nil
+	}
 	var bidangID *string
 	err := r.pool.QueryRow(ctx, `SELECT bidang_id FROM kemenag_arsip.folders WHERE id = $1`, id).Scan(&bidangID)
 	if errors.Is(err, pgx.ErrNoRows) {

@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -35,6 +36,9 @@ func (r *FileRepo) ListByFolder(ctx context.Context, folderID *string) ([]domain
 	if folderID == nil || *folderID == "" || *folderID == "root" {
 		query = `SELECT ` + fileColumns + ` FROM kemenag_arsip.files WHERE deleted_at IS NULL AND folder_id IS NULL ORDER BY created_at DESC`
 	} else {
+		if len(*folderID) != 36 {
+			return []domain.File{}, nil
+		}
 		query = `SELECT ` + fileColumns + ` FROM kemenag_arsip.files WHERE deleted_at IS NULL AND folder_id = $1::uuid ORDER BY created_at DESC`
 		args = append(args, *folderID)
 	}
@@ -125,6 +129,10 @@ func (r *FileRepo) UpdateFolder(ctx context.Context, id string, folderID *string
 
 // GetBidangID mengambil bidang_id sebuah file.
 func (r *FileRepo) GetBidangID(ctx context.Context, id string) (*string, error) {
+	id = strings.TrimSpace(id)
+	if id == "" || id == "root" || id == "undefined" || id == "null" || len(id) != 36 {
+		return nil, nil
+	}
 	var bidangID *string
 	err := r.pool.QueryRow(ctx, `SELECT bidang_id FROM kemenag_arsip.files WHERE id = $1`, id).Scan(&bidangID)
 	if errors.Is(err, pgx.ErrNoRows) {

@@ -114,5 +114,19 @@ func cleanUUID(s string) *string {
 	if s == "" || s == "root" || s == "undefined" || s == "null" || s == "starred" {
 		return nil
 	}
+	if len(s) != 36 {
+		return nil
+	}
+	for i, r := range s {
+		if i == 8 || i == 13 || i == 18 || i == 23 {
+			if r != '-' {
+				return nil
+			}
+		} else {
+			if !((r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') || (r >= 'A' && r <= 'F')) {
+				return nil
+			}
+		}
+	}
 	return &s
 }
