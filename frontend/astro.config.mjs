@@ -14,7 +14,10 @@ export default defineConfig({
     host: "0.0.0.0",
   },
   output: "server",
-  adapter: node({ mode: "standalone" }),
+  adapter: node({ mode: "standalone", assets: true }),
+  security: {
+    checkOrigin: false,
+  },
   integrations: [
     react(),
   ],
