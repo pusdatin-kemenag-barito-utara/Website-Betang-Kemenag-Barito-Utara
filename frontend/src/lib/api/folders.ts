@@ -2,6 +2,11 @@ import { request } from "./client";
 
 export async function getFolderContents(folderId: string, query = "") {
   try {
+    if (folderId === "starred") {
+      const res = await request("/starred");
+      if (!res.success) throw new Error(res.error || "Gagal memuat item berbintang");
+      return { success: true, data: res.data };
+    }
     const cleanId = folderId || "root";
     const q = query ? `?q=${encodeURIComponent(query)}` : "";
     const res = await request(`/folders/${encodeURIComponent(cleanId)}${q}`);
@@ -14,6 +19,9 @@ export async function getFolderContents(folderId: string, query = "") {
 
 export async function getBreadcrumbs(folderId: string) {
   try {
+    if (folderId === "starred") {
+      return { success: true, data: [{ id: "starred", name: "Berbintang" }] };
+    }
     const cleanId = folderId || "root";
     const res = await request(`/folders/${encodeURIComponent(cleanId)}/breadcrumbs`);
     if (!res.success) throw new Error(res.error || "Gagal memuat breadcrumbs");

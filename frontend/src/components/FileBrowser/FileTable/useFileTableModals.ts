@@ -4,6 +4,7 @@ import {
   getPresignedDownloadUrl,
   downloadZip,
   toggleStar,
+  API_ORIGIN,
 } from "@/lib/api";
 import { toast } from "sonner";
 import type { FileItem } from "@/lib/types";
@@ -54,15 +55,17 @@ export function useFileTableModals({
     }
     setPreviewFile(item);
     setPreviewLoading(true);
+    setPreviewUrl(null);
     try {
-      const res = await getPresignedDownloadUrl(item.objectKey || item.id, item.name);
+      const key = item.objectKey || item.id;
+      const res = await getPresignedDownloadUrl(key, item.name);
       if (res.success && res.presignedUrl) {
         setPreviewUrl(res.presignedUrl);
       } else {
-        toast.error("Gagal memuat pratinjau berkas");
+        setPreviewUrl(`${API_ORIGIN}/api/v1/files/stream?key=${encodeURIComponent(key)}`);
       }
     } catch {
-      toast.error("Terjadi kesalahan jaringan");
+      setPreviewUrl(`${API_ORIGIN}/api/v1/files/stream?key=${encodeURIComponent(item.objectKey || item.id)}`);
     } finally {
       setPreviewLoading(false);
     }
