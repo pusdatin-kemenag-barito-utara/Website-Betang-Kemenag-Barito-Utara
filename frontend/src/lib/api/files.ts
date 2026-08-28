@@ -14,11 +14,15 @@ export async function saveFileMetadata({
   sizeBytes: number;
 }) {
   try {
+    const cleanFolderId =
+      folderId && folderId !== "root" && folderId !== "undefined" && folderId !== "null" && folderId !== "starred"
+        ? folderId
+        : "root";
     const res = await request("/files/metadata", {
       method: "POST",
       body: JSON.stringify({
         name,
-        folderId: folderId || "root",
+        folderId: cleanFolderId,
         r2ObjectKey,
         mimeType,
         sizeBytes,
@@ -33,9 +37,13 @@ export async function saveFileMetadata({
 
 export async function uploadFileDirect(file: File, folderId: string | null, name?: string) {
   try {
+    const cleanFolderId =
+      folderId && folderId !== "root" && folderId !== "undefined" && folderId !== "null" && folderId !== "starred"
+        ? folderId
+        : "root";
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("folderId", folderId || "root");
+    formData.append("folderId", cleanFolderId);
     formData.append("name", name || file.name);
 
     const res = await fetch(`${API_ORIGIN}/api/v1/files/upload`, {

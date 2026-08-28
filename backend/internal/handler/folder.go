@@ -26,11 +26,7 @@ func (h *FolderHandler) Contents(c fiber.Ctx) error {
 	folderID := c.Params("folderId")
 	query := strings.TrimSpace(c.Query("q"))
 
-	var parentID *string
-	if folderID != "" && folderID != "root" {
-		parentID = &folderID
-	}
-
+	parentID := cleanUUID(folderID)
 	contents, err := h.folders.Contents(c.Context(), parentID, query)
 	if err != nil {
 		return writeFail(c, fiber.StatusInternalServerError, "Gagal memuat isi folder.")
@@ -41,10 +37,11 @@ func (h *FolderHandler) Contents(c fiber.Ctx) error {
 // Breadcrumbs mengambil jalur folder dari akar hingga folder saat ini.
 func (h *FolderHandler) Breadcrumbs(c fiber.Ctx) error {
 	folderID := c.Params("folderId")
-	if folderID == "" || folderID == "root" {
+	cleanID := cleanUUID(folderID)
+	if cleanID == nil {
 		return writeOK(c, []any{})
 	}
-	paths, err := h.folders.Breadcrumbs(c.Context(), folderID)
+	paths, err := h.folders.Breadcrumbs(c.Context(), *cleanID)
 	if err != nil {
 		return writeFail(c, fiber.StatusInternalServerError, "Gagal memuat jalur folder.")
 	}
@@ -71,10 +68,7 @@ func (h *FolderHandler) Create(c fiber.Ctx) error {
 	}
 
 	user := currentUser(c)
-	var parentID *string
-	if req.ParentID != "" && req.ParentID != "root" {
-		parentID = &req.ParentID
-	}
+	parentID := cleanUUID(req.ParentID)
 	created, err := h.folders.Create(c.Context(), req.Name, parentID, user.ID, user.Email, clientIP(c))
 	if err != nil {
 		return writeError(c, err)

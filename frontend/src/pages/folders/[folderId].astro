@@ -50,20 +50,21 @@ const formatDate = (dateStr: string | null | undefined) => {
 
 const items = [
   ...(folders || []).map((f: any) => {
-    const folderSize = f.total_size || 0;
-    const dateVal = f.updated_at || f.created_at;
+    const folderObj = f.folder || f;
+    const folderSize = f.total_size || folderObj.total_size || 0;
+    const dateVal = folderObj.updated_at || folderObj.created_at;
     return {
-      id: f.id,
-      name: f.name,
+      id: folderObj.id,
+      name: folderObj.name || "Folder Tanpa Nama",
       type: "folder" as const,
       size: folderSize > 0 ? formatFileSize(folderSize) : "-",
       rawSizeBytes: folderSize,
       updatedAt: formatDate(dateVal),
       rawDate: dateVal,
-      createdAt: formatDate(f.created_at),
-      isRestricted: f.is_restricted || false,
-      isStarred: f.is_starred || false,
-      color: f.color || null,
+      createdAt: formatDate(folderObj.created_at),
+      isRestricted: folderObj.is_restricted || false,
+      isStarred: folderObj.is_starred || false,
+      color: folderObj.color || null,
     };
   }),
   ...(files || []).map((f: any) => {

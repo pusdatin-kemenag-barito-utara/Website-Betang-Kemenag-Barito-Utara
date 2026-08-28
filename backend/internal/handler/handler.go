@@ -4,6 +4,7 @@ package handler
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/gofiber/fiber/v3"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -105,4 +106,13 @@ func splitComma(s string) []string {
 	}
 	result = append(result, current)
 	return result
+}
+
+// cleanUUID membersihkan dan memvalidasi string UUID agar tidak memicu error sintaks PostgreSQL.
+func cleanUUID(s string) *string {
+	s = strings.TrimSpace(s)
+	if s == "" || s == "root" || s == "undefined" || s == "null" || s == "starred" {
+		return nil
+	}
+	return &s
 }

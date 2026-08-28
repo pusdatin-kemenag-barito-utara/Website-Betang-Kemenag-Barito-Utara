@@ -53,11 +53,7 @@ func (h *FileHandler) SaveMetadata(c fiber.Ctx) error {
 		return writeFail(c, fiber.StatusBadRequest, "Data permintaan tidak valid.")
 	}
 	user := currentUser(c)
-
-	var folderID *string
-	if req.FolderID != "" && req.FolderID != "root" {
-		folderID = &req.FolderID
-	}
+	folderID := cleanUUID(req.FolderID)
 	created, err := h.svc.SaveMetadata(c.Context(), req.Name, folderID, req.R2ObjectKey,
 		req.MimeType, req.SizeBytes, user.ID, user.Email, clientIP(c))
 	if err != nil {
@@ -73,16 +69,13 @@ func (h *FileHandler) Upload(c fiber.Ctx) error {
 		return writeFail(c, fiber.StatusBadRequest, "File wajib disertakan.")
 	}
 
-	folderID := c.FormValue("folderId")
+	rawFolderID := c.FormValue("folderId")
 	name := c.FormValue("name")
 	if name == "" {
 		name = fileHeader.Filename
 	}
 
-	var pFolderID *string
-	if folderID != "" && folderID != "root" {
-		pFolderID = &folderID
-	}
+	pFolderID := cleanUUID(rawFolderID)
 
 	file, err := fileHeader.Open()
 	if err != nil {
