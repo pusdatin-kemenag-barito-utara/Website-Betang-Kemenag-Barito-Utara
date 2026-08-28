@@ -48,6 +48,8 @@ export const ALL: APIRoute = async ({ request, params }) => {
       activeProxyOrigin = origin;
       const resHeaders = new Headers(upstream.headers);
       resHeaders.delete("transfer-encoding");
+      resHeaders.delete("content-encoding");
+      resHeaders.delete("content-length");
 
       return new Response(upstream.body, {
         status: upstream.status,

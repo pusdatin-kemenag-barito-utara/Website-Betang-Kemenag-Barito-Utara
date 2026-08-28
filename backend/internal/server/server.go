@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
-	"github.com/gofiber/fiber/v3/middleware/compress"
 	"github.com/gofiber/fiber/v3/middleware/limiter"
 	"github.com/gofiber/fiber/v3/middleware/recover"
 
@@ -88,9 +87,6 @@ func Build(ctx context.Context, cfg *config.Config) (*fiber.App, func(), error) 
 	app.Use(cors.Handle)
 	app.Use(middleware.RequestLogger())
 	app.Use(recover.New())
-	app.Use(compress.New(compress.Config{
-		Level: compress.LevelDefault,
-	}))
 	app.Use(apiLimiter)
 
 	// Kelompok route tanpa autentikasi.
