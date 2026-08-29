@@ -15,6 +15,16 @@ interface FileTableViewProps {
   onRowDoubleClick: (item: FileItem) => void;
 }
 
+const getColumnWidthClass = (colId: string) => {
+  if (colId === "select") return "w-10 sm:w-12";
+  if (colId === "name") return "w-auto";
+  if (colId === "size") return "hidden sm:table-cell sm:w-24";
+  if (colId === "format") return "hidden sm:table-cell sm:w-20";
+  if (colId === "updatedAt") return "hidden md:table-cell md:w-32";
+  if (colId === "actions") return "w-16 sm:w-14";
+  return "";
+};
+
 export function FileTableView({
   table,
   dragOverFolderId,
@@ -27,20 +37,20 @@ export function FileTableView({
   onRowDoubleClick,
 }: FileTableViewProps) {
   return (
-    <div className="overflow-x-auto custom-scrollbar">
-      <table className="w-full text-left border-collapse">
+    <div className="w-full overflow-hidden">
+      <table className="w-full table-fixed text-left border-collapse">
         <thead>
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id} className="border-b border-slate-100 bg-slate-50/50">
               {headerGroup.headers.map((header) => {
                 const canSort = header.column.getCanSort();
                 const isSorted = header.column.getIsSorted();
+                const widthClass = getColumnWidthClass(header.column.id);
 
                 return (
                   <th
                     key={header.id}
-                    style={{ width: header.getSize() !== 150 ? header.getSize() : undefined }}
-                    className="px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider select-none"
+                    className={`px-3 sm:px-4 py-3 text-[11px] font-bold text-slate-500 uppercase tracking-wider select-none ${widthClass}`}
                   >
                     {header.isPlaceholder ? null : (
                       <div
@@ -97,11 +107,14 @@ export function FileTableView({
                     : "hover:bg-slate-50/80"
                 }`}
               >
-                {row.getVisibleCells().map((cell) => (
-                  <td key={cell.id} className="px-4 py-3 text-sm">
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </td>
-                ))}
+                {row.getVisibleCells().map((cell) => {
+                  const widthClass = getColumnWidthClass(cell.column.id);
+                  return (
+                    <td key={cell.id} className={`px-3 sm:px-4 py-2.5 sm:py-3 text-sm overflow-hidden ${widthClass}`}>
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </td>
+                  );
+                })}
               </tr>
             );
           })}

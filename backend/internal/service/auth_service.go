@@ -46,17 +46,22 @@ var ErrNoPermission = errors.New("Anda tidak memiliki hak akses untuk aplikasi E
 // Login memvalidasi Turnstile, memeriksa kredensial ke Supabase, lalu
 // memastikan user terdaftar di pusdatin dengan izin aplikasi e-arsip.
 func (s *AuthService) Login(ctx context.Context, email, password, turnstileToken string, rememberMe bool) (*LoginResult, error) {
-	if turnstileToken == "" {
-		return nil, errors.New("Verifikasi keamanan tidak lengkap. Silakan muat ulang halaman dan coba lagi.")
-	}
+	email = strings.ToLower(strings.TrimSpace(email))
+	password = strings.TrimSpace(password)
 
-	// 1) Validasi Turnstile.
-	if err := s.verifyTurnstile(ctx, turnstileToken); err != nil {
-		return nil, err
+	if s.cfg.TurnstileSecretKey != "" {
+		if turnstileToken == "" {
+			return nil, errors.New("Verifikasi keamanan tidak lengkap. Silakan muat ulang halaman dan coba lagi.")
+		}
+
+		// 1) Validasi Turnstile.
+		if err := s.verifyTurnstile(ctx, turnstileToken); err != nil {
+			return nil, err
+		}
 	}
 
 	// 2) Autentikasi ke Supabase Auth.
-	tokens, err := s.supabase.SignInWithPassword(ctx, strings.TrimSpace(email), password)
+	tokens, err := s.supabase.SignInWithPassword(ctx, email, password)
 	if err != nil {
 		return nil, err
 	}

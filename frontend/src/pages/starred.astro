@@ -14,8 +14,8 @@ let starredRes: any = { ok: false, body: null };
 try {
   const cookie = Astro.request.headers.get("cookie") || "";
   [auth, starredRes] = await Promise.all([
-    requireUser(cookie),
-    apiGet("/starred", cookie),
+    requireUser(cookie, Astro.response.headers),
+    apiGet("/starred", cookie, false, Astro.response.headers),
   ]);
 } catch (e) {
   console.error("Starred SSR Error:", e);

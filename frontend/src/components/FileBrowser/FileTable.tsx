@@ -172,6 +172,7 @@ export function FileTable({
           onNavigate={onNavigate}
           onPreview={handlePreview}
           onContextMenu={handleContextMenuTrigger}
+          onOpenMenu={handleOpenItemMenu}
           onDragStart={handleDragStart}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}

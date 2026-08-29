@@ -13,6 +13,7 @@ interface FileGridViewProps {
   onNavigate?: (id: string) => void;
   onPreview: (item: FileItem) => void;
   onContextMenu: (e: React.MouseEvent, item: FileItem) => void;
+  onOpenMenu?: (e: React.MouseEvent, item: FileItem) => void;
   onDragStart: (e: React.DragEvent, item: FileItem) => void;
   onDragOver: (e: React.DragEvent, item: FileItem) => void;
   onDragLeave: () => void;
@@ -29,13 +30,14 @@ export function FileGridView({
   onNavigate,
   onPreview,
   onContextMenu,
+  onOpenMenu,
   onDragStart,
   onDragOver,
   onDragLeave,
   onDrop,
 }: FileGridViewProps) {
   return (
-    <div className="p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4">
+    <div className="p-3 sm:p-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2.5 sm:gap-4">
       {data.map((item) => {
         const isFolder = item.type === "folder";
         const isSelected = selectedIds[item.id];
@@ -79,7 +81,7 @@ export function FileGridView({
             }`}
           >
             {/* Header Card: Checkbox, Bintang, Titik 3 */}
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-1.5 sm:mb-2">
               <input
                 type="checkbox"
                 checked={!!isSelected}
@@ -89,14 +91,14 @@ export function FileGridView({
                   isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
                 } transition-opacity`}
               />
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-0.5 sm:gap-1">
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     onToggleStar(item, e);
                   }}
-                  className={`p-1 rounded-lg text-slate-300 hover:text-amber-400 transition-colors ${
+                  className={`p-1 rounded-lg text-slate-300 hover:text-amber-400 transition-colors cursor-pointer ${
                     isStarred ? "opacity-100" : "opacity-0 group-hover:opacity-100"
                   }`}
                   title={isStarred ? "Hapus dari Berbintang" : "Tambahkan ke Berbintang"}
@@ -112,12 +114,16 @@ export function FileGridView({
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    onContextMenu(e, item);
+                    if (onOpenMenu) {
+                      onOpenMenu(e, item);
+                    } else {
+                      onContextMenu(e, item);
+                    }
                   }}
-                  className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 opacity-100 transition-colors cursor-pointer"
                   title="Menu Opsi"
                 >
-                  <MoreVertical className="h-3.5 w-3.5" />
+                  <MoreVertical className="h-4 w-4" />
                 </button>
               </div>
             </div>

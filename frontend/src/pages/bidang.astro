@@ -6,7 +6,7 @@ import { BidangView } from "@/components/Bidang/BidangView";
 import { apiGet, requireUser } from "@/lib/server";
 
 const cookie = Astro.request.headers.get("cookie") || "";
-const auth = await requireUser(cookie);
+const auth = await requireUser(cookie, Astro.response.headers);
 if (!auth.ok) {
   return Astro.redirect("/login");
 }
@@ -16,7 +16,7 @@ if (!isSuperAdmin) {
   return Astro.redirect("/");
 }
 
-const res = await apiGet("/bidang", cookie);
+const res = await apiGet("/bidang", cookie, false, Astro.response.headers);
 const bidangRaw: {
   id: string;
   name: string;

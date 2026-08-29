@@ -18,9 +18,9 @@ let breadcrumbsRes: any = { ok: false, body: null };
 try {
   const cookie = Astro.request.headers.get("cookie") || "";
   [auth, contentsRes, breadcrumbsRes] = await Promise.all([
-    requireUser(cookie),
-    apiGet(`/folders/${encodeURIComponent(folderId)}${q ? `?q=${encodeURIComponent(q)}` : ""}`, cookie),
-    apiGet(`/folders/${encodeURIComponent(folderId)}/breadcrumbs`, cookie),
+    requireUser(cookie, Astro.response.headers),
+    apiGet(`/folders/${encodeURIComponent(folderId)}${q ? `?q=${encodeURIComponent(q)}` : ""}`, cookie, false, Astro.response.headers),
+    apiGet(`/folders/${encodeURIComponent(folderId)}/breadcrumbs`, cookie, false, Astro.response.headers),
   ]);
 } catch (e) {
   console.error("Folder SSR Error:", e);

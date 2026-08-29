@@ -22,7 +22,7 @@ export function FileFilterChips({ filterType, onFilterChange }: FileFilterChipsP
   ];
 
   return (
-    <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar pb-1 -mx-1 px-1 select-none">
+    <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 select-none">
       {chips.map((chip) => {
         const Icon = chip.icon;
         const isActive = filterType === chip.id;
@@ -30,8 +30,9 @@ export function FileFilterChips({ filterType, onFilterChange }: FileFilterChipsP
         return (
           <button
             key={chip.id}
+            type="button"
             onClick={() => onFilterChange(chip.id)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+            className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
               isActive
                 ? "bg-emerald-600 text-white shadow-sm ring-1 ring-emerald-500"
                 : "bg-white border border-slate-200/80 text-slate-600 hover:bg-slate-50 hover:border-slate-300"

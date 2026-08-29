@@ -20,8 +20,8 @@ let settings: any = { ok: false, body: null };
 try {
   const cookie = Astro.request.headers.get("cookie") || "";
   [auth, settings] = await Promise.all([
-    requireUser(cookie),
-    apiGet("/settings", cookie, true),
+    requireUser(cookie, Astro.response.headers),
+    apiGet("/settings", cookie, true, Astro.response.headers),
   ]);
 } catch (e) {
   console.error("DashboardLayout SSR Error:", e);

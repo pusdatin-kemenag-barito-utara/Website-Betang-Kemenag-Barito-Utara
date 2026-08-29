@@ -88,13 +88,47 @@ export function createFileTableColumns({
         const item = row.original;
         const isFolder = item.type === "folder";
         const isStarred = starredMap[item.id] ?? item.isStarred ?? false;
+        const formatLabel = getFileTypeLabel(item);
+        const hasRealSize =
+          (item.rawSizeBytes && item.rawSizeBytes > 0) ||
+          (item.size && item.size !== "-" && item.size !== "Folder" && item.size !== "—");
+        const displaySize = hasRealSize
+          ? item.rawSizeBytes && item.rawSizeBytes > 0
+            ? formatFileSize(item.rawSizeBytes)
+            : item.size
+          : "";
+
+        const content = (
+          <div className="flex flex-col min-w-0 flex-1 overflow-hidden">
+            <span className="font-semibold text-slate-800 hover:text-emerald-600 transition-colors truncate block w-full text-xs sm:text-sm">
+              {item.name}
+            </span>
+            {/* Subtitle metadata khusus tampilan mobile (< sm) */}
+            <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-medium mt-0.5 sm:hidden truncate overflow-hidden">
+              {displaySize ? (
+                <>
+                  <span className="shrink-0">{displaySize}</span>
+                  <span>•</span>
+                </>
+              ) : null}
+              <span className="shrink-0">{formatLabel}</span>
+              {(item.updatedAt || item.createdAt) && (
+                <>
+                  <span>•</span>
+                  <span className="truncate">{item.updatedAt || item.createdAt}</span>
+                </>
+              )}
+            </div>
+          </div>
+        );
 
         return (
-          <div className="flex items-center gap-3 min-w-0 max-w-[200px] sm:max-w-xs md:max-w-sm lg:max-w-md">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 w-full overflow-hidden">
+            {/* Tombol bintang di kolom nama hanya tampil di desktop (di mobile menyatu di kolom aksi kanan) */}
             <button
               type="button"
               onClick={(e) => onToggleStar(item, e)}
-              className="text-slate-300 hover:text-amber-400 transition-colors p-0.5 shrink-0 cursor-pointer"
+              className="hidden sm:inline-flex text-slate-300 hover:text-amber-400 transition-colors p-0.5 shrink-0 cursor-pointer"
               title={isStarred ? "Hapus dari Berbintang" : "Tambahkan ke Berbintang"}
             >
               <Star
@@ -113,19 +147,19 @@ export function createFileTableColumns({
                     onNavigate(item.id);
                   }
                 }}
-                className="flex items-center gap-2.5 min-w-0 font-semibold text-slate-800 hover:text-emerald-600 transition-colors truncate text-xs sm:text-sm"
+                className="flex items-center gap-2 sm:gap-2.5 min-w-0 w-full overflow-hidden"
               >
                 {getFileIcon(item)}
-                <span className="truncate">{item.name}</span>
+                {content}
               </a>
             ) : (
               <button
                 type="button"
                 onClick={() => onPreview(item)}
-                className="flex items-center gap-2.5 min-w-0 font-medium text-slate-700 hover:text-emerald-600 transition-colors truncate text-xs sm:text-sm text-left cursor-pointer"
+                className="flex items-center gap-2 sm:gap-2.5 min-w-0 w-full overflow-hidden text-left cursor-pointer"
               >
                 {getFileIcon(item)}
-                <span className="truncate">{item.name}</span>
+                {content}
               </button>
             )}
           </div>
@@ -202,9 +236,24 @@ export function createFileTableColumns({
       header: "Aksi",
       cell: ({ row }) => {
         const item = row.original;
+        const isStarred = starredMap[item.id] ?? item.isStarred ?? false;
 
         return (
-          <div className="flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
+          <div className="flex items-center justify-end gap-0.5 sm:gap-1" onClick={(e) => e.stopPropagation()}>
+            {/* Tombol Bintang untuk layar Mobile (< sm) */}
+            <button
+              type="button"
+              onClick={(e) => onToggleStar(item, e)}
+              className="sm:hidden p-1.5 rounded-lg text-slate-300 hover:text-amber-400 transition-colors cursor-pointer"
+              title={isStarred ? "Hapus dari Berbintang" : "Tambahkan ke Berbintang"}
+            >
+              <Star
+                className={`h-4 w-4 ${
+                  isStarred ? "fill-amber-400 text-amber-400" : "hover:scale-110"
+                }`}
+              />
+            </button>
+
             <button
               type="button"
               onClick={(e) => onOpenMenu(e, item)}
@@ -217,7 +266,7 @@ export function createFileTableColumns({
         );
       },
       enableSorting: false,
-      size: 50,
+      size: 60,
     },
   ];
 }

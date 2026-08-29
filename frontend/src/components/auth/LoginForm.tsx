@@ -151,6 +151,9 @@ export function LoginForm({ siteKey }: LoginFormProps) {
             placeholder="admin@kemenag.go.id"
             type="email"
             autoComplete="email"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             required
           />
         </div>
@@ -177,6 +180,9 @@ export function LoginForm({ siteKey }: LoginFormProps) {
             placeholder="••••••••••••"
             type={showPassword ? "text" : "password"}
             autoComplete="current-password"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             required
           />
           <button
@@ -192,9 +198,10 @@ export function LoginForm({ siteKey }: LoginFormProps) {
 
       {/* Ingat Saya Checkbox */}
       <div className="flex items-center justify-between px-1">
-        <label className="flex items-center gap-2.5 cursor-pointer select-none">
+        <label htmlFor="rememberMe" className="flex items-center gap-2.5 cursor-pointer select-none">
           <div className="relative">
             <input
+              id="rememberMe"
               type="checkbox"
               name="rememberMe"
               checked={rememberMe}

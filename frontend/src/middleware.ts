@@ -1,7 +1,7 @@
 // Middleware Astro: maintenance check, proteksi sesi, dan header CSP.
 // Pengganti proxy.ts + next.config.ts headers dari aplikasi lama.
 import type { APIContext, MiddlewareNext } from "astro";
-import { fetchFromBackend } from "@/lib/server";
+import { fetchFromBackend, forwardSetCookies } from "@/lib/server";
 
 const PUSDATIN_URL =
   import.meta.env.PUBLIC_PUSDATIN_URL || "https://pusdatin.kemenag-baritoutara.com";
@@ -17,15 +17,20 @@ function buildCSP() {
     const isDev = import.meta.env.DEV;
     const devConnect = isDev ? "ws://localhost:* ws://127.0.0.1:* http://localhost:* http://127.0.0.1:*" : "";
     const csp = [
-      "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://challenges.cloudflare.com https://static.cloudflareinsights.com https://www.googletagmanager.com https://www.google-analytics.com https://ssl.google-analytics.com",
-      `frame-src https://challenges.cloudflare.com https://${pusdatinHost} https://*.kemenag-baritoutara.com`,
-      `connect-src 'self' ${devConnect} https://challenges.cloudflare.com https://db.kemenag-baritoutara.com https://${pusdatinHost} https://*.kemenag-baritoutara.com https://*.r2.cloudflarestorage.com http://localhost:8080 http://127.0.0.1:8080 http://backend:8080 https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com https://region1.google-analytics.com`,
-      "worker-src blob: 'self'",
+      "script-src 'self' 'unsafe-eval' 'unsafe-inline' blob: data: https://challenges.cloudflare.com https://static.cloudflareinsights.com https://www.googletagmanager.com https://www.google-analytics.com https://ssl.google-analytics.com",
+      "script-src-elem 'self' 'unsafe-eval' 'unsafe-inline' blob: data: https://challenges.cloudflare.com https://static.cloudflareinsights.com https://www.googletagmanager.com https://www.google-analytics.com https://ssl.google-analytics.com",
+      "script-src-attr 'self' 'unsafe-inline'",
+      `frame-src 'self' blob: https://challenges.cloudflare.com https://${pusdatinHost} https://*.kemenag-baritoutara.com`,
+      `child-src 'self' blob: https://challenges.cloudflare.com`,
+      `connect-src 'self' ${devConnect} https://challenges.cloudflare.com https://db.kemenag-baritoutara.com https://${pusdatinHost} https://*.kemenag-baritoutara.com https://*.r2.cloudflarestorage.com http://localhost:8080 http://127.0.0.1:8080 http://backend:8080 https://www.google-analytics.com https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com https://region1.google-analytics.com blob: data:`,
+      "worker-src 'self' blob: https://challenges.cloudflare.com",
       "font-src 'self' data: https:",
+      "img-src 'self' data: blob: https: https://*.r2.cloudflarestorage.com https://www.google-analytics.com https://www.googletagmanager.com",
+      "style-src 'self' 'unsafe-inline'",
     ].join("; ");
-    return `default-src 'self'; ${csp}; img-src 'self' data: blob: https: https://*.r2.cloudflarestorage.com https://www.google-analytics.com https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'`;
+    return `default-src 'self'; ${csp}`;
   } catch {
-    return "default-src 'self'; font-src 'self' data: https:; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://challenges.cloudflare.com https://static.cloudflareinsights.com";
+    return "default-src 'self'; font-src 'self' data: https:; img-src 'self' data: blob: https:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-eval' 'unsafe-inline' blob: data: https://challenges.cloudflare.com https://static.cloudflareinsights.com";
   }
 }
 
@@ -126,7 +131,7 @@ export async function onRequest(context: APIContext, next: MiddlewareNext) {
 }
 
 /** Verifikasi sesi dengan memanggil /auth/me pada backend. */
-async function hasValidSession(request: Request): Promise<boolean> {
+async function hasValidSession(request: Request, targetHeaders?: Headers): Promise<boolean> {
   const cookie = request.headers.get("cookie") || "";
   if (!cookie.includes("earsip-auth=")) {
     return false;
@@ -134,10 +139,13 @@ async function hasValidSession(request: Request): Promise<boolean> {
   try {
     const res = await fetchFromBackend("/auth/me", {
       headers: { cookie },
-      signal: AbortSignal.timeout(3000),
+      signal: AbortSignal.timeout(7000),
     });
     if (!res.ok) {
       return false;
+    }
+    if (targetHeaders) {
+      forwardSetCookies(res, targetHeaders);
     }
     const body: any = await res.json();
     return Boolean(body?.success && body?.data?.user?.email);

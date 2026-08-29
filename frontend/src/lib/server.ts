@@ -27,7 +27,7 @@ export async function fetchFromBackend(path: string, options: RequestInit = {}):
     try {
       const res = await fetch(`${origin}/api/v1${path}`, {
         ...options,
-        signal: options.signal || AbortSignal.timeout(2000),
+        signal: options.signal || AbortSignal.timeout(7000),
       });
       activeBackendOrigin = origin;
       return res;
@@ -38,18 +38,49 @@ export async function fetchFromBackend(path: string, options: RequestInit = {}):
   throw lastError || new Error("Backend Go tidak dapat dihubungi");
 }
 
+/**
+ * Meneruskan header Set-Cookie dari respon backend Go ke header respon Astro SSR.
+ * Krusial agar saat backend memperbarui token Supabase (refresh token), browser pengguna
+ * langsung mendapatkan cookie sesi baru tanpa terputus/ter-logout tiba-tiba.
+ */
+export function forwardSetCookies(upstreamRes: Response, targetHeaders?: Headers) {
+  if (!targetHeaders) return;
+  try {
+    if (typeof (upstreamRes.headers as any).getSetCookie === "function") {
+      const cookies: string[] = (upstreamRes.headers as any).getSetCookie();
+      if (cookies && cookies.length > 0) {
+        for (const cookieStr of cookies) {
+          targetHeaders.append("set-cookie", cookieStr);
+        }
+        return;
+      }
+    }
+    const sc = upstreamRes.headers.get("set-cookie");
+    if (sc) {
+      targetHeaders.append("set-cookie", sc);
+    }
+  } catch (err) {
+    console.warn("[SSR COOKIE FORWARD ERROR]:", err);
+  }
+}
+
 export interface ApiResponse {
   ok: boolean;
   status: number;
   body: any;
 }
 
-// In-memory cache per cookie untuk respon cepat (TTL 20 detik)
+// In-memory cache per cookie untuk respon cepat (TTL 15 detik)
 const userSessionCache = new Map<string, { user: any; expiresAt: number }>();
 const serverCache = new Map<string, { response: ApiResponse; expiresAt: number }>();
 
-/** GET ke endpoint API backend dengan cookie sesi pengguna. */
-export async function apiGet(path: string, cookie: string, useCache = false): Promise<ApiResponse> {
+/** GET ke endpoint API backend dengan cookie sesi pengguna dan penerusan Set-Cookie opsional. */
+export async function apiGet(
+  path: string,
+  cookie: string,
+  useCache = false,
+  responseHeaders?: Headers,
+): Promise<ApiResponse> {
   const cacheKey = `${path}:${cookie}`;
   const now = Date.now();
 
@@ -66,64 +97,70 @@ export async function apiGet(path: string, cookie: string, useCache = false): Pr
       headers: { cookie: cookie || "" },
       cache: "no-store",
     });
-  } catch {
+  } catch (err) {
+    console.warn(`[SSR API GET ERROR] ${path}:`, err);
     return { ok: false, status: 0, body: null };
   }
 
-  let body: any = null
-  try {
-    body = await res.json()
-  } catch {
-    body = null
+  // Teruskan Set-Cookie jika backend me-refresh sesi
+  if (responseHeaders) {
+    forwardSetCookies(res, responseHeaders);
   }
 
-  const result: ApiResponse = { ok: res.ok, status: res.status, body }
+  let body: any = null;
+  try {
+    body = await res.json();
+  } catch {
+    body = null;
+  }
+
+  const result: ApiResponse = { ok: res.ok, status: res.status, body };
 
   if (useCache && res.ok) {
     serverCache.set(cacheKey, {
       response: result,
-      expiresAt: now + 20000, // 20 detik
-    })
+      expiresAt: now + 15000, // 15 detik
+    });
   }
 
-  return result
+  return result;
 }
 
 export interface AuthCheck {
-  ok: boolean
+  ok: boolean;
   user: {
-    id: string
-    name: string
-    email: string
-    role: string
-    status: string
-    isSuperAdmin: boolean
-  } | null
+    id: string;
+    name: string;
+    email: string;
+    role: string;
+    status: string;
+    isSuperAdmin: boolean;
+  } | null;
 }
 
-/** Memeriksa sesi via GET /auth/me dengan in-memory cache (20s TTL) agar navigasi halaman instan. */
-export async function requireUser(cookie: string): Promise<AuthCheck> {
+/** Memeriksa sesi via GET /auth/me dengan in-memory cache (15s TTL) dan sinkronisasi header Set-Cookie. */
+export async function requireUser(cookie: string, responseHeaders?: Headers): Promise<AuthCheck> {
   if (!cookie || !cookie.includes("earsip-auth=")) {
-    return { ok: false, user: null }
+    return { ok: false, user: null };
   }
 
-  const now = Date.now()
-  const cached = userSessionCache.get(cookie)
+  const now = Date.now();
+  const cached = userSessionCache.get(cookie);
   if (cached && cached.expiresAt > now) {
-    return { ok: true, user: cached.user }
+    return { ok: true, user: cached.user };
   }
 
-  const res = await apiGet("/auth/me", cookie, false)
+  const res = await apiGet("/auth/me", cookie, false, responseHeaders);
   if (!res.ok || !res.body?.data?.user) {
-    userSessionCache.delete(cookie)
-    return { ok: false, user: null }
+    userSessionCache.delete(cookie);
+    return { ok: false, user: null };
   }
 
-  const user = res.body.data.user
+  const user = res.body.data.user;
   userSessionCache.set(cookie, {
     user,
-    expiresAt: now + 20000, // 20 detik
-  })
+    expiresAt: now + 15000, // 15 detik
+  });
 
-  return { ok: true, user }
+  return { ok: true, user };
 }

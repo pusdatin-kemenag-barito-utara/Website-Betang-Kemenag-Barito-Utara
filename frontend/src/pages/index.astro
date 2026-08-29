@@ -32,8 +32,8 @@ let statsRes: any = { ok: false, body: null };
 try {
   const cookie = Astro.request.headers.get("cookie") || "";
   [auth, statsRes] = await Promise.all([
-    requireUser(cookie),
-    apiGet("/stats", cookie),
+    requireUser(cookie, Astro.response.headers),
+    apiGet("/stats", cookie, false, Astro.response.headers),
   ]);
 } catch (e) {
   console.error("Index SSR Error:", e);

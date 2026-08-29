@@ -11,8 +11,8 @@ let res: any = { ok: false, body: null };
 try {
   const cookie = Astro.request.headers.get("cookie") || "";
   [auth, res] = await Promise.all([
-    requireUser(cookie),
-    apiGet("/trash", cookie),
+    requireUser(cookie, Astro.response.headers),
+    apiGet("/trash", cookie, false, Astro.response.headers),
   ]);
 } catch (e) {
   console.error("Trash SSR Error:", e);

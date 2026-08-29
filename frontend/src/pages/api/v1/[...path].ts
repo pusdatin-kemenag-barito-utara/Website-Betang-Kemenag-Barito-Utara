@@ -51,6 +51,17 @@ export const ALL: APIRoute = async ({ request, params }) => {
       resHeaders.delete("content-encoding");
       resHeaders.delete("content-length");
 
+      // Pastikan header Set-Cookie tidak tergabung dengan koma (header folding)
+      if (typeof (upstream.headers as any).getSetCookie === "function") {
+        const cookies: string[] = (upstream.headers as any).getSetCookie();
+        if (cookies && cookies.length > 0) {
+          resHeaders.delete("set-cookie");
+          for (const c of cookies) {
+            resHeaders.append("set-cookie", c);
+          }
+        }
+      }
+
       return new Response(upstream.body, {
         status: upstream.status,
         statusText: upstream.statusText,

@@ -4,9 +4,9 @@ import { request } from "./client";
  * Login: autentikasi kredensial admin dan Cloudflare Turnstile token.
  */
 export async function loginAction(_prevState: { error: string | null } | null, formData: FormData) {
-  const email = (formData.get("email") as string) || "";
-  const password = (formData.get("password") as string) || "";
-  const turnstileToken = (formData.get("cf-turnstile-response") as string) || "";
+  const email = ((formData.get("email") as string) || "").trim().toLowerCase();
+  const password = ((formData.get("password") as string) || "").trim();
+  const turnstileToken = ((formData.get("cf-turnstile-response") as string) || "").trim();
   const rememberMe = (formData.get("rememberMe") as string) === "true";
 
   if (!email || !password) {

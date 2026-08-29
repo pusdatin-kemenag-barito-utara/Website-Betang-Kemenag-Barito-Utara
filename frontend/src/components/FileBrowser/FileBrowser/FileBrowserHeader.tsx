@@ -57,12 +57,14 @@ export function FileBrowserHeader({
   return (
     <div className="flex flex-col gap-4">
       {/* Breadcrumbs & Tombol + Baru */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <Breadcrumbs
-          items={breadcrumbsList}
-          currentFolderId={currentFolderId}
-          onNavigate={onNavigateBreadcrumb}
-        />
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0 flex-1 overflow-x-auto custom-scrollbar">
+          <Breadcrumbs
+            items={breadcrumbsList}
+            currentFolderId={currentFolderId}
+            onNavigate={onNavigateBreadcrumb}
+          />
+        </div>
 
         <div className="flex items-center gap-2 relative shrink-0" ref={dropdownRef}>
           {/* Tombol Utama + Baru (Dropdown Google Drive Style) */}
