@@ -65,6 +65,7 @@ func (h *AuthHandler) Login(c fiber.Ctx) error {
 
 // Logout menghapus sesi dan cookie.
 func (h *AuthHandler) Logout(c fiber.Ctx) error {
+	c.Set("Clear-Site-Data", `"cache"`)
 	if h.authMW != nil {
 		h.authMW.ClearSession(c)
 		c.Cookie(&fiber.Cookie{Name: "session_only", Value: "", Path: "/", MaxAge: -1})
@@ -87,13 +88,23 @@ func (h *AuthHandler) Me(c fiber.Ctx) error {
 		return writeFail(c, fiber.StatusNotFound, "Akun Anda tidak terdaftar di sistem terpusat.")
 	}
 
+	status := "inactive"
+	if meta.IsActive {
+		status = "active"
+	}
+
 	return writeOK(c, fiber.Map{
 		"user": fiber.Map{
 			"id":           meta.ID,
-			"name":         meta.Name,
+			"name":         meta.FullName,
+			"fullName":     meta.FullName,
+			"username":     meta.Username,
 			"email":        meta.Email,
 			"role":         meta.Role,
-			"status":       meta.Status,
+			"bidangId":     meta.BidangID,
+			"bidangName":   meta.BidangName,
+			"status":       status,
+			"isActive":     meta.IsActive,
 			"isSuperAdmin": meta.IsSuperAdmin(),
 		},
 	})

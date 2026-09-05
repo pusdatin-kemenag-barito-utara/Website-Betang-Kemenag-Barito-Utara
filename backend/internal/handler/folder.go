@@ -25,10 +25,17 @@ func NewFolderHandler(folders *service.FolderService, files *service.FileService
 func (h *FolderHandler) Contents(c fiber.Ctx) error {
 	folderID := c.Params("folderId")
 	query := strings.TrimSpace(c.Query("q"))
+	user := currentUser(c)
 
 	parentID := cleanUUID(folderID)
-	contents, err := h.folders.Contents(c.Context(), parentID, query)
+	contents, err := h.folders.Contents(c.Context(), parentID, query, user)
 	if err != nil {
+		if strings.Contains(err.Error(), "tidak memiliki izin") {
+			return writeFail(c, fiber.StatusForbidden, err.Error())
+		}
+		if strings.Contains(err.Error(), "tidak ditemukan") {
+			return writeFail(c, fiber.StatusNotFound, err.Error())
+		}
 		return writeFail(c, fiber.StatusInternalServerError, "Gagal memuat isi folder.")
 	}
 	return writeOK(c, contents)
@@ -41,8 +48,12 @@ func (h *FolderHandler) Breadcrumbs(c fiber.Ctx) error {
 	if cleanID == nil {
 		return writeOK(c, []any{})
 	}
-	paths, err := h.folders.Breadcrumbs(c.Context(), *cleanID)
+	user := currentUser(c)
+	paths, err := h.folders.Breadcrumbs(c.Context(), *cleanID, user)
 	if err != nil {
+		if strings.Contains(err.Error(), "tidak memiliki izin") {
+			return writeFail(c, fiber.StatusForbidden, err.Error())
+		}
 		return writeFail(c, fiber.StatusInternalServerError, "Gagal memuat jalur folder.")
 	}
 	return writeOK(c, paths)
@@ -50,7 +61,8 @@ func (h *FolderHandler) Breadcrumbs(c fiber.Ctx) error {
 
 // Tree mengambil seluruh folder untuk pohon pindah/salin.
 func (h *FolderHandler) Tree(c fiber.Ctx) error {
-	tree, err := h.folders.Tree(c.Context())
+	user := currentUser(c)
+	tree, err := h.folders.Tree(c.Context(), user)
 	if err != nil {
 		return writeFail(c, fiber.StatusInternalServerError, "Gagal memuat pohon folder.")
 	}
@@ -69,7 +81,7 @@ func (h *FolderHandler) Create(c fiber.Ctx) error {
 
 	user := currentUser(c)
 	parentID := cleanUUID(req.ParentID)
-	created, err := h.folders.Create(c.Context(), req.Name, parentID, user.ID, user.Email, clientIP(c))
+	created, err := h.folders.Create(c.Context(), req.Name, parentID, user.ID, user.Email, clientIP(c), user.BidangID)
 	if err != nil {
 		return writeError(c, err)
 	}
@@ -249,7 +261,8 @@ func (h *FolderHandler) UpdateColor(c fiber.Ctx) error {
 
 // Starred mengambil seluruh file dan folder yang dibintangi.
 func (h *FolderHandler) Starred(c fiber.Ctx) error {
-	contents, err := h.folders.ListStarred(c.Context())
+	user := currentUser(c)
+	contents, err := h.folders.ListStarred(c.Context(), user)
 	if err != nil {
 		return writeFail(c, fiber.StatusInternalServerError, "Gagal memuat item berbintang.")
 	}

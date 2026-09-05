@@ -36,7 +36,7 @@ func (s *FileService) PresignUpload(ctx context.Context, objectKey, contentType 
 }
 
 // DirectUpload mengunggah file langsung ke Cloudflare R2 via backend dan menyimpan metadata ke DB.
-func (s *FileService) DirectUpload(ctx context.Context, name string, folderID *string, body io.Reader, sizeBytes int64, mimeType string, actorID, actorEmail, ip string) (*domain.File, error) {
+func (s *FileService) DirectUpload(ctx context.Context, name string, folderID *string, body io.Reader, sizeBytes int64, mimeType string, actorID, actorEmail, ip string, userBidangID *string) (*domain.File, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return nil, errors.New("Nama file tidak boleh kosong.")
@@ -48,19 +48,23 @@ func (s *FileService) DirectUpload(ctx context.Context, name string, folderID *s
 	if folderID != nil && *folderID != "" && *folderID != "root" {
 		folderSegment = *folderID
 	}
-	key := fmt.Sprintf("arsip/global/%s/%d-%s", folderSegment, timestamp, cleanName)
+	bidangSegment := "global"
+	if userBidangID != nil && *userBidangID != "" {
+		bidangSegment = *userBidangID
+	}
+	key := fmt.Sprintf("arsip/%s/%s/%d-%s", bidangSegment, folderSegment, timestamp, cleanName)
 
 	if err := s.r2.PutObject(ctx, key, body, sizeBytes, mimeType); err != nil {
 		return nil, fmt.Errorf("Gagal menyimpan ke Cloudflare R2: %w", err)
 	}
 
-	return s.SaveMetadata(ctx, name, folderID, key, mimeType, sizeBytes, actorID, actorEmail, ip)
+	return s.SaveMetadata(ctx, name, folderID, key, mimeType, sizeBytes, actorID, actorEmail, ip, userBidangID)
 }
 
 // SaveMetadata menyimpan metadata file setelah upload ke R2 selesai.
 // Bila nama yang sama sudah ada di folder yang sama, file lama disimpan
 // sebagai versi dan metadata diperbarui.
-func (s *FileService) SaveMetadata(ctx context.Context, name string, folderID *string, objectKey, mimeType string, sizeBytes int64, actorID, actorEmail, ip string) (*domain.File, error) {
+func (s *FileService) SaveMetadata(ctx context.Context, name string, folderID *string, objectKey, mimeType string, sizeBytes int64, actorID, actorEmail, ip string, userBidangID *string) (*domain.File, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return nil, errors.New("Nama file tidak boleh kosong.")
@@ -69,6 +73,9 @@ func (s *FileService) SaveMetadata(ctx context.Context, name string, folderID *s
 	bidangID, err := s.BidangIDForFolder(ctx, folderID)
 	if err != nil {
 		return nil, err
+	}
+	if bidangID == nil && userBidangID != nil && *userBidangID != "" {
+		bidangID = userBidangID
 	}
 
 	existing, err := s.files.FindByNameInFolder(ctx, name, folderID)

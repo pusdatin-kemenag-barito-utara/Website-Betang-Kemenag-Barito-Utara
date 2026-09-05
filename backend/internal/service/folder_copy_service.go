@@ -54,7 +54,7 @@ func (s *FolderService) copyFolderRecursive(ctx context.Context, source *domain.
 	}
 
 	// Salin file di dalam folder ini.
-	files, err := s.files.ListByFolder(ctx, &source.ID)
+	files, err := s.files.ListByFolder(ctx, &source.ID, nil)
 	if err != nil {
 		return err
 	}
@@ -65,7 +65,7 @@ func (s *FolderService) copyFolderRecursive(ctx context.Context, source *domain.
 	}
 
 	// Salin subfolder secara rekursif.
-	children, err := s.folders.ListByParent(ctx, &source.ID)
+	children, err := s.folders.ListByParent(ctx, &source.ID, nil)
 	if err != nil {
 		return err
 	}

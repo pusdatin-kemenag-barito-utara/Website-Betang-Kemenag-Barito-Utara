@@ -7,15 +7,12 @@ function getBackendUrls(): string[] {
     process.env.BACKEND_INTERNAL_URL ||
     import.meta.env.BACKEND_URL ||
     process.env.BACKEND_URL;
-  const urls: string[] = [];
-  if (custom) urls.push(custom.replace(/\/+$/, ""));
-  urls.push("http://127.0.0.1:8080");
-  urls.push("http://localhost:8080");
-  urls.push("http://backend:8080");
+  const urls: string[] = ["http://127.0.0.1:8080", "http://localhost:8080"];
+  if (custom) urls.unshift(custom.replace(/\/+$/, ""));
   return Array.from(new Set(urls));
 }
 
-let activeBackendOrigin = "";
+let activeBackendOrigin = "http://127.0.0.1:8080";
 
 export async function fetchFromBackend(path: string, options: RequestInit = {}): Promise<Response> {
   const candidateUrls = activeBackendOrigin
@@ -27,7 +24,7 @@ export async function fetchFromBackend(path: string, options: RequestInit = {}):
     try {
       const res = await fetch(`${origin}/api/v1${path}`, {
         ...options,
-        signal: options.signal || AbortSignal.timeout(7000),
+        signal: options.signal || AbortSignal.timeout(5000),
       });
       activeBackendOrigin = origin;
       return res;
@@ -35,6 +32,25 @@ export async function fetchFromBackend(path: string, options: RequestInit = {}):
       lastError = err;
     }
   }
+
+  // Jika di mode dev dan gagal pertama kali, tunggu sebentar (misal Air sedang rebuild) lalu coba lagi sekali
+  if (import.meta.env.DEV) {
+    await new Promise((r) => setTimeout(r, 450));
+    for (const origin of getBackendUrls()) {
+      try {
+        const res = await fetch(`${origin}/api/v1${path}`, {
+          ...options,
+          signal: options.signal || AbortSignal.timeout(5000),
+        });
+        activeBackendOrigin = origin;
+        return res;
+      } catch (err) {
+        lastError = err;
+      }
+    }
+  }
+
+  activeBackendOrigin = "http://127.0.0.1:8080";
   throw lastError || new Error("Backend Go tidak dapat dihubungi");
 }
 
@@ -70,9 +86,23 @@ export interface ApiResponse {
   body: any;
 }
 
-// In-memory cache per cookie untuk respon cepat (TTL 15 detik)
-const userSessionCache = new Map<string, { user: any; expiresAt: number }>();
-const serverCache = new Map<string, { response: ApiResponse; expiresAt: number }>();
+// In-memory cache per cookie untuk respon instan (TTL 30 detik), dipersistenkan di globalThis
+// agar tidak terhapus saat HMR atau reload modul di environment Vite dev.
+interface GlobalServerCache {
+  __betangUserSessionCache?: Map<string, { user: any; expiresAt: number }>;
+  __betangServerCache?: Map<string, { response: ApiResponse; expiresAt: number }>;
+}
+
+const g = globalThis as unknown as GlobalServerCache;
+if (!g.__betangUserSessionCache) {
+  g.__betangUserSessionCache = new Map();
+}
+if (!g.__betangServerCache) {
+  g.__betangServerCache = new Map();
+}
+
+const userSessionCache = g.__betangUserSessionCache;
+const serverCache = g.__betangServerCache;
 
 /** GET ke endpoint API backend dengan cookie sesi pengguna dan penerusan Set-Cookie opsional. */
 export async function apiGet(
@@ -119,7 +149,7 @@ export async function apiGet(
   if (useCache && res.ok) {
     serverCache.set(cacheKey, {
       response: result,
-      expiresAt: now + 15000, // 15 detik
+      expiresAt: now + 30000, // 30 detik
     });
   }
 
@@ -133,12 +163,14 @@ export interface AuthCheck {
     name: string;
     email: string;
     role: string;
+    bidangId?: string | null;
+    bidangName?: string | null;
     status: string;
     isSuperAdmin: boolean;
   } | null;
 }
 
-/** Memeriksa sesi via GET /auth/me dengan in-memory cache (15s TTL) dan sinkronisasi header Set-Cookie. */
+/** Memeriksa sesi via GET /auth/me dengan in-memory cache (30s TTL) dan sinkronisasi header Set-Cookie. */
 export async function requireUser(cookie: string, responseHeaders?: Headers): Promise<AuthCheck> {
   if (!cookie || !cookie.includes("earsip-auth=")) {
     return { ok: false, user: null };
@@ -159,7 +191,7 @@ export async function requireUser(cookie: string, responseHeaders?: Headers): Pr
   const user = res.body.data.user;
   userSessionCache.set(cookie, {
     user,
-    expiresAt: now + 15000, // 15 detik
+    expiresAt: now + 30000, // 30 detik
   });
 
   return { ok: true, user };

@@ -29,17 +29,45 @@ func (h *BidangHandler) List(c fiber.Ctx) error {
 // Create menambah bidang baru (super admin).
 func (h *BidangHandler) Create(c fiber.Ctx) error {
 	var req struct {
-		Name string `json:"name"`
+		Name                 string   `json:"name"`
+		FolderIDs            []string `json:"folderIds"`
+		AutoCreateRootFolder bool     `json:"autoCreateRootFolder"`
 	}
 	if err := c.Bind().Body(&req); err != nil {
 		return writeFail(c, fiber.StatusBadRequest, "Data permintaan tidak valid.")
 	}
 	user := currentUser(c)
-	created, err := h.svc.Create(c.Context(), req.Name, user.Email, clientIP(c))
+	created, err := h.svc.Create(c.Context(), req.Name, req.FolderIDs, req.AutoCreateRootFolder, user.ID, user.Email, clientIP(c))
 	if err != nil {
 		return writeError(c, err)
 	}
 	return writeOK(c, created)
+}
+
+// GetFolders mengambil daftar ID folder root yang diizinkan untuk satu bidang.
+func (h *BidangHandler) GetFolders(c fiber.Ctx) error {
+	id := c.Params("id")
+	ids, err := h.svc.GetAccessibleFolderIDs(c.Context(), id)
+	if err != nil {
+		return writeFail(c, fiber.StatusInternalServerError, "Gagal memuat hak akses folder.")
+	}
+	return writeOK(c, ids)
+}
+
+// SetFolders memperbarui daftar ID folder root yang diizinkan untuk satu bidang.
+func (h *BidangHandler) SetFolders(c fiber.Ctx) error {
+	id := c.Params("id")
+	var req struct {
+		FolderIDs []string `json:"folderIds"`
+	}
+	if err := c.Bind().Body(&req); err != nil {
+		return writeFail(c, fiber.StatusBadRequest, "Data permintaan tidak valid.")
+	}
+	user := currentUser(c)
+	if err := h.svc.SetAccessibleFolders(c.Context(), id, req.FolderIDs, user.Email, clientIP(c)); err != nil {
+		return writeError(c, err)
+	}
+	return writeOK(c, fiber.Map{"success": true})
 }
 
 // Update mengubah nama/urutan bidang (super admin).

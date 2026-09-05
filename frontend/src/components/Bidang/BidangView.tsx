@@ -1,26 +1,31 @@
 "use client"
 
 import { useState } from "react"
-import { Building2, Plus, Pencil, Trash2 } from "lucide-react"
+import { Building2, Plus, Pencil, Trash2, Folder, FolderKey } from "lucide-react"
 import { AddBidangModal } from "./AddBidangModal"
 import { EditBidangModal } from "./EditBidangModal"
 import { DeleteBidangModal } from "./DeleteBidangModal"
+import { FolderAccessModal, type RootFolderOption } from "./FolderAccessModal"
 
 interface BidangData {
   id: string
   name: string
   count: number
   sort_order: number
+  accessibleFolderIds?: string[]
+  accessibleFolderNames?: string[]
 }
 
 interface BidangViewProps {
   bidangData: BidangData[]
+  allRootFolders?: RootFolderOption[]
 }
 
-export function BidangView({ bidangData }: BidangViewProps) {
+export function BidangView({ bidangData, allRootFolders = [] }: BidangViewProps) {
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [editItem, setEditItem] = useState<BidangData | null>(null)
   const [deleteItem, setDeleteItem] = useState<BidangData | null>(null)
+  const [accessItem, setAccessItem] = useState<BidangData | null>(null)
 
   return (
     <>
@@ -44,6 +49,7 @@ export function BidangView({ bidangData }: BidangViewProps) {
               <tr>
                 <th className="border-b border-slate-100 px-3 md:px-8 py-4 w-10 hidden md:table-cell">No.</th>
                 <th className="border-b border-slate-100 px-3 md:px-8 py-4">Nama Bidang</th>
+                <th className="border-b border-slate-100 px-3 md:px-8 py-4 hidden lg:table-cell">Akses Folder Root</th>
                 <th className="border-b border-slate-100 px-3 md:px-8 py-4 hidden sm:table-cell">Total Dokumen</th>
                 <th className="border-b border-slate-100 px-3 md:px-8 py-4 text-right">Aksi</th>
               </tr>
@@ -51,12 +57,13 @@ export function BidangView({ bidangData }: BidangViewProps) {
             <tbody className="divide-y divide-slate-50">
               {bidangData.length === 0 ? (
                 <tr>
-                  <td colSpan={4} className="px-8 py-8 text-center text-slate-500 font-medium">
+                  <td colSpan={5} className="px-8 py-8 text-center text-slate-500 font-medium">
                     Belum ada bidang terdaftar
                   </td>
                 </tr>
               ) : (
                 bidangData.map((b) => {
+                  const folderNames = b.accessibleFolderNames || []
                   return (
                     <tr 
                       key={b.id} 
@@ -70,7 +77,54 @@ export function BidangView({ bidangData }: BidangViewProps) {
                           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
                             <Building2 className="h-5 w-5" />
                           </div>
-                          {b.name}
+                          <div>
+                            <span className="block font-bold text-slate-800">{b.name}</span>
+                            {/* Tampilan mobile untuk folder root */}
+                            <div className="mt-1 flex flex-wrap gap-1 lg:hidden">
+                              {folderNames.length > 0 ? (
+                                folderNames.slice(0, 1).map((fname, idx) => (
+                                  <span
+                                    key={idx}
+                                    className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-700"
+                                  >
+                                    <Folder className="h-2.5 w-2.5" />
+                                    {fname}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-[10px] text-slate-400 italic">Belum ada akses folder</span>
+                              )}
+                              {folderNames.length > 1 && (
+                                <span className="text-[10px] font-bold text-slate-500">
+                                  +{folderNames.length - 1}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-3 md:px-8 py-4 border-b border-slate-50 hidden lg:table-cell">
+                        <div className="flex flex-wrap items-center gap-1.5 max-w-xs">
+                          {folderNames.length > 0 ? (
+                            <>
+                              {folderNames.slice(0, 2).map((fname, idx) => (
+                                <span
+                                  key={idx}
+                                  className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800 border border-emerald-200/60 shadow-2xs"
+                                >
+                                  <Folder className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                                  <span className="truncate max-w-[130px]">{fname}</span>
+                                </span>
+                              ))}
+                              {folderNames.length > 2 && (
+                                <span className="inline-flex items-center rounded-lg bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-600">
+                                  +{folderNames.length - 2} lainnya
+                                </span>
+                              )}
+                            </>
+                          ) : (
+                            <span className="text-xs text-slate-400 italic">Belum diatur</span>
+                          )}
                         </div>
                       </td>
                       <td className="px-3 md:px-8 py-4 text-sm font-medium text-slate-500 border-b border-slate-50 hidden sm:table-cell">
@@ -79,8 +133,14 @@ export function BidangView({ bidangData }: BidangViewProps) {
                         </span>
                       </td>
                       <td className="px-3 md:px-8 py-4 border-b border-slate-50">
-                      {/* Tombol aksi langsung ditampilkan tanpa opacity-0 hover:opacity-100 */}
                       <div className="flex justify-end gap-2">
+                        <button 
+                          onClick={() => setAccessItem(b)}
+                          className="rounded-lg p-2 text-slate-500 bg-slate-50 hover:bg-emerald-50 hover:text-emerald-700 transition-colors"
+                          title="Atur Hak Akses Folder Root"
+                        >
+                          <FolderKey className="h-4 w-4 text-emerald-600" />
+                        </button>
                         <button 
                           onClick={() => setEditItem(b)}
                           className="rounded-lg p-2 text-slate-400 bg-slate-50 hover:bg-emerald-50 hover:text-emerald-600 transition-colors"
@@ -109,7 +169,8 @@ export function BidangView({ bidangData }: BidangViewProps) {
       {/* Modals */}
       <AddBidangModal 
         isOpen={isAddOpen} 
-        onClose={() => setIsAddOpen(false)} 
+        onClose={() => setIsAddOpen(false)}
+        allRootFolders={allRootFolders}
       />
       
       {editItem && (
@@ -128,6 +189,17 @@ export function BidangView({ bidangData }: BidangViewProps) {
           onClose={() => setDeleteItem(null)}
           bidangId={deleteItem.id}
           bidangName={deleteItem.name}
+        />
+      )}
+
+      {accessItem && (
+        <FolderAccessModal
+          isOpen={!!accessItem}
+          onClose={() => setAccessItem(null)}
+          bidangId={accessItem.id}
+          bidangName={accessItem.name}
+          currentFolderIds={accessItem.accessibleFolderIds || []}
+          allRootFolders={allRootFolders}
         />
       )}
     </>

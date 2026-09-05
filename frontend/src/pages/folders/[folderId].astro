@@ -30,8 +30,8 @@ if (!auth?.ok) {
   return Astro.redirect("/login");
 }
 
-// Bidang deprecated: seluruh pengguna memakai global (migrasi dari Pusdatin).
-const userBidangId = "global";
+// Admin bidang memakai id bidangnya masing-masing; Super Admin memakai "global"
+const userBidangId = auth?.user?.bidangId || "global";
 
 const contents = contentsRes?.ok ? contentsRes.body?.data : null;
 const folders: any[] = contents?.folders ?? [];
@@ -68,21 +68,22 @@ const items = [
     };
   }),
   ...(files || []).map((f: any) => {
-    const dateVal = f.updated_at || f.created_at;
+    const dateVal = f.updated_at || f.updatedAt || f.created_at || f.createdAt;
+    const sizeBytes = f.size_bytes || f.sizeBytes || 0;
     return {
       id: f.id,
       name: f.name,
       type: "file" as const,
-      mimeType: f.mime_type,
-      size: formatFileSize(f.size_bytes),
-      rawSizeBytes: f.size_bytes,
+      mimeType: f.mime_type || f.mimeType,
+      size: formatFileSize(sizeBytes),
+      rawSizeBytes: sizeBytes,
       updatedAt: formatDate(dateVal),
       rawDate: dateVal,
-      createdAt: formatDate(f.created_at),
-      uploadedBy: f.uploaded_by,
-      isRestricted: f.is_restricted || false,
-      isStarred: f.is_starred || false,
-      objectKey: f.r2_object_key,
+      createdAt: formatDate(f.created_at || f.createdAt),
+      uploadedBy: f.uploaded_by || f.uploadedBy,
+      isRestricted: f.is_restricted || f.isRestricted || false,
+      isStarred: f.is_starred || f.isStarred || false,
+      objectKey: f.r2_object_key || f.r2ObjectKey || f.object_key || f.objectKey,
     };
   }),
 ];

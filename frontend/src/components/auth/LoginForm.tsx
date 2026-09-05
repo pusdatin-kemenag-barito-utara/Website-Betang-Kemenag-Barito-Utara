@@ -67,9 +67,7 @@ export function LoginForm({ siteKey }: LoginFormProps) {
         trackEvent("login_failed", {
           error_message: result.error,
         });
-        toast.error("Gagal Masuk", {
-          description: result.error,
-        });
+        toast.error(result.error || "Gagal masuk");
         // Reset Turnstile agar token tidak dipakai ulang.
         formData.set("cf-turnstile-response", "");
         setTurnstileToken("");
@@ -86,14 +84,14 @@ export function LoginForm({ siteKey }: LoginFormProps) {
           setAnalyticsUser(result.user.id, result.user.role, result.user.email);
         }
 
-        // Tampilkan toaster pemberitahuan berhasil login
-        toast.success("Login Berhasil!", {
-          description: `Selamat datang, ${displayName}. Sedang mengalihkan ke dashboard...`,
-          duration: 3000,
+        // Tampilkan toaster pemberitahuan berhasil login ringkas
+        toast.success(`Login Berhasil! Selamat datang, ${displayName}.`, {
+          duration: 2500,
         });
 
         // Simpan / hapus email di localStorage sesuai pilihan Ingat Saya
         try {
+          localStorage.setItem("is_logged_in", "true");
           if (rememberMe) {
             localStorage.setItem("betang_remember_email", email.trim());
           } else {
@@ -113,7 +111,7 @@ export function LoginForm({ siteKey }: LoginFormProps) {
     } catch {
       const errMsg = "Terjadi kesalahan jaringan saat memproses login.";
       setError(errMsg);
-      toast.error("Terjadi Kesalahan", { description: errMsg });
+      toast.error(errMsg);
       trackEvent("login_failed", { error_message: errMsg });
       setIsPending(false);
     }

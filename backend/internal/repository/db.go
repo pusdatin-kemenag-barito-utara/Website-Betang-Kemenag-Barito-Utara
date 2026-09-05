@@ -18,6 +18,7 @@ type Repos struct {
 	File     *FileRepo
 	Trash    *TrashRepo
 	Settings *SettingsRepo
+	User     *UserRepo
 	Pusdatin *PusdatinRepo
 	Storage  *StorageRepo
 
@@ -70,6 +71,7 @@ func New(pool *pgxpool.Pool, pusdatinSchema string) *Repos {
 		File:     &FileRepo{pool: pool},
 		Trash:    &TrashRepo{pool: pool},
 		Settings: &SettingsRepo{pool: pool},
+		User:     &UserRepo{pool: pool},
 		Pusdatin: &PusdatinRepo{pool: pool, schema: pusdatinSchema},
 		Storage:  &StorageRepo{pool: pool},
 		Pool:     pool,

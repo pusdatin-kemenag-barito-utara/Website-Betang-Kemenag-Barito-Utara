@@ -99,7 +99,11 @@ export async function onRequest(context: APIContext, next: MiddlewareNext) {
     const hasAuthCookie = cookie.includes("earsip-auth=");
 
     if (!isPublicPath && !hasAuthCookie) {
-      return context.redirect("/login");
+      const redirectRes = context.redirect("/login");
+      redirectRes.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0");
+      redirectRes.headers.set("Pragma", "no-cache");
+      redirectRes.headers.set("Expires", "0");
+      return redirectRes;
     }
 
     if (pathname === "/login" && hasAuthCookie) {
@@ -111,6 +115,12 @@ export async function onRequest(context: APIContext, next: MiddlewareNext) {
 
     const response = await next();
     try {
+      if (!isPublicPath) {
+        response.headers.set("Cache-Control", "no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0");
+        response.headers.set("Pragma", "no-cache");
+        response.headers.set("Expires", "0");
+        response.headers.set("Surrogate-Control", "no-store");
+      }
       response.headers.set("Content-Security-Policy", buildCSP());
       response.headers.set("X-Frame-Options", "SAMEORIGIN");
       response.headers.set("X-Content-Type-Options", "nosniff");

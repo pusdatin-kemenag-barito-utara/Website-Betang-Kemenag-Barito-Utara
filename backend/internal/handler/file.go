@@ -55,7 +55,7 @@ func (h *FileHandler) SaveMetadata(c fiber.Ctx) error {
 	user := currentUser(c)
 	folderID := cleanUUID(req.FolderID)
 	created, err := h.svc.SaveMetadata(c.Context(), req.Name, folderID, req.R2ObjectKey,
-		req.MimeType, req.SizeBytes, user.ID, user.Email, clientIP(c))
+		req.MimeType, req.SizeBytes, user.ID, user.Email, clientIP(c), user.BidangID)
 	if err != nil {
 		return writeError(c, err)
 	}
@@ -89,7 +89,7 @@ func (h *FileHandler) Upload(c fiber.Ctx) error {
 		mimeType = "application/octet-stream"
 	}
 
-	created, err := h.svc.DirectUpload(c.Context(), name, pFolderID, file, fileHeader.Size, mimeType, user.ID, user.Email, clientIP(c))
+	created, err := h.svc.DirectUpload(c.Context(), name, pFolderID, file, fileHeader.Size, mimeType, user.ID, user.Email, clientIP(c), user.BidangID)
 	if err != nil {
 		return writeError(c, err)
 	}

@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { X, Share2, Copy, Check, ExternalLink, Clock, MessageSquare, Loader2 } from "lucide-react";
+import { X, Share2, Copy, Check, ExternalLink, Clock, MessageSquare, Loader2, Zap } from "lucide-react";
 import type { FileItem } from "@/lib/types";
-import { createShareLink } from "@/lib/api";
+import { createShareLink, getR2FileUrl } from "@/lib/api";
 import { toast } from "sonner";
 
 interface ShareLinkModalProps {
@@ -15,8 +15,11 @@ export function ShareLinkModal({ isOpen, onClose, file }: ShareLinkModalProps) {
   const [shareUrl, setShareUrl] = useState<string>("");
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
+  const [copiedDirect, setCopiedDirect] = useState<boolean>(false);
 
   if (!isOpen || !file) return null;
+
+  const directCdnUrl = getR2FileUrl(file.objectKey || file.id);
 
   const handleGenerate = async (hours = expiryHours) => {
     setIsLoading(true);
@@ -25,16 +28,26 @@ export function ShareLinkModal({ isOpen, onClose, file }: ShareLinkModalProps) {
       const res = await createShareLink(file.id, hours);
       if (res.success && res.shareUrl) {
         setShareUrl(res.shareUrl);
-        toast.success("Tautan Berbagi Siap", {
-          description: `Berlaku selama ${hours === 1 ? "1 jam" : hours === 24 ? "24 jam" : "7 hari"}.`,
-        });
+        toast.success("Tautan berbagi berbatas waktu berhasil dibuat!");
       } else {
-        toast.error("Gagal membuat tautan", { description: res.error });
+        toast.error(res.error || "Gagal membuat tautan");
       }
     } catch {
       toast.error("Terjadi kesalahan sistem saat membuat tautan.");
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleCopyDirect = async () => {
+    if (!directCdnUrl) return;
+    try {
+      await navigator.clipboard.writeText(directCdnUrl);
+      setCopiedDirect(true);
+      toast.success("Tautan Cepat CDN Cloudflare disalin!");
+      setTimeout(() => setCopiedDirect(false), 2500);
+    } catch {
+      toast.error("Gagal menyalin tautan.");
     }
   };
 
@@ -50,10 +63,10 @@ export function ShareLinkModal({ isOpen, onClose, file }: ShareLinkModalProps) {
     }
   };
 
-  const handleWhatsApp = () => {
-    if (!shareUrl) return;
+  const handleWhatsApp = (urlToSend: string) => {
+    if (!urlToSend) return;
     const text = encodeURIComponent(
-      `Dokumen: *${file.name}*\nSilakan akses/unduh melalui tautan aman SI BETANG berikut (berlaku terbatas):\n${shareUrl}`
+      `Dokumen: *${file.name}*\nSilakan akses/unduh dokumen resmi melalui tautan SI BETANG Kemenag Barito Utara berikut:\n${urlToSend}`
     );
     window.open(`https://wa.me/?text=${text}`, "_blank");
   };
@@ -78,7 +91,7 @@ export function ShareLinkModal({ isOpen, onClose, file }: ShareLinkModalProps) {
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>
@@ -86,11 +99,60 @@ export function ShareLinkModal({ isOpen, onClose, file }: ShareLinkModalProps) {
 
         {/* Form Body */}
         <div className="p-5 space-y-4">
-          {/* Expiry Selection */}
-          <div>
+          {/* Direct Cloudflare CDN Option */}
+          {directCdnUrl && (
+            <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/60">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-800 dark:text-emerald-300">
+                  <Zap className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                  Tautan Cepat Cloudflare CDN
+                </span>
+                <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/60 px-1.5 py-0.5 rounded">
+                  HTTP/3 • Instan
+                </span>
+              </div>
+              <div className="flex items-center gap-2 mt-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={directCdnUrl}
+                  className="bg-white dark:bg-slate-900 text-xs text-slate-700 dark:text-slate-200 outline-none flex-1 truncate font-mono px-2 py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800/60"
+                />
+                <button
+                  type="button"
+                  onClick={handleCopyDirect}
+                  className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors shrink-0 cursor-pointer shadow-xs"
+                >
+                  {copiedDirect ? (
+                    <>
+                      <Check className="w-3.5 h-3.5" />
+                      Disalin
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-3.5 h-3.5" />
+                      Salin
+                    </>
+                  )}
+                </button>
+                <a
+                  href={directCdnUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-1.5 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 rounded-lg border border-emerald-200 dark:border-emerald-800 transition-colors"
+                  title="Buka Dokumen"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                </a>
+              </div>
+            </div>
+          )}
+
+          {/* Expiry Selection for Restricted Temporary Link */}
+          <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
             <label className="block text-xs font-medium text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-1.5">
               <Clock className="w-3.5 h-3.5 text-slate-400" />
-              Masa Berlaku Tautan:
+              Opsi Tautan Berbatas Waktu (Presigned):
             </label>
             <div className="grid grid-cols-3 gap-2">
               {[
@@ -105,7 +167,7 @@ export function ShareLinkModal({ isOpen, onClose, file }: ShareLinkModalProps) {
                     setExpiryHours(exp.value);
                     if (shareUrl) handleGenerate(exp.value);
                   }}
-                  className={`py-2 px-3 text-xs font-medium rounded-xl border transition-all ${
+                  className={`py-2 px-3 text-xs font-medium rounded-xl border transition-all cursor-pointer ${
                     expiryHours === exp.value
                       ? "bg-blue-50 dark:bg-blue-950/40 border-blue-500 text-blue-600 dark:text-blue-400 font-semibold"
                       : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800"
@@ -122,17 +184,17 @@ export function ShareLinkModal({ isOpen, onClose, file }: ShareLinkModalProps) {
             <button
               onClick={() => handleGenerate()}
               disabled={isLoading}
-              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-semibold rounded-xl transition-all shadow-sm shadow-emerald-500/20"
+              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold rounded-xl transition-all cursor-pointer"
             >
               {isLoading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Membuat Tautan Aman...
+                  Membuat Tautan Berbatas Waktu...
                 </>
               ) : (
                 <>
                   <Share2 className="w-4 h-4" />
-                  Buat Tautan Berbagi
+                  Buat Tautan Berbatas Waktu
                 </>
               )}
             </button>
@@ -147,7 +209,7 @@ export function ShareLinkModal({ isOpen, onClose, file }: ShareLinkModalProps) {
                 />
                 <button
                   onClick={handleCopy}
-                  className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg transition-colors flex-shrink-0"
+                  className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors shrink-0 cursor-pointer"
                 >
                   {copied ? (
                     <>
@@ -166,8 +228,8 @@ export function ShareLinkModal({ isOpen, onClose, file }: ShareLinkModalProps) {
               {/* Social / WhatsApp Share */}
               <div className="flex items-center gap-2">
                 <button
-                  onClick={handleWhatsApp}
-                  className="flex-1 flex items-center justify-center gap-2 py-2 px-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-medium rounded-xl border border-emerald-500/30 transition-colors"
+                  onClick={() => handleWhatsApp(shareUrl || directCdnUrl)}
+                  className="flex-1 flex items-center justify-center gap-2 py-2 px-3 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-xs font-medium rounded-xl border border-emerald-500/30 transition-colors cursor-pointer"
                 >
                   <MessageSquare className="w-3.5 h-3.5" />
                   Kirim ke WhatsApp

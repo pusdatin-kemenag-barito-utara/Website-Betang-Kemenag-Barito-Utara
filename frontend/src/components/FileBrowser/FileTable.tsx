@@ -18,6 +18,8 @@ import { FileTableEmptyState } from "./FileTable/FileTableEmptyState";
 import { FileTableBatchBar } from "./FileTable/FileTableBatchBar";
 import { FileTableModals } from "./FileTable/FileTableModals";
 import type { FileItem } from "@/lib/types";
+import { copyItem } from "@/lib/api";
+import { toast } from "sonner";
 
 export function FileTable({
   data,
@@ -30,6 +32,7 @@ export function FileTable({
 }: FileTableProps) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
+  const [detailsItem, setDetailsItem] = useState<FileItem | null>(null);
 
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({
     visible: false,
@@ -110,6 +113,26 @@ export function FileTable({
     setContextMenu({ visible: true, x: targetX, y: targetY, item });
   };
 
+  const handleDuplicate = async (item: FileItem) => {
+    try {
+      const res = await copyItem(item.id, item.type, folderId || "root", folderId || "root");
+      if (res.success) {
+        toast.success(`Salinan "${item.name}" berhasil dibuat`);
+        window.dispatchEvent(new CustomEvent("folder-content-updated"));
+        if (onRefresh) onRefresh();
+      } else {
+        toast.error(res.error || "Gagal membuat salinan item");
+      }
+    } catch {
+      toast.error("Terjadi kesalahan saat menduplikasi item");
+    }
+  };
+
+  const handleShowDetails = (item: FileItem) => {
+    setDetailsItem(item);
+    onShowInfo?.(item);
+  };
+
   const columns = useMemo(
     () =>
       createFileTableColumns({
@@ -118,7 +141,7 @@ export function FileTable({
         onDownload: handleDownload,
         onToggleStar: handleToggleStar,
         onDelete: (item) => setItemsToDelete([item]),
-        onShowInfo,
+        onShowInfo: handleShowDetails,
         onOpenMenu: handleOpenItemMenu,
         starredMap: localStarredMap,
       }),
@@ -130,6 +153,7 @@ export function FileTable({
     columns,
     state: { sorting, rowSelection },
     enableRowSelection: true,
+    getRowId: (row) => row.id,
     onSortingChange: setSorting,
     onRowSelectionChange: setRowSelection,
     getCoreRowModel: getCoreRowModel(),
@@ -187,8 +211,16 @@ export function FileTable({
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           onContextMenu={handleContextMenuTrigger}
-          onRowClick={() => {
-            // Klik baris tidak membuka info otomatis, hanya via menu 'Detail Informasi'
+          onRowClick={(item) => {
+            setRowSelection((prev) => {
+              const next = { ...prev };
+              if (next[item.id]) {
+                delete next[item.id];
+              } else {
+                next[item.id] = true;
+              }
+              return next;
+            });
           }}
           onRowDoubleClick={(item) => {
             if (item.type === "folder" && onNavigate) onNavigate(item.id);
@@ -245,11 +277,12 @@ export function FileTable({
           setItemsToMove([item]);
           setMoveModalMode("copy");
         }}
+        onDuplicate={handleDuplicate}
         onRename={(item) => setItemToRename(item)}
         onColor={(item) => setFolderToColor(item)}
         onVersion={(item) => setVersionHistoryFile(item)}
         onDelete={(item) => setItemsToDelete([item])}
-        onShowInfo={(item) => onShowInfo?.(item)}
+        onShowInfo={handleShowDetails}
       />
 
       {/* Dialog Modals */}
@@ -266,6 +299,7 @@ export function FileTable({
         versionHistoryFile={versionHistoryFile}
         itemsToMove={itemsToMove}
         moveModalMode={moveModalMode}
+        itemForDetails={detailsItem}
         onClosePreview={() => {
           setPreviewFile(null);
           setPreviewUrl(null);
@@ -277,6 +311,14 @@ export function FileTable({
         onCloseColor={() => setFolderToColor(null)}
         onCloseShare={() => setShareLinkFile(null)}
         onCloseVersion={() => setVersionHistoryFile(null)}
+        onCloseDetails={() => setDetailsItem(null)}
+        onTriggerPreview={handlePreview}
+        onTriggerDownload={handleDownload}
+        onTriggerToggleStar={handleToggleStar}
+        onTriggerRename={(item) => setItemToRename(item)}
+        onTriggerChangeColor={(item) => setFolderToColor(item)}
+        onTriggerShare={(item) => setShareLinkFile(item)}
+        onTriggerDelete={(item) => setItemsToDelete([item])}
         onRefresh={onRefresh}
       />
     </div>

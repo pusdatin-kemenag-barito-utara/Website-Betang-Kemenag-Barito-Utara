@@ -3,6 +3,7 @@ import {
   Download,
   Share2,
   Copy,
+  CopyPlus,
   Pencil,
   Palette,
   History,
@@ -26,6 +27,7 @@ interface FileContextMenuProps {
   onToggleStar: (item: FileItem) => void;
   onMove: (item: FileItem) => void;
   onCopy: (item: FileItem) => void;
+  onDuplicate?: (item: FileItem) => void;
   onRename: (item: FileItem) => void;
   onColor: (item: FileItem) => void;
   onVersion: (item: FileItem) => void;
@@ -46,6 +48,7 @@ export function FileContextMenu({
   onToggleStar,
   onMove,
   onCopy,
+  onDuplicate,
   onRename,
   onColor,
   onVersion,
@@ -152,6 +155,20 @@ export function FileContextMenu({
           <Copy className="h-4 w-4 text-purple-600 shrink-0" />
           <span>Salin ke...</span>
         </button>
+
+        {onDuplicate && (
+          <button
+            type="button"
+            onClick={() => {
+              onDuplicate(item);
+              onClose();
+            }}
+            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors text-left cursor-pointer"
+          >
+            <CopyPlus className="h-4 w-4 text-emerald-600 shrink-0" />
+            <span>Buat Salinan</span>
+          </button>
+        )}
 
         <button
           type="button"

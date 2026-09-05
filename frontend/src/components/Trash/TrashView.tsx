@@ -4,9 +4,11 @@ import {
   restoreTrashItem,
   restoreTrashItemsBatch,
   permanentDeleteTrashItems,
+  getR2FileUrl,
 } from "@/lib/api";
 import { toast } from "sonner";
 import { DeleteConfirmModal } from "../FileBrowser/DeleteConfirmModal";
+import { FilePreviewModal } from "../FileBrowser/FilePreviewModal";
 import { trackEvent } from "@/lib/analytics";
 import type { TrashItem, TrashViewProps } from "./types";
 import { TrashToolbar } from "./TrashToolbar";
@@ -15,6 +17,7 @@ import { TrashTable } from "./TrashTable";
 export function TrashView({ initialData }: TrashViewProps) {
   const [items, setItems] = useState<TrashItem[]>(initialData);
   const [searchQuery, setSearchQuery] = useState("");
+  const [filterType, setFilterType] = useState<"all" | "file" | "folder">("all");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [actionType, setActionType] = useState<"restore" | "delete" | null>(null);
@@ -22,12 +25,18 @@ export function TrashView({ initialData }: TrashViewProps) {
 
   const [itemsToDelete, setItemsToDelete] = useState<TrashItem[]>([]);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [previewItem, setPreviewItem] = useState<TrashItem | null>(null);
+
+  const fileCount = useMemo(() => items.filter((i) => i.type === "file").length, [items]);
+  const folderCount = useMemo(() => items.filter((i) => i.type === "folder").length, [items]);
 
   const filteredItems = useMemo(() => {
-    if (!searchQuery.trim()) return items;
-    const q = searchQuery.toLowerCase();
-    return items.filter((item) => item.name.toLowerCase().includes(q));
-  }, [items, searchQuery]);
+    return items.filter((item) => {
+      const matchesSearch = !searchQuery.trim() || item.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesFilter = filterType === "all" || item.type === filterType;
+      return matchesSearch && matchesFilter;
+    });
+  }, [items, searchQuery, filterType]);
 
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -123,8 +132,8 @@ export function TrashView({ initialData }: TrashViewProps) {
   return (
     <div className="space-y-4">
       {/* Notice Retention */}
-      <div className="flex items-center gap-3 rounded-2xl bg-amber-50 p-4 border border-amber-200/60 text-amber-900 text-xs">
-        <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0" />
+      <div className="flex items-center gap-3 rounded-2xl bg-amber-50 dark:bg-amber-950/30 p-4 border border-amber-200/70 dark:border-amber-900/50 text-amber-900 dark:text-amber-300 text-xs">
+        <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0" />
         <div>
           <span className="font-bold">Informasi Masa Retensi: </span>
           <span>
@@ -139,24 +148,30 @@ export function TrashView({ initialData }: TrashViewProps) {
         selectedCount={selectedIds.size}
         totalCount={items.length}
         isBatchRestoring={isBatchRestoring}
+        filterType={filterType}
+        fileCount={fileCount}
+        folderCount={folderCount}
+        onFilterChange={setFilterType}
         onSearchChange={setSearchQuery}
         onBatchRestore={handleBatchRestore}
         onBatchDelete={() => setItemsToDelete(items.filter((i) => selectedIds.has(i.id)))}
         onEmptyTrash={() => setItemsToDelete([...items])}
       />
 
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-xs overflow-hidden">
         {filteredItems.length === 0 ? (
           <div className="flex flex-col items-center justify-center p-16 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-50 text-slate-300 mb-3">
+            <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-slate-50 dark:bg-slate-800/60 text-slate-300 dark:text-slate-600 mb-3">
               <Trash2 className="h-8 w-8 stroke-1" />
             </div>
-            <h3 className="text-base font-bold text-slate-800 mb-1">
-              {searchQuery ? "Tidak ada hasil ditemukan" : "Sampah Kosong"}
+            <h3 className="text-base font-bold text-slate-800 dark:text-slate-100 mb-1">
+              {searchQuery || filterType !== "all" ? "Tidak ada hasil ditemukan" : "Sampah Kosong"}
             </h3>
-            <p className="text-xs text-slate-500 max-w-xs">
+            <p className="text-xs text-slate-500 dark:text-slate-400 max-w-xs">
               {searchQuery
                 ? `Tidak ada item yang cocok dengan "${searchQuery}".`
+                : filterType !== "all"
+                ? `Tidak ada ${filterType === "file" ? "berkas" : "folder"} di dalam sampah.`
                 : "Tidak ada berkas atau folder yang dihapus saat ini."}
             </p>
           </div>
@@ -170,6 +185,7 @@ export function TrashView({ initialData }: TrashViewProps) {
             onToggleSelectAll={toggleSelectAll}
             onRestoreSingle={handleRestore}
             onDeleteSingle={(item) => setItemsToDelete([item])}
+            onPreviewFile={(item) => setPreviewItem(item)}
           />
         )}
       </div>
@@ -184,6 +200,17 @@ export function TrashView({ initialData }: TrashViewProps) {
           isPermanent={true}
           onClose={() => setItemsToDelete([])}
           onConfirm={handlePermanentDeleteConfirm}
+        />
+      )}
+
+      {/* File Preview Modal */}
+      {previewItem && (
+        <FilePreviewModal
+          isOpen={!!previewItem}
+          onClose={() => setPreviewItem(null)}
+          fileUrl={getR2FileUrl(previewItem.r2ObjectKey || previewItem.id)}
+          fileName={previewItem.name}
+          mimeType={previewItem.mimeType || "application/octet-stream"}
         />
       )}
     </div>

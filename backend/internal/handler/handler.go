@@ -25,6 +25,7 @@ type Handlers struct {
 	Settings    *SettingsHandler
 	Storage     *StorageHandler
 	Maintenance *MaintenanceHandler
+	User        *UserHandler
 }
 
 // New membuat seluruh handler dari service dan pool database yang tersedia.
@@ -39,6 +40,7 @@ func New(services *service.Services, pool *pgxpool.Pool) *Handlers {
 		Settings:    NewSettingsHandler(services.Settings, services.Auth),
 		Storage:     NewStorageHandler(services.Storage),
 		Maintenance: NewMaintenanceHandler(services.Maintenance),
+		User:        NewUserHandler(services.User, services.Auth),
 	}
 }
 

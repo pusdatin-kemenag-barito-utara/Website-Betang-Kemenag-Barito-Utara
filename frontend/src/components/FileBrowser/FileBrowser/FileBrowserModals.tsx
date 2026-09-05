@@ -10,6 +10,7 @@ interface FileBrowserModalsProps {
   currentFolderId: string;
   userBidangId: string;
   selectedItemForInfo: FileItem | null;
+  initialFiles?: File[];
   onCloseCreate: () => void;
   onCloseUpload: () => void;
   onCloseInfo: () => void;
@@ -23,6 +24,7 @@ export function FileBrowserModals({
   currentFolderId,
   userBidangId,
   selectedItemForInfo,
+  initialFiles,
   onCloseCreate,
   onCloseUpload,
   onCloseInfo,
@@ -43,6 +45,7 @@ export function FileBrowserModals({
         folderId={currentFolderId}
         userBidangId={userBidangId}
         isFolderMode={isFolderMode}
+        initialFiles={initialFiles}
         onSuccess={onSuccessMutation}
       />
 

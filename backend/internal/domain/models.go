@@ -14,10 +14,12 @@ type Bidang struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// Bidang adalah hasil list bidang beserta jumlah dokumen aktif.
+// BidangWithCount adalah hasil list bidang beserta jumlah dokumen aktif dan daftar folder root yang dapat diakses.
 type BidangWithCount struct {
 	Bidang
-	DocCount int64 `json:"doc_count"`
+	DocCount              int64    `json:"doc_count"`
+	AccessibleFolderIDs   []string `json:"accessible_folder_ids"`
+	AccessibleFolderNames []string `json:"accessible_folder_names"`
 }
 
 // Breadcrumb adalah satu tingkat navigasi folder.
@@ -74,7 +76,27 @@ type FileVersion struct {
 	UploadedByUser *UserBrief `json:"uploaded_by_user"`
 }
 
-// AppPermission adalah izin aplikasi pada user pusdatin.
+// User merepresentasikan akun pengguna pada tabel kemenag_arsip.users.
+type User struct {
+	ID         string    `json:"id"`
+	Email      string    `json:"email"`
+	Username   string    `json:"username"`
+	FullName   string    `json:"full_name"`
+	Role       string    `json:"role"` // 'Super Admin', 'Admin Bidang'
+	BidangID   *string   `json:"bidang_id"`
+	BidangName *string   `json:"bidang_name,omitempty"`
+	IsActive   bool      `json:"is_active"`
+	AvatarURL  *string   `json:"avatar_url,omitempty"`
+	CreatedAt  time.Time `json:"created_at"`
+	UpdatedAt  time.Time `json:"updated_at"`
+}
+
+// IsSuperAdmin mengecek apakah pengguna bertindak sebagai Super Admin.
+func (u *User) IsSuperAdmin() bool {
+	return u.Role == "super_admin" || u.Role == "Super Admin"
+}
+
+// AppPermission adalah izin aplikasi pada user pusdatin (legacy).
 type AppPermission struct {
 	AppID string `json:"app_id"`
 	Role  string `json:"role"`
@@ -126,8 +148,11 @@ type Session struct {
 
 // AuthUser adalah konteks user terautentikasi yang dilampirkan pada request.
 type AuthUser struct {
-	ID    string
-	Email string
+	ID           string
+	Email        string
+	Role         string
+	BidangID     *string
+	IsSuperAdmin bool
 }
 
 // FolderSummary adalah folder + total ukuran (hasil RPC get_folders_size).
@@ -138,11 +163,14 @@ type FolderSummary struct {
 
 // TrashItem adalah item pada halaman recycle bin.
 type TrashItem struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Type      string `json:"type"` // folder | file
-	DeletedAt string `json:"deleted_at"`
-	ExpiresAt string `json:"expires_at"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Type        string `json:"type"` // folder | file
+	DeletedAt   string `json:"deleted_at"`
+	ExpiresAt   string `json:"expires_at"`
+	R2ObjectKey string `json:"r2_object_key"`
+	MimeType    string `json:"mime_type"`
+	SizeBytes   int64  `json:"size_bytes"`
 }
 
 // StorageUsage adalah hasil perhitungan penggunaan penyimpanan.
@@ -154,7 +182,12 @@ type StorageUsage struct {
 
 // AppSettings adalah pengaturan global aplikasi.
 type AppSettings struct {
-	DisableRightClick bool `json:"disable_right_click"`
+	DisableRightClick       bool   `json:"disable_right_click"`
+	DisablePrintShortcut    bool   `json:"disable_print_shortcut"`
+	EnableWatermark         bool   `json:"enable_watermark"`
+	MaxUploadSizeMB         int    `json:"max_upload_size_mb"`
+	DefaultShareExpiryHours int    `json:"default_share_expiry_hours"`
+	DefaultPdfViewerMode    string `json:"default_pdf_viewer_mode"`
 }
 
 // DownloadFile adalah satu file untuk dikompres menjadi ZIP.

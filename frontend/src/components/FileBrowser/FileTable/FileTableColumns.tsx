@@ -6,6 +6,7 @@ import {
   FileArchive,
   Star,
   MoreVertical,
+  Info,
 } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { formatFileSize } from "@/lib/utils";
@@ -48,6 +49,7 @@ export function createFileTableColumns({
   onToggleStar,
   onOpenMenu,
   starredMap,
+  onShowInfo,
 }: {
   onNavigate?: (id: string) => void;
   onPreview: (item: FileItem) => void;
@@ -142,6 +144,7 @@ export function createFileTableColumns({
               <a
                 href={`/folders/${item.id}`}
                 onClick={(e) => {
+                  e.stopPropagation();
                   if (onNavigate) {
                     e.preventDefault();
                     onNavigate(item.id);
@@ -155,7 +158,10 @@ export function createFileTableColumns({
             ) : (
               <button
                 type="button"
-                onClick={() => onPreview(item)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onPreview(item);
+                }}
                 className="flex items-center gap-2 sm:gap-2.5 min-w-0 w-full overflow-hidden text-left cursor-pointer"
               >
                 {getFileIcon(item)}
@@ -254,6 +260,17 @@ export function createFileTableColumns({
               />
             </button>
 
+            {onShowInfo && (
+              <button
+                type="button"
+                onClick={() => onShowInfo(item)}
+                className="hidden sm:inline-flex p-1.5 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                title="Detail Informasi"
+              >
+                <Info className="h-4 w-4" />
+              </button>
+            )}
+
             <button
               type="button"
               onClick={(e) => onOpenMenu(e, item)}
@@ -266,7 +283,7 @@ export function createFileTableColumns({
         );
       },
       enableSorting: false,
-      size: 60,
+      size: 85,
     },
   ];
 }

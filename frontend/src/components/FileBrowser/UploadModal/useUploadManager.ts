@@ -16,7 +16,7 @@ export interface UploadItem {
 export function useUploadManager({
   isOpen,
   folderId,
-  userBidangId,
+  userBidangId: _userBidangId,
   initialFiles,
   onClose,
   onSuccess,
@@ -100,12 +100,68 @@ export function useUploadManager({
 
     for (const item of pendingItems) {
       if (cancelToken.current) break;
-      updateItemStatus(item.id, { status: "uploading", progress: 25, error: undefined });
+      updateItemStatus(item.id, { status: "uploading", progress: 20, error: undefined });
 
       try {
-        // 1. Coba Direct Multipart Upload ke backend
-        const directRes = await uploadFileDirect(item.file, folderId, item.file.name);
-        if (directRes.success) {
+        // 1. Prioritaskan Direct Upload Langsung ke Cloudflare R2 via Presigned PUT
+        const fileExt = item.file.name.split(".").pop();
+        const originalName = item.file.name.substring(0, item.file.name.lastIndexOf(".")) || item.file.name;
+        const safeName = originalName.replace(/[^a-zA-Z0-9-]/g, "_").substring(0, 40);
+        const fileName = `${safeName}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
+        const folderPathSegment = folderId === "root" ? "root" : folderId;
+        const filePath = `arsip/global/${folderPathSegment}/${fileName}`;
+
+        let uploadedViaR2 = false;
+
+        const presignRes = await getPresignedUploadUrl(filePath, item.file.type || "application/octet-stream");
+
+        if (presignRes.success && presignRes.presignedUrl && presignRes.r2ObjectKey) {
+          updateItemStatus(item.id, { progress: 50 });
+          if (cancelToken.current) break;
+
+          try {
+            const uploadResponse = await fetch(presignRes.presignedUrl, {
+              method: "PUT",
+              body: item.file,
+              headers: { "Content-Type": item.file.type || "application/octet-stream" },
+            });
+
+            if (uploadResponse.ok) {
+              updateItemStatus(item.id, { progress: 85 });
+              if (cancelToken.current) break;
+
+              const metaRes = await saveFileMetadata({
+                name: item.file.name,
+                folderId: folderId,
+                r2ObjectKey: presignRes.r2ObjectKey,
+                mimeType: item.file.type || "application/octet-stream",
+                sizeBytes: item.file.size,
+              });
+
+              if (metaRes.success) {
+                uploadedViaR2 = true;
+                successCount++;
+                trackEvent("upload_file", {
+                  file_name: item.file.name,
+                  file_size: item.file.size,
+                  mime_type: item.file.type || "application/octet-stream",
+                });
+                updateItemStatus(item.id, { status: "success", progress: 100 });
+                continue;
+              }
+            }
+          } catch (r2Err) {
+            console.warn("Direct Cloudflare R2 upload gagal, beralih ke backend upload:", r2Err);
+          }
+        }
+
+        // 2. Fallback: Direct Multipart Upload melalui backend Go
+        if (!uploadedViaR2) {
+          updateItemStatus(item.id, { progress: 60 });
+          const directRes = await uploadFileDirect(item.file, folderId, item.file.name);
+          if (!directRes.success) {
+            throw new Error(directRes.error || "Gagal mengunggah berkas ke penyimpanan Cloudflare R2.");
+          }
           successCount++;
           trackEvent("upload_file", {
             file_name: item.file.name,
@@ -113,65 +169,7 @@ export function useUploadManager({
             mime_type: item.file.type || "application/octet-stream",
           });
           updateItemStatus(item.id, { status: "success", progress: 100 });
-          continue;
         }
-
-        // 2. Fallback ke Pre-signed URL PUT
-        updateItemStatus(item.id, { progress: 45 });
-        const fileExt = item.file.name.split(".").pop();
-        const originalName = item.file.name.substring(0, item.file.name.lastIndexOf(".")) || item.file.name;
-        const safeName = originalName.replace(/[^a-zA-Z0-9-]/g, "_").substring(0, 40);
-        const fileName = `${safeName}_${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
-        const folderPathSegment = folderId === "root" ? "root" : folderId;
-        const filePath = `arsip/${userBidangId}/${folderPathSegment}/${fileName}`;
-
-        const { success, presignedUrl, r2ObjectKey, error: presignedError } =
-          await getPresignedUploadUrl(filePath, item.file.type || "application/octet-stream");
-        if (!success || !presignedUrl || !r2ObjectKey) {
-          throw new Error(directRes.error || presignedError || "Gagal mengunggah file.");
-        }
-
-        if (cancelToken.current) break;
-        updateItemStatus(item.id, { progress: 65 });
-
-        let uploadResponse = await fetch(presignedUrl, {
-          method: "PUT",
-          body: item.file,
-          headers: { "Content-Type": item.file.type || "application/octet-stream" },
-        }).catch(() => null);
-
-        if (!uploadResponse || !uploadResponse.ok) {
-          uploadResponse = await fetch(`/api/proxy-upload?url=${encodeURIComponent(presignedUrl)}`, {
-            method: "PUT",
-            body: item.file,
-            headers: { "Content-Type": item.file.type || "application/octet-stream" },
-          });
-        }
-
-        if (!uploadResponse.ok) {
-          throw new Error(directRes.error || "Gagal mengunggah file ke penyimpanan");
-        }
-
-        if (cancelToken.current) break;
-        updateItemStatus(item.id, { progress: 85 });
-
-        const result = await saveFileMetadata({
-          name: item.file.name,
-          folderId: folderId,
-          r2ObjectKey: r2ObjectKey,
-          mimeType: item.file.type || "application/octet-stream",
-          sizeBytes: item.file.size,
-        });
-
-        if (!result.success) throw new Error(result.error || "Database error");
-
-        successCount++;
-        trackEvent("upload_file", {
-          file_name: item.file.name,
-          file_size: item.file.size,
-          mime_type: item.file.type || "application/octet-stream",
-        });
-        updateItemStatus(item.id, { status: "success", progress: 100 });
       } catch (err) {
         updateItemStatus(item.id, {
           status: "error",

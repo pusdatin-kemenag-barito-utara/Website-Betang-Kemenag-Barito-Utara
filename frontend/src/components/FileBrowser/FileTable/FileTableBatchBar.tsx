@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Download, FolderInput, Copy, Trash2, Loader2 } from "lucide-react";
-import { downloadZip, getPresignedDownloadUrl } from "@/lib/api";
+import { downloadZip, getPresignedDownloadUrl, getR2FileUrl } from "@/lib/api";
 import { toast } from "sonner";
 import type { FileItem } from "@/lib/types";
 
@@ -26,21 +26,36 @@ export function FileTableBatchBar({
     setIsDownloadingBatch(true);
     const firstItem = selectedItems[0];
 
-    // Jika hanya 1 file individual terpilih, unduh langsung sesuai nama berkas aslinya
+    // Jika hanya 1 file individual terpilih, unduh langsung via Cloudflare R2 CDN
     if (count === 1 && firstItem && firstItem.type === "file") {
       try {
-        const res = await getPresignedDownloadUrl(firstItem.objectKey || firstItem.id, firstItem.name);
-        if (res.success && res.presignedUrl) {
-          const a = document.createElement("a");
-          a.href = res.presignedUrl;
-          a.download = firstItem.name;
-          a.click();
-          toast.success(`Mengunduh ${firstItem.name}`);
-          setIsDownloadingBatch(false);
-          return;
-        }
+        const directUrl = getR2FileUrl(firstItem.objectKey || firstItem.id);
+        const a = document.createElement("a");
+        a.href = directUrl;
+        a.download = firstItem.name;
+        a.target = "_blank";
+        a.rel = "noreferrer";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        toast.success(`Mengunduh ${firstItem.name}`);
+        setIsDownloadingBatch(false);
+        return;
       } catch {
-        // Lanjutkan ke mekanisme ZIP bila URL presigned gagal
+        try {
+          const res = await getPresignedDownloadUrl(firstItem.objectKey || firstItem.id, firstItem.name);
+          if (res.success && res.presignedUrl) {
+            const a = document.createElement("a");
+            a.href = res.presignedUrl;
+            a.download = firstItem.name;
+            a.click();
+            toast.success(`Mengunduh ${firstItem.name}`);
+            setIsDownloadingBatch(false);
+            return;
+          }
+        } catch {
+          // Lanjutkan ke mekanisme ZIP bila URL direct/presigned gagal
+        }
       }
     }
 

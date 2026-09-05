@@ -37,9 +37,30 @@ func (r *SettingsRepo) Get(ctx context.Context) (*domain.AppSettings, error) {
 
 	var s domain.AppSettings
 	err := r.pool.QueryRow(ctx, `
-		SELECT disable_right_click FROM kemenag_arsip.app_settings WHERE id = 1`).Scan(&s.DisableRightClick)
+		SELECT 
+			COALESCE(disable_right_click, true),
+			COALESCE(disable_print_shortcut, false),
+			COALESCE(enable_watermark, false),
+			COALESCE(max_upload_size_mb, 100),
+			COALESCE(default_share_expiry_hours, 24),
+			COALESCE(default_pdf_viewer_mode, 'iframe')
+		FROM kemenag_arsip.app_settings WHERE id = 1`).Scan(
+		&s.DisableRightClick,
+		&s.DisablePrintShortcut,
+		&s.EnableWatermark,
+		&s.MaxUploadSizeMB,
+		&s.DefaultShareExpiryHours,
+		&s.DefaultPdfViewerMode,
+	)
 	if errors.Is(err, pgx.ErrNoRows) {
-		s = domain.AppSettings{DisableRightClick: false}
+		s = domain.AppSettings{
+			DisableRightClick:       true,
+			DisablePrintShortcut:    false,
+			EnableWatermark:         false,
+			MaxUploadSizeMB:         100,
+			DefaultShareExpiryHours: 24,
+			DefaultPdfViewerMode:    "iframe",
+		}
 	} else if err != nil {
 		return nil, err
 	}
@@ -53,18 +74,34 @@ func (r *SettingsRepo) Get(ctx context.Context) (*domain.AppSettings, error) {
 }
 
 // Update menyimpan pengaturan aplikasi (upsert baris id = 1) dan menginvalidasi cache.
-func (r *SettingsRepo) Update(ctx context.Context, disableRightClick bool) error {
+func (r *SettingsRepo) Update(ctx context.Context, settings domain.AppSettings) error {
 	_, err := r.pool.Exec(ctx, `
-		INSERT INTO kemenag_arsip.app_settings (id, disable_right_click, updated_at)
-		VALUES (1, $1, now())
-		ON CONFLICT (id) DO UPDATE SET disable_right_click = $1, updated_at = now()`,
-		disableRightClick)
+		INSERT INTO kemenag_arsip.app_settings (
+			id, disable_right_click, disable_print_shortcut, enable_watermark, 
+			max_upload_size_mb, default_share_expiry_hours, default_pdf_viewer_mode, updated_at
+		)
+		VALUES (1, $1, $2, $3, $4, $5, $6, now())
+		ON CONFLICT (id) DO UPDATE SET 
+			disable_right_click = $1,
+			disable_print_shortcut = $2,
+			enable_watermark = $3,
+			max_upload_size_mb = $4,
+			default_share_expiry_hours = $5,
+			default_pdf_viewer_mode = $6,
+			updated_at = now()`,
+		settings.DisableRightClick,
+		settings.DisablePrintShortcut,
+		settings.EnableWatermark,
+		settings.MaxUploadSizeMB,
+		settings.DefaultShareExpiryHours,
+		settings.DefaultPdfViewerMode,
+	)
 	if err != nil {
 		return err
 	}
 
 	r.mu.Lock()
-	r.cached = &domain.AppSettings{DisableRightClick: disableRightClick}
+	r.cached = &settings
 	r.cachedTime = time.Now()
 	r.mu.Unlock()
 

@@ -6,3 +6,4 @@ export * from "./trash";
 export * from "./settings";
 export * from "./bidang";
 export * from "./stats";
+export * from "./users";

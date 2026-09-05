@@ -8,18 +8,38 @@ import (
 	"github.com/kemenag-baritoutara/betang-kemenag/internal/domain"
 )
 
-// Search mencari folder berdasarkan trigram fuzzy similarity, substring ILIKE, dan FTS.
-func (r *FolderRepo) Search(ctx context.Context, query string) ([]domain.Folder, error) {
-	rows, err := r.pool.Query(ctx, `
-		SELECT `+folderColumns+` FROM kemenag_arsip.folders
-		WHERE deleted_at IS NULL
-		  AND (
-		    name ILIKE '%' || $1 || '%'
-		    OR similarity(name, $1) > 0.2
-		    OR (fts_doc IS NOT NULL AND fts_doc @@ plainto_tsquery('simple', $1))
-		    OR (fts_doc IS NOT NULL AND fts_doc @@ websearch_to_tsquery('simple', $1))
-		  )
-		ORDER BY similarity(name, $1) DESC, name ASC`, query)
+// Search mencari folder berdasarkan trigram fuzzy similarity, substring ILIKE, dan FTS, dengan filter opsional bidangID.
+func (r *FolderRepo) Search(ctx context.Context, query string, bidangID *string) ([]domain.Folder, error) {
+	var sqlQuery string
+	var args []any
+	if bidangID != nil && *bidangID != "" {
+		sqlQuery = `
+			SELECT ` + folderColumns + ` FROM kemenag_arsip.folders
+			WHERE deleted_at IS NULL
+			  AND bidang_id = $2::uuid
+			  AND (
+			    name ILIKE '%' || $1 || '%'
+			    OR similarity(name, $1) > 0.2
+			    OR (fts_doc IS NOT NULL AND fts_doc @@ plainto_tsquery('simple', $1))
+			    OR (fts_doc IS NOT NULL AND fts_doc @@ websearch_to_tsquery('simple', $1))
+			  )
+			ORDER BY similarity(name, $1) DESC, name ASC`
+		args = append(args, query, *bidangID)
+	} else {
+		sqlQuery = `
+			SELECT ` + folderColumns + ` FROM kemenag_arsip.folders
+			WHERE deleted_at IS NULL
+			  AND (
+			    name ILIKE '%' || $1 || '%'
+			    OR similarity(name, $1) > 0.2
+			    OR (fts_doc IS NOT NULL AND fts_doc @@ plainto_tsquery('simple', $1))
+			    OR (fts_doc IS NOT NULL AND fts_doc @@ websearch_to_tsquery('simple', $1))
+			  )
+			ORDER BY similarity(name, $1) DESC, name ASC`
+		args = append(args, query)
+	}
+
+	rows, err := r.pool.Query(ctx, sqlQuery, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -136,12 +156,24 @@ func (r *FolderRepo) UpdateColor(ctx context.Context, folderID string, color *st
 	return err
 }
 
-// ListStarred mengambil seluruh folder aktif yang dibintangi.
-func (r *FolderRepo) ListStarred(ctx context.Context) ([]domain.Folder, error) {
-	rows, err := r.pool.Query(ctx, `
-		SELECT `+folderColumns+` FROM kemenag_arsip.folders
-		WHERE deleted_at IS NULL AND is_starred = true
-		ORDER BY updated_at DESC, created_at DESC`)
+// ListStarred mengambil seluruh folder aktif yang dibintangi, dengan filter opsional bidangID.
+func (r *FolderRepo) ListStarred(ctx context.Context, bidangID *string) ([]domain.Folder, error) {
+	var query string
+	var args []any
+	if bidangID != nil && *bidangID != "" {
+		query = `
+			SELECT ` + folderColumns + ` FROM kemenag_arsip.folders
+			WHERE deleted_at IS NULL AND is_starred = true AND bidang_id = $1::uuid
+			ORDER BY updated_at DESC, created_at DESC`
+		args = append(args, *bidangID)
+	} else {
+		query = `
+			SELECT ` + folderColumns + ` FROM kemenag_arsip.folders
+			WHERE deleted_at IS NULL AND is_starred = true
+			ORDER BY updated_at DESC, created_at DESC`
+	}
+
+	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}

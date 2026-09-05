@@ -4,6 +4,10 @@ export interface TrashItem {
   type: "folder" | "file";
   deletedAt: string;
   expiresAt: string;
+  daysRemaining?: number;
+  r2ObjectKey?: string;
+  mimeType?: string;
+  sizeBytes?: number;
 }
 
 export interface TrashViewProps {

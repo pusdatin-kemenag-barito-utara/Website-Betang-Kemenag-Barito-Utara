@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -37,13 +38,17 @@ func (r *BidangRepo) List(ctx context.Context) ([]domain.Bidang, error) {
 	return items, rows.Err()
 }
 
-// ListWithCounts mengembalikan bidang beserta jumlah dokumen aktif per bidang.
+// ListWithCounts mengembalikan bidang beserta jumlah dokumen aktif dan daftar folder root yang diakses.
 func (r *BidangRepo) ListWithCounts(ctx context.Context) ([]domain.BidangWithCount, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT b.id, b.name, b.sort_order, b.created_at,
-		       COUNT(f.id) FILTER (WHERE f.deleted_at IS NULL) AS doc_count
+		       COUNT(DISTINCT f.id) FILTER (WHERE f.deleted_at IS NULL) AS doc_count,
+		       COALESCE(array_agg(DISTINCT bf.folder_id::text) FILTER (WHERE bf.folder_id IS NOT NULL), '{}') AS folder_ids,
+		       COALESCE(array_agg(DISTINCT fold.name) FILTER (WHERE fold.name IS NOT NULL), '{}') AS folder_names
 		FROM kemenag_arsip.bidang b
 		LEFT JOIN kemenag_arsip.files f ON f.bidang_id = b.id
+		LEFT JOIN kemenag_arsip.bidang_folders bf ON bf.bidang_id = b.id
+		LEFT JOIN kemenag_arsip.folders fold ON fold.id = bf.folder_id AND fold.deleted_at IS NULL
 		GROUP BY b.id, b.name, b.sort_order, b.created_at
 		ORDER BY b.sort_order ASC, b.name ASC`)
 	if err != nil {
@@ -54,12 +59,61 @@ func (r *BidangRepo) ListWithCounts(ctx context.Context) ([]domain.BidangWithCou
 	items := []domain.BidangWithCount{}
 	for rows.Next() {
 		var b domain.BidangWithCount
-		if err := rows.Scan(&b.ID, &b.Name, &b.SortOrder, &b.CreatedAt, &b.DocCount); err != nil {
+		if err := rows.Scan(&b.ID, &b.Name, &b.SortOrder, &b.CreatedAt, &b.DocCount, &b.AccessibleFolderIDs, &b.AccessibleFolderNames); err != nil {
 			return nil, err
 		}
 		items = append(items, b)
 	}
 	return items, rows.Err()
+}
+
+// GetAccessibleFolderIDs mengambil daftar ID folder root yang dapat diakses oleh satu bidang.
+func (r *BidangRepo) GetAccessibleFolderIDs(ctx context.Context, bidangID string) ([]string, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT folder_id::text
+		FROM kemenag_arsip.bidang_folders
+		WHERE bidang_id = $1::uuid`, bidangID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	ids := []string{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+// SetAccessibleFolders memperbarui daftar folder root yang dapat diakses oleh satu bidang.
+func (r *BidangRepo) SetAccessibleFolders(ctx context.Context, bidangID string, folderIDs []string) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, `DELETE FROM kemenag_arsip.bidang_folders WHERE bidang_id = $1::uuid`, bidangID); err != nil {
+		return err
+	}
+
+	for _, fID := range folderIDs {
+		fID = strings.TrimSpace(fID)
+		if len(fID) == 36 {
+			if _, err := tx.Exec(ctx, `
+				INSERT INTO kemenag_arsip.bidang_folders (bidang_id, folder_id)
+				VALUES ($1::uuid, $2::uuid)
+				ON CONFLICT DO NOTHING`, bidangID, fID); err != nil {
+				return err
+			}
+		}
+	}
+
+	return tx.Commit(ctx)
 }
 
 // FindByName mencari bidang dengan nama yang sama (tidak peka huruf besar/kecil),

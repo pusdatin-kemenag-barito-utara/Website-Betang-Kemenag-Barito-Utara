@@ -15,9 +15,9 @@ func (r *FileRepo) ListVersions(ctx context.Context, fileID string) ([]domain.Fi
 	}
 	rows, err := r.pool.Query(ctx, `
 		SELECT v.id, v.file_id, v.r2_object_key, v.size_bytes, v.uploaded_by, v.created_at,
-		       COALESCE(u.name, v.uploaded_by::text) AS full_name
+		       COALESCE(u.full_name, v.uploaded_by::text) AS full_name
 		FROM kemenag_arsip.file_versions v
-		LEFT JOIN kemenag_pusdatin.profiles u ON u.id = v.uploaded_by
+		LEFT JOIN kemenag_arsip.users u ON u.id = v.uploaded_by
 		WHERE v.file_id = $1::uuid
 		ORDER BY v.created_at DESC`, fileID)
 	if err != nil {

@@ -4,7 +4,7 @@ import {
   getPresignedDownloadUrl,
   downloadZip,
   toggleStar,
-  API_ORIGIN,
+  getR2FileUrl,
 } from "@/lib/api";
 import { toast } from "sonner";
 import type { FileItem } from "@/lib/types";
@@ -48,27 +48,16 @@ export function useFileTableModals({
     }
   };
 
-  const handlePreview = async (item: FileItem) => {
+  const handlePreview = (item: FileItem) => {
     if (item.type === "folder") {
       if (onNavigate) onNavigate(item.id);
       return;
     }
     setPreviewFile(item);
-    setPreviewLoading(true);
-    setPreviewUrl(null);
-    try {
-      const key = item.objectKey || item.id;
-      const res = await getPresignedDownloadUrl(key, item.name);
-      if (res.success && res.presignedUrl) {
-        setPreviewUrl(res.presignedUrl);
-      } else {
-        setPreviewUrl(`${API_ORIGIN}/api/v1/files/stream?key=${encodeURIComponent(key)}`);
-      }
-    } catch {
-      setPreviewUrl(`${API_ORIGIN}/api/v1/files/stream?key=${encodeURIComponent(item.objectKey || item.id)}`);
-    } finally {
-      setPreviewLoading(false);
-    }
+    setPreviewLoading(false);
+    const key = item.objectKey || item.id;
+    const directUrl = getR2FileUrl(key);
+    setPreviewUrl(directUrl);
   };
 
   const handleDownload = async (item: FileItem) => {
@@ -89,15 +78,29 @@ export function useFileTableModals({
     }
 
     try {
-      const res = await getPresignedDownloadUrl(item.objectKey || item.id, item.name);
-      if (res.success && res.presignedUrl) {
-        const a = document.createElement("a");
-        a.href = res.presignedUrl;
-        a.download = item.name;
-        a.click();
-      }
+      const key = item.objectKey || item.id;
+      const directUrl = getR2FileUrl(key);
+      const a = document.createElement("a");
+      a.href = directUrl;
+      a.download = item.name;
+      a.target = "_blank";
+      a.rel = "noreferrer";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
     } catch {
-      toast.error("Gagal mengunduh berkas");
+      // Fallback ke presigned download URL bila diperlukan
+      try {
+        const res = await getPresignedDownloadUrl(item.objectKey || item.id, item.name);
+        if (res.success && res.presignedUrl) {
+          const a = document.createElement("a");
+          a.href = res.presignedUrl;
+          a.download = item.name;
+          a.click();
+        }
+      } catch {
+        toast.error("Gagal mengunduh berkas");
+      }
     }
   };
 

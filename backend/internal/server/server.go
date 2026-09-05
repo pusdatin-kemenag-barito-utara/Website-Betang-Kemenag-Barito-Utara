@@ -41,7 +41,7 @@ func Build(ctx context.Context, cfg *config.Config) (*fiber.App, func(), error) 
 	}
 
 	// 3) Client Supabase Auth.
-	supabaseClient := auth.NewSupabaseClient(cfg.SupabaseURL, cfg.SupabaseAnonKey, cfg.SupabaseJWTSecret)
+	supabaseClient := auth.NewSupabaseClient(cfg.SupabaseURL, cfg.SupabaseAnonKey, cfg.SupabaseJWTSecret, cfg.SupabaseServiceRoleKey)
 
 	// 4) Lapisan repository dan service.
 	repos := repository.New(pool, cfg.PusdatinSchema)
@@ -110,9 +110,11 @@ func Build(ctx context.Context, cfg *config.Config) (*fiber.App, func(), error) 
 
 	protected.Get("/bidang", handlers.Bidang.List)
 	protected.Post("/bidang", handlers.Bidang.Create)
+	protected.Post("/bidang/reorder", handlers.Bidang.Reorder)
+	protected.Get("/bidang/:id/folders", handlers.Bidang.GetFolders)
+	protected.Put("/bidang/:id/folders", handlers.Bidang.SetFolders)
 	protected.Patch("/bidang/:id", handlers.Bidang.Update)
 	protected.Delete("/bidang/:id", handlers.Bidang.Delete)
-	protected.Post("/bidang/reorder", handlers.Bidang.Reorder)
 
 	protected.Get("/folders/tree", handlers.Folder.Tree)
 	protected.Get("/folders", handlers.Folder.Contents)
@@ -148,6 +150,12 @@ func Build(ctx context.Context, cfg *config.Config) (*fiber.App, func(), error) 
 
 	protected.Get("/settings", handlers.Settings.Get)
 	protected.Put("/settings", handlers.Settings.Update)
+
+	// Manajemen Pengguna (khusus Super Admin)
+	protected.Get("/users", handlers.User.List)
+	protected.Post("/users", handlers.User.Create)
+	protected.Patch("/users/:id", handlers.User.Update)
+	protected.Delete("/users/:id", handlers.User.Delete)
 
 	protected.Get("/storage/usage", handlers.Storage.Usage)
 	protected.Get("/maintenance/status", handlers.Maintenance.Status)

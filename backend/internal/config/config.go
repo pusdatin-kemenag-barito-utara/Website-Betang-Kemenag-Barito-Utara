@@ -14,9 +14,10 @@ type Config struct {
 	Port string
 
 	// Supabase Auth (issuer token tetap dari Supabase)
-	SupabaseURL      string
-	SupabaseAnonKey  string
-	SupabaseJWTSecret string
+	SupabaseURL            string
+	SupabaseAnonKey        string
+	SupabaseJWTSecret      string
+	SupabaseServiceRoleKey string
 
 	// Postgres (satu database, dua schema)
 	DatabaseURL    string
@@ -59,8 +60,9 @@ func Load() (*Config, error) {
 	cfg := &Config{
 		Port:               backendPort,
 		SupabaseURL:        getEnvFirst([]string{"SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL", "PUBLIC_SUPABASE_URL"}, "https://db.kemenag-baritoutara.com"),
-		SupabaseAnonKey:    getEnvFirst([]string{"SUPABASE_ANON_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "PUBLIC_SUPABASE_ANON_KEY"}, ""),
-		SupabaseJWTSecret:  getEnvFirst([]string{"SUPABASE_JWT_SECRET", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEY"}, ""),
+		SupabaseAnonKey:        getEnvFirst([]string{"SUPABASE_ANON_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "PUBLIC_SUPABASE_ANON_KEY"}, ""),
+		SupabaseJWTSecret:      getEnvFirst([]string{"SUPABASE_JWT_SECRET", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEY"}, ""),
+		SupabaseServiceRoleKey: getEnvFirst([]string{"SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SERVICE_KEY", "SERVICE_ROLE_KEY"}, ""),
 		DatabaseURL:        getEnvFirst([]string{"DATABASE_URL", "DIRECT_URL", "POSTGRES_URL", "POSTGRESQL_URL"}, ""),
 		DBSChema:           getEnvFirst([]string{"DB_SCHEMA"}, "kemenag_arsip"),
 		PusdatinSchema:     getEnvFirst([]string{"PUSDATIN_SCHEMA"}, "kemenag_pusdatin"),

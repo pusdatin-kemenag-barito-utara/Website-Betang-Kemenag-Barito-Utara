@@ -57,6 +57,8 @@ export function TopNavbar({ onMenuClick, initialUser }: TopNavbarProps) {
 
           // Sinkronisasi status user ke Google Analytics & GTM
           setAnalyticsUser(user.id, roleLabel, user.email);
+        } else if (res.unauthorized) {
+          window.location.replace("/login");
         }
       } catch {
         // Abaikan; fallback nama default.

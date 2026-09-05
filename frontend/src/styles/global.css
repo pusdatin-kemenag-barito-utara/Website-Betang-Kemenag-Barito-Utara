@@ -127,3 +127,90 @@
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
 }
+
+/* ==========================================================================
+   Modern Gradient Toaster (Sonner)
+   ========================================================================== */
+[data-sonner-toaster] [data-sonner-toast] {
+  border-radius: 16px !important;
+  padding: 12px 18px !important;
+  font-size: 13.5px !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.01em !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+[data-sonner-toaster] [data-sonner-toast] [data-title] {
+  color: #ffffff !important;
+  font-weight: 600 !important;
+  font-size: 13.5px !important;
+  line-height: 1.4 !important;
+}
+
+[data-sonner-toaster] [data-sonner-toast] [data-description] {
+  color: rgba(255, 255, 255, 0.88) !important;
+  font-weight: 450 !important;
+  font-size: 12px !important;
+  margin-top: 2px !important;
+}
+
+[data-sonner-toaster] [data-sonner-toast] [data-icon] {
+  color: #ffffff !important;
+}
+
+[data-sonner-toaster] [data-sonner-toast] [data-icon] svg {
+  color: #ffffff !important;
+}
+
+[data-sonner-toaster] [data-sonner-toast] [data-close-button] {
+  background: rgba(255, 255, 255, 0.2) !important;
+  border: 1px solid rgba(255, 255, 255, 0.3) !important;
+  color: #ffffff !important;
+  border-radius: 9999px !important;
+  transition: all 0.2s ease !important;
+  opacity: 0.85 !important;
+}
+
+[data-sonner-toaster] [data-sonner-toast] [data-close-button]:hover {
+  background: rgba(255, 255, 255, 0.4) !important;
+  opacity: 1 !important;
+}
+
+/* 🟢 Success: Modern Emerald to Teal Gradient */
+[data-sonner-toaster] [data-sonner-toast][data-type="success"] {
+  background: linear-gradient(135deg, #059669 0%, #0d9488 100%) !important;
+  border-color: rgba(255, 255, 255, 0.25) !important;
+  box-shadow: 0 14px 30px -8px rgba(5, 150, 105, 0.45), 0 4px 12px -2px rgba(5, 150, 105, 0.2) !important;
+}
+
+/* 🔴 Error: Modern Rose to Red Gradient */
+[data-sonner-toaster] [data-sonner-toast][data-type="error"] {
+  background: linear-gradient(135deg, #e11d48 0%, #dc2626 100%) !important;
+  border-color: rgba(255, 255, 255, 0.25) !important;
+  box-shadow: 0 14px 30px -8px rgba(225, 29, 72, 0.45), 0 4px 12px -2px rgba(225, 29, 72, 0.2) !important;
+}
+
+/* 🔵 Info: Modern Sky to Indigo Gradient */
+[data-sonner-toaster] [data-sonner-toast][data-type="info"] {
+  background: linear-gradient(135deg, #0284c7 0%, #2563eb 100%) !important;
+  border-color: rgba(255, 255, 255, 0.25) !important;
+  box-shadow: 0 14px 30px -8px rgba(2, 132, 199, 0.45), 0 4px 12px -2px rgba(2, 132, 199, 0.2) !important;
+}
+
+/* 🟠 Warning: Modern Amber to Orange Gradient */
+[data-sonner-toaster] [data-sonner-toast][data-type="warning"] {
+  background: linear-gradient(135deg, #d97706 0%, #ea580c 100%) !important;
+  border-color: rgba(255, 255, 255, 0.25) !important;
+  box-shadow: 0 14px 30px -8px rgba(217, 119, 6, 0.45), 0 4px 12px -2px rgba(217, 119, 6, 0.2) !important;
+}
+
+/* ⚫ Default / Normal: Modern Slate Gradient */
+[data-sonner-toaster] [data-sonner-toast][data-type="default"],
+[data-sonner-toaster] [data-sonner-toast]:not([data-type]) {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%) !important;
+  border-color: rgba(255, 255, 255, 0.15) !important;
+  box-shadow: 0 14px 30px -8px rgba(15, 23, 42, 0.45), 0 4px 12px -2px rgba(15, 23, 42, 0.2) !important;
+}

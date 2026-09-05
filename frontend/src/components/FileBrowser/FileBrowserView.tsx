@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { FileTable } from "./FileTable";
-import { FileBrowserHeader } from "./FileBrowser/FileBrowserHeader";
+import { FileBrowserHeader, type FileSortOption } from "./FileBrowser/FileBrowserHeader";
 import { FileFilterChips } from "./FileBrowser/FileFilterChips";
 import { FileBrowserModals } from "./FileBrowser/FileBrowserModals";
 import type { FileItem } from "@/lib/types";
@@ -9,7 +9,7 @@ import { formatFileSize } from "@/lib/utils";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, UploadCloud } from "lucide-react";
 
 interface FileBrowserViewProps {
   folderId: string;
@@ -54,21 +54,22 @@ const formatFolderContentsToItems = (contents: any): FileItem[] => {
       };
     }),
     ...(files || []).map((f: any) => {
-      const dateVal = f.updated_at || f.created_at;
+      const dateVal = f.updated_at || f.updatedAt || f.created_at || f.createdAt;
+      const sizeBytes = f.size_bytes || f.sizeBytes || 0;
       return {
         id: f.id,
         name: f.name,
         type: "file" as const,
-        mimeType: f.mime_type,
-        size: formatFileSize(f.size_bytes),
-        rawSizeBytes: f.size_bytes,
+        mimeType: f.mime_type || f.mimeType,
+        size: formatFileSize(sizeBytes),
+        rawSizeBytes: sizeBytes,
         updatedAt: formatDate(dateVal),
         rawDate: dateVal,
-        createdAt: formatDate(f.created_at),
-        uploadedBy: f.uploaded_by,
-        isRestricted: f.is_restricted || false,
-        isStarred: f.is_starred || false,
-        objectKey: f.r2_object_key,
+        createdAt: formatDate(f.created_at || f.createdAt),
+        uploadedBy: f.uploaded_by || f.uploadedBy,
+        isRestricted: f.is_restricted || f.isRestricted || false,
+        isStarred: f.is_starred || f.isStarred || false,
+        objectKey: f.r2_object_key || f.r2ObjectKey || f.object_key || f.objectKey,
       };
     }),
   ];
@@ -98,7 +99,13 @@ export function FileBrowserView({
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [filterType, setFilterType] = useState<string>("all");
+  const [sortBy, setSortBy] = useState<FileSortOption>("name-asc");
   const [selectedItemForInfo, setSelectedItemForInfo] = useState<FileItem | null>(null);
+
+  // External file drag & drop states
+  const [isDragOverWindow, setIsDragOverWindow] = useState(false);
+  const [droppedFiles, setDroppedFiles] = useState<File[] | undefined>(undefined);
+  const dragCounter = useRef(0);
 
   const loadFolder = useCallback(async (targetId: string, pushState = true) => {
     setIsLoadingFolder(true);
@@ -152,8 +159,48 @@ export function FileBrowserView({
     return () => window.removeEventListener("folder-content-updated", handleContentUpdated);
   }, [currentFolderId, loadFolder]);
 
-  const filteredItems = useMemo(() => {
-    let result = items;
+  // Drag & drop handlers for external files
+  const handleDragEnter = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.types && Array.from(e.dataTransfer.types).includes("Files")) {
+      dragCounter.current += 1;
+      setIsDragOverWindow(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current -= 1;
+    if (dragCounter.current <= 0) {
+      dragCounter.current = 0;
+      setIsDragOverWindow(false);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounter.current = 0;
+    setIsDragOverWindow(false);
+
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const filesArray = Array.from(e.dataTransfer.files);
+      setDroppedFiles(filesArray);
+      setIsFolderMode(false);
+      setIsUploadOpen(true);
+      toast.info(`${filesArray.length} berkas siap diunggah`);
+    }
+  };
+
+  const sortedAndFilteredItems = useMemo(() => {
+    let result = [...items];
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter((item) => item.name.toLowerCase().includes(q));
@@ -172,25 +219,81 @@ export function FileBrowserView({
           item.type === "file" && (item.mimeType?.includes("zip") || item.name.endsWith(".zip")),
       );
     }
-    return result;
-  }, [items, searchQuery, filterType]);
+
+    // Apply Sorting: Folder selalu di atas, lalu urutkan sesuai opsi
+    return result.sort((a, b) => {
+      // Prioritaskan folder selalu di atas
+      if (a.type !== b.type) {
+        return a.type === "folder" ? -1 : 1;
+      }
+
+      switch (sortBy) {
+        case "name-desc":
+          return b.name.localeCompare(a.name, "id-ID", { sensitivity: "base" });
+        case "date-desc": {
+          const tA = a.rawDate ? new Date(a.rawDate).getTime() : 0;
+          const tB = b.rawDate ? new Date(b.rawDate).getTime() : 0;
+          return tB - tA;
+        }
+        case "date-asc": {
+          const tA = a.rawDate ? new Date(a.rawDate).getTime() : 0;
+          const tB = b.rawDate ? new Date(b.rawDate).getTime() : 0;
+          return tA - tB;
+        }
+        case "size-desc": {
+          const sA = a.rawSizeBytes || 0;
+          const sB = b.rawSizeBytes || 0;
+          return sB - sA;
+        }
+        case "size-asc": {
+          const sA = a.rawSizeBytes || 0;
+          const sB = b.rawSizeBytes || 0;
+          return sA - sB;
+        }
+        case "name-asc":
+        default:
+          return a.name.localeCompare(b.name, "id-ID", { sensitivity: "base" });
+      }
+    });
+  }, [items, searchQuery, filterType, sortBy]);
 
   return (
-    <div className="space-y-4">
+    <div
+      className="space-y-4 relative"
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+    >
+      {/* Dropzone Overlay saat Drag & Drop berkas dari luar */}
+      {isDragOverWindow && (
+        <div className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-emerald-600/90 text-white backdrop-blur-xs rounded-2xl border-2 border-dashed border-white p-6 animate-in fade-in zoom-in-95 pointer-events-none">
+          <UploadCloud className="h-16 w-16 mb-3 animate-bounce" />
+          <h3 className="text-base sm:text-lg font-bold">Lepaskan Berkas untuk Mengunggah</h3>
+          <p className="text-xs text-emerald-100 mt-1">
+            Berkas akan otomatis disiapkan untuk diunggah ke folder ini
+          </p>
+        </div>
+      )}
+
       <FileBrowserHeader
         breadcrumbsList={breadcrumbsList}
         currentFolderId={currentFolderId}
         searchQuery={searchQuery}
         viewMode={viewMode}
+        sortBy={sortBy}
         onSearchChange={setSearchQuery}
         onViewModeChange={setViewMode}
+        onSortChange={setSortBy}
         onOpenCreateFolder={() => setIsCreateOpen(true)}
         onOpenUploadFile={() => {
           setIsFolderMode(false);
+          setDroppedFiles(undefined);
           setIsUploadOpen(true);
         }}
         onOpenUploadFolder={() => {
           setIsFolderMode(true);
+          setDroppedFiles(undefined);
           setIsUploadOpen(true);
         }}
         onNavigateBreadcrumb={handleNavigate}
@@ -205,7 +308,7 @@ export function FileBrowserView({
         </div>
       ) : (
         <FileTable
-          data={filteredItems}
+          data={sortedAndFilteredItems}
           folderId={currentFolderId}
           onNavigate={handleNavigate}
           onShowInfo={setSelectedItemForInfo}
@@ -222,8 +325,12 @@ export function FileBrowserView({
         currentFolderId={currentFolderId}
         userBidangId={userBidangId}
         selectedItemForInfo={selectedItemForInfo}
+        initialFiles={droppedFiles}
         onCloseCreate={() => setIsCreateOpen(false)}
-        onCloseUpload={() => setIsUploadOpen(false)}
+        onCloseUpload={() => {
+          setIsUploadOpen(false);
+          setDroppedFiles(undefined);
+        }}
         onCloseInfo={() => setSelectedItemForInfo(null)}
         onSuccessMutation={() => loadFolder(currentFolderId, false)}
       />

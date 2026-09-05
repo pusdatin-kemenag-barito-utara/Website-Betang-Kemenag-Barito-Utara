@@ -12,6 +12,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -28,20 +29,22 @@ type Tokens struct {
 
 // SupabaseClient membungkus REST API Supabase Auth.
 type SupabaseClient struct {
-	url       string
-	anonKey   string
-	jwtSecret []byte
-	http      *http.Client
+	url            string
+	anonKey        string
+	serviceRoleKey string
+	jwtSecret      []byte
+	http           *http.Client
 }
 
 // NewSupabaseClient membuat client Supabase Auth.
 // jwtSecret dapat berupa base64 (encode 32 byte) atau plain text.
-func NewSupabaseClient(url, anonKey, jwtSecret string) *SupabaseClient {
+func NewSupabaseClient(url, anonKey, jwtSecret, serviceRoleKey string) *SupabaseClient {
 	return &SupabaseClient{
-		url:       url,
-		anonKey:   anonKey,
-		jwtSecret: decodeJWTSecret(jwtSecret),
-		http:      &http.Client{Timeout: 15 * time.Second},
+		url:            url,
+		anonKey:        anonKey,
+		serviceRoleKey: serviceRoleKey,
+		jwtSecret:      decodeJWTSecret(jwtSecret),
+		http:           &http.Client{Timeout: 15 * time.Second},
 	}
 }
 
@@ -185,3 +188,141 @@ func (s *SupabaseClient) VerifyAccessToken(tokenString string) (jwt.MapClaims, e
 	}
 	return claims, nil
 }
+
+// AdminCreateUser membuat akun baru di Supabase Auth melalui Admin REST API.
+func (s *SupabaseClient) AdminCreateUser(ctx context.Context, email, password, fullName, username string) (string, error) {
+	if s.serviceRoleKey == "" {
+		return "", errors.New("service role key tidak terkonfigurasi")
+	}
+
+	payload := map[string]any{
+		"email":         strings.ToLower(strings.TrimSpace(email)),
+		"password":      password,
+		"email_confirm": true,
+		"user_metadata": map[string]any{
+			"full_name": strings.TrimSpace(fullName),
+			"username":  strings.TrimSpace(username),
+		},
+	}
+	body, _ := json.Marshal(payload)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, s.url+"/auth/v1/admin/users", bytes.NewReader(body))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("apikey", s.serviceRoleKey)
+	req.Header.Set("Authorization", "Bearer "+s.serviceRoleKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := s.http.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("koneksi admin Supabase gagal: %w", err)
+	}
+	defer resp.Body.Close()
+
+	raw, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode >= 400 {
+		var apiErr struct {
+			Message string `json:"message"`
+			Error   string `json:"error"`
+			Msg     string `json:"msg"`
+		}
+		_ = json.Unmarshal(raw, &apiErr)
+		msg := apiErr.Message
+		if msg == "" {
+			msg = apiErr.Msg
+		}
+		if msg == "" {
+			msg = apiErr.Error
+		}
+		if strings.Contains(strings.ToLower(msg), "already") || strings.Contains(strings.ToLower(string(raw)), "already registered") {
+			return "", errors.New("email ini sudah terdaftar di sistem autentikasi")
+		}
+		return "", fmt.Errorf("gagal membuat akun auth (%d): %s", resp.StatusCode, msg)
+	}
+
+	var res struct {
+		ID   string `json:"id"`
+		User struct {
+			ID string `json:"id"`
+		} `json:"user"`
+	}
+	_ = json.Unmarshal(raw, &res)
+	userID := res.ID
+	if userID == "" {
+		userID = res.User.ID
+	}
+	if userID == "" {
+		return "", errors.New("gagal mendapatkan ID pengguna baru dari Supabase")
+	}
+	return userID, nil
+}
+
+// AdminUpdateUser memperbarui email, password, dan/atau user_metadata di Supabase Auth.
+func (s *SupabaseClient) AdminUpdateUser(ctx context.Context, id, email, password string, metadata map[string]any) error {
+	if s.serviceRoleKey == "" {
+		return errors.New("service role key tidak terkonfigurasi")
+	}
+
+	payload := map[string]any{}
+	if email != "" {
+		payload["email"] = strings.ToLower(strings.TrimSpace(email))
+		payload["email_confirm"] = true
+	}
+	if password != "" {
+		payload["password"] = password
+	}
+	if len(metadata) > 0 {
+		payload["user_metadata"] = metadata
+	}
+	if len(payload) == 0 {
+		return nil
+	}
+
+	body, _ := json.Marshal(payload)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, s.url+"/auth/v1/admin/users/"+id, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("apikey", s.serviceRoleKey)
+	req.Header.Set("Authorization", "Bearer "+s.serviceRoleKey)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := s.http.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 {
+		raw, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("gagal memperbarui auth user (%d): %s", resp.StatusCode, string(raw))
+	}
+	return nil
+}
+
+// AdminDeleteUser menghapus akun dari Supabase Auth.
+func (s *SupabaseClient) AdminDeleteUser(ctx context.Context, id string) error {
+	if s.serviceRoleKey == "" {
+		return errors.New("service role key tidak terkonfigurasi")
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, s.url+"/auth/v1/admin/users/"+id, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("apikey", s.serviceRoleKey)
+	req.Header.Set("Authorization", "Bearer "+s.serviceRoleKey)
+
+	resp, err := s.http.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 400 && resp.StatusCode != 404 {
+		raw, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("gagal menghapus auth user (%d): %s", resp.StatusCode, string(raw))
+	}
+	return nil
+}
+

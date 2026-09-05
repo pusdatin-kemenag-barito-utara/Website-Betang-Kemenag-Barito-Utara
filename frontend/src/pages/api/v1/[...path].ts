@@ -14,11 +14,10 @@ function getCandidateOrigins(): string[] {
   if (custom) urls.push(custom.replace(/\/+$/, ""));
   urls.push("http://127.0.0.1:8080");
   urls.push("http://localhost:8080");
-  urls.push("http://backend:8080");
   return Array.from(new Set(urls));
 }
 
-let activeProxyOrigin = "";
+let activeProxyOrigin = "http://127.0.0.1:8080";
 
 export const ALL: APIRoute = async ({ request, params }) => {
   const url = new URL(request.url);

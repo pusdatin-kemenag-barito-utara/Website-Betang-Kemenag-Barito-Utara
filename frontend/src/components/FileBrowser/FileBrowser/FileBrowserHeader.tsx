@@ -9,16 +9,27 @@ import {
   FolderPlus,
   ChevronDown,
   X,
+  ArrowUpDown,
 } from "lucide-react";
 import { Breadcrumbs } from "../Breadcrumbs";
+
+export type FileSortOption =
+  | "name-asc"
+  | "name-desc"
+  | "date-desc"
+  | "date-asc"
+  | "size-desc"
+  | "size-asc";
 
 interface FileBrowserHeaderProps {
   breadcrumbsList: { id: string; name: string }[];
   currentFolderId: string;
   searchQuery: string;
   viewMode: "list" | "grid";
+  sortBy?: FileSortOption;
   onSearchChange: (q: string) => void;
   onViewModeChange: (mode: "list" | "grid") => void;
+  onSortChange?: (sort: FileSortOption) => void;
   onOpenCreateFolder: () => void;
   onOpenUploadFile: () => void;
   onOpenUploadFolder: () => void;
@@ -30,8 +41,10 @@ export function FileBrowserHeader({
   currentFolderId,
   searchQuery,
   viewMode,
+  sortBy = "name-asc",
   onSearchChange,
   onViewModeChange,
+  onSortChange,
   onOpenCreateFolder,
   onOpenUploadFile,
   onOpenUploadFolder,
@@ -142,32 +155,53 @@ export function FileBrowserHeader({
           )}
         </div>
 
-        {/* View Mode Toggle (List vs Grid) */}
-        <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200/60 shrink-0">
-          <button
-            type="button"
-            onClick={() => onViewModeChange("list")}
-            className={`p-1.5 rounded-lg transition-all cursor-pointer ${
-              viewMode === "list"
-                ? "bg-white text-emerald-700 shadow-xs font-bold ring-1 ring-slate-200/60"
-                : "text-slate-400 hover:text-slate-700"
-            }`}
-            title="Tampilan Daftar (List)"
-          >
-            <List className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => onViewModeChange("grid")}
-            className={`p-1.5 rounded-lg transition-all cursor-pointer ${
-              viewMode === "grid"
-                ? "bg-white text-emerald-700 shadow-xs font-bold ring-1 ring-slate-200/60"
-                : "text-slate-400 hover:text-slate-700"
-            }`}
-            title="Tampilan Kisi (Grid)"
-          >
-            <LayoutGrid className="h-4 w-4" />
-          </button>
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Sort By Dropdown */}
+          <div className="relative">
+            <select
+              value={sortBy}
+              onChange={(e) => onSortChange?.(e.target.value as FileSortOption)}
+              className="appearance-none pl-8 pr-7 py-1.5 rounded-xl bg-white border border-slate-200/80 text-xs font-semibold text-slate-700 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 cursor-pointer shadow-2xs transition-all"
+              title="Urutkan berkas & folder"
+            >
+              <option value="name-asc">Nama (A - Z)</option>
+              <option value="name-desc">Nama (Z - A)</option>
+              <option value="date-desc">Diubah (Terbaru)</option>
+              <option value="date-asc">Diubah (Terlama)</option>
+              <option value="size-desc">Ukuran (Terbesar)</option>
+              <option value="size-asc">Ukuran (Terkecil)</option>
+            </select>
+            <ArrowUpDown className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400 pointer-events-none" />
+          </div>
+
+          {/* View Mode Toggle (List vs Grid) */}
+          <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200/60 shrink-0">
+            <button
+              type="button"
+              onClick={() => onViewModeChange("list")}
+              className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                viewMode === "list"
+                  ? "bg-white text-emerald-700 shadow-xs font-bold ring-1 ring-slate-200/60"
+                  : "text-slate-400 hover:text-slate-700"
+              }`}
+              title="Tampilan Daftar (List)"
+            >
+              <List className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => onViewModeChange("grid")}
+              className={`p-1.5 rounded-lg transition-all cursor-pointer ${
+                viewMode === "grid"
+                  ? "bg-white text-emerald-700 shadow-xs font-bold ring-1 ring-slate-200/60"
+                  : "text-slate-400 hover:text-slate-700"
+              }`}
+              title="Tampilan Kisi (Grid)"
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </div>
     </div>

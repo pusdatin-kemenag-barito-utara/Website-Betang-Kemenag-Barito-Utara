@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { FolderIcon, LayoutDashboard, Trash2, Settings, X, Star } from "lucide-react";
+import { FolderIcon, LayoutDashboard, Trash2, Settings, X, Star, Users, Building2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StorageQuotaWidget } from "./StorageQuotaWidget";
 import { getCurrentUser } from "@/lib/api";
@@ -12,6 +12,7 @@ const mainNavigation = [
 ];
 
 const archiveManagement = [
+  { name: "Manajemen Pengguna", href: "/users", icon: Users, requireSuperAdmin: true },
   { name: "Pengaturan Sistem", href: "/settings", icon: Settings, requireSuperAdmin: true },
   { name: "Recycle Bin", href: "/trash", icon: Trash2 },
 ];
@@ -90,6 +91,7 @@ export function Sidebar({ onClose, currentPath, isSuperAdmin: propIsSuperAdmin }
         <a
           key={item.name}
           href={item.href}
+          data-astro-prefetch="hover"
           onClick={() => handleNavClick(item.name, item.href)}
           className={cn(
             "group flex items-center rounded-xl px-3 py-3 text-sm font-medium transition-all duration-200",

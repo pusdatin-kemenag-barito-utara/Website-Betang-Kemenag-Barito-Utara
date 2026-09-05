@@ -28,12 +28,17 @@ func scanFolder(row pgx.Row) (*domain.Folder, error) {
 	return &f, nil
 }
 
-// ListByParent mengambil folder aktif milik satu parent (nil = root).
-func (r *FolderRepo) ListByParent(ctx context.Context, parentID *string) ([]domain.Folder, error) {
+// ListByParent mengambil folder aktif milik satu parent (nil = root), dengan filter opsional bidangID.
+func (r *FolderRepo) ListByParent(ctx context.Context, parentID *string, bidangID *string) ([]domain.Folder, error) {
 	var query string
 	var args []any
 	if parentID == nil || *parentID == "" || *parentID == "root" {
-		query = `SELECT ` + folderColumns + ` FROM kemenag_arsip.folders WHERE deleted_at IS NULL AND parent_id IS NULL ORDER BY name ASC`
+		if bidangID != nil && *bidangID != "" {
+			query = `SELECT ` + folderColumns + ` FROM kemenag_arsip.folders WHERE deleted_at IS NULL AND parent_id IS NULL AND (id IN (SELECT folder_id FROM kemenag_arsip.bidang_folders WHERE bidang_id = $1::uuid) OR bidang_id = $1::uuid) ORDER BY name ASC`
+			args = append(args, *bidangID)
+		} else {
+			query = `SELECT ` + folderColumns + ` FROM kemenag_arsip.folders WHERE deleted_at IS NULL AND parent_id IS NULL ORDER BY name ASC`
+		}
 	} else {
 		if len(*parentID) != 36 {
 			return []domain.Folder{}, nil
@@ -59,12 +64,24 @@ func (r *FolderRepo) ListByParent(ctx context.Context, parentID *string) ([]doma
 	return items, rows.Err()
 }
 
-// ListAll mengambil seluruh folder aktif (untuk pohon pindah/salin).
-func (r *FolderRepo) ListAll(ctx context.Context) ([]domain.Folder, error) {
-	rows, err := r.pool.Query(ctx, `
-		SELECT `+folderColumns+` FROM kemenag_arsip.folders
-		WHERE deleted_at IS NULL
-		ORDER BY name ASC`)
+// ListAll mengambil seluruh folder aktif (untuk pohon pindah/salin), dengan filter opsional bidangID.
+func (r *FolderRepo) ListAll(ctx context.Context, bidangID *string) ([]domain.Folder, error) {
+	var query string
+	var args []any
+	if bidangID != nil && *bidangID != "" {
+		query = `
+			SELECT ` + folderColumns + ` FROM kemenag_arsip.folders f
+			WHERE f.deleted_at IS NULL AND kemenag_arsip.can_bidang_access_folder($1::uuid, f.id)
+			ORDER BY f.name ASC`
+		args = append(args, *bidangID)
+	} else {
+		query = `
+			SELECT ` + folderColumns + ` FROM kemenag_arsip.folders
+			WHERE deleted_at IS NULL
+			ORDER BY name ASC`
+	}
+
+	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -79,6 +96,17 @@ func (r *FolderRepo) ListAll(ctx context.Context) ([]domain.Folder, error) {
 		items = append(items, *f)
 	}
 	return items, rows.Err()
+}
+
+// CanBidangAccess memeriksa apakah bidang memiliki hak akses ke folder ini (atau ancestor-nya).
+func (r *FolderRepo) CanBidangAccess(ctx context.Context, bidangID, folderID string) (bool, error) {
+	folderID = strings.TrimSpace(folderID)
+	if folderID == "" || folderID == "root" || len(folderID) != 36 {
+		return true, nil
+	}
+	var allowed bool
+	err := r.pool.QueryRow(ctx, `SELECT kemenag_arsip.can_bidang_access_folder($1::uuid, $2::uuid)`, bidangID, folderID).Scan(&allowed)
+	return allowed, err
 }
 
 // GetByID mengambil satu folder aktif.

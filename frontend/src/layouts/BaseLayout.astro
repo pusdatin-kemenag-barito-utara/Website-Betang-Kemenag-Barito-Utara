@@ -3,7 +3,6 @@ import "@fontsource-variable/plus-jakarta-sans";
 import "@/styles/global.css";
 import { MaintenanceListener } from "@/components/layout/MaintenanceListener";
 import { ToasterIsland } from "@/components/layout/ToasterIsland";
-import { PwaInstallPrompt } from "@/components/layout/PwaInstallPrompt";
 import MetaTags from "@/components/seo/MetaTags.astro";
 import JsonLd from "@/components/seo/JsonLd.astro";
 import AnalyticsScripts from "@/components/seo/AnalyticsScripts.astro";
@@ -84,7 +83,6 @@ const ogImageUrl = new URL(image, siteUrl).toString();
 
     <!-- React Island Global Components -->
     <ToasterIsland client:load />
-    <PwaInstallPrompt client:load />
     <MaintenanceListener client:load />
   </body>
 </html>

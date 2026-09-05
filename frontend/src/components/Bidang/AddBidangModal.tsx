@@ -1,21 +1,32 @@
 "use client"
 
 import { useState } from "react"
-import { X, Loader2 } from "lucide-react"
+import { X, Loader2, FolderPlus, Folder, CheckSquare, Square } from "lucide-react"
 import { createBidang, reloadSoon } from "@/lib/api"
 import { toast } from "sonner"
+import type { RootFolderOption } from "./FolderAccessModal"
 
 interface AddBidangModalProps {
   isOpen: boolean
   onClose: () => void
+  allRootFolders?: RootFolderOption[]
+  onSuccess?: (created?: { id: string; name: string }) => void
 }
 
-export function AddBidangModal({ isOpen, onClose }: AddBidangModalProps) {
+export function AddBidangModal({ isOpen, onClose, allRootFolders = [], onSuccess }: AddBidangModalProps) {
   const [name, setName] = useState("")
   const [sortOrder, setSortOrder] = useState<number>(1)
+  const [autoCreateRootFolder, setAutoCreateRootFolder] = useState(true)
+  const [selectedFolderIds, setSelectedFolderIds] = useState<string[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   if (!isOpen) return null
+
+  const toggleFolder = (id: string) => {
+    setSelectedFolderIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    )
+  }
 
   const handleSubmit = async (e: React.SyntheticEvent) => {
     e.preventDefault()
@@ -23,12 +34,18 @@ export function AddBidangModal({ isOpen, onClose }: AddBidangModalProps) {
 
     setIsSubmitting(true)
     try {
-      const res = await createBidang(name, sortOrder)
+      const res = await createBidang(name, sortOrder, selectedFolderIds, autoCreateRootFolder)
       if (res.success) {
         toast.success("Bidang baru berhasil ditambahkan")
+        const createdData = res.data ? { id: res.data.id, name: res.data.name } : undefined
         setName("")
+        setSelectedFolderIds([])
         onClose()
-        reloadSoon()
+        if (onSuccess) {
+          onSuccess(createdData)
+        } else {
+          reloadSoon()
+        }
       } else {
         toast.error(res.error || "Gagal menambahkan bidang")
       }
@@ -73,7 +90,7 @@ export function AddBidangModal({ isOpen, onClose }: AddBidangModalProps) {
             />
           </div>
 
-          <div className="px-6 pb-6">
+          <div className="px-6 pb-5">
             <label htmlFor="addBidangOrder" className="block text-sm font-semibold text-slate-700 mb-2">
               Nomor Urut
             </label>
@@ -87,6 +104,58 @@ export function AddBidangModal({ isOpen, onClose }: AddBidangModalProps) {
               required
               disabled={isSubmitting}
             />
+          </div>
+
+          <div className="px-6 pb-6 space-y-3">
+            <div className="rounded-2xl bg-emerald-50/70 border border-emerald-100 p-3.5">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={autoCreateRootFolder}
+                  onChange={(e) => setAutoCreateRootFolder(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                  disabled={isSubmitting}
+                />
+                <div>
+                  <span className="text-xs font-bold text-emerald-900 block">
+                    Buatkan Folder Root Otomatis
+                  </span>
+                  <span className="text-[11px] text-emerald-700 leading-snug block mt-0.5">
+                    Membuat folder root baru di File Browser dengan nama bidang ini dan langsung menghubungkannya.
+                  </span>
+                </div>
+              </label>
+            </div>
+
+            {allRootFolders.length > 0 && (
+              <div>
+                <span className="block text-xs font-semibold text-slate-700 mb-1.5">
+                  Beri Akses ke Folder Root Lainnya (Opsional):
+                </span>
+                <div className="max-h-36 overflow-y-auto rounded-xl border border-slate-200 divide-y divide-slate-100 bg-slate-50/50 p-1">
+                  {allRootFolders.map((f) => {
+                    const isChecked = selectedFolderIds.includes(f.id)
+                    return (
+                      <label
+                        key={f.id}
+                        onClick={() => toggleFolder(f.id)}
+                        className={`flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer text-xs transition-colors ${
+                          isChecked ? "bg-white text-slate-900 font-semibold" : "hover:bg-slate-100 text-slate-600"
+                        }`}
+                      >
+                        {isChecked ? (
+                          <CheckSquare className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                        ) : (
+                          <Square className="h-3.5 w-3.5 text-slate-300 shrink-0" />
+                        )}
+                        <Folder className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                        <span className="truncate">{f.name}</span>
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center justify-end gap-3 border-t border-slate-100 bg-slate-50 p-4">

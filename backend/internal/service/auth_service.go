@@ -30,7 +30,7 @@ type LoginResult struct {
 // AuthService menangani autentikasi, sesi, dan otorisasi.
 type AuthService struct {
 	supabase *auth.SupabaseClient
-	pusdatin *repository.PusdatinRepo
+	userRepo *repository.UserRepo
 	cfg      *config.Config
 }
 
@@ -40,11 +40,11 @@ var ErrInvalidCredentials = errors.New("email atau password yang Anda masukkan s
 // ErrAccountInactive dipakai bila akun dinonaktifkan.
 var ErrAccountInactive = errors.New("Akun Anda sedang dinonaktifkan. Silakan hubungi administrator.")
 
-// ErrNoPermission dipakai bila user tidak punya akses aplikasi.
-var ErrNoPermission = errors.New("Anda tidak memiliki hak akses untuk aplikasi E-Arsip.")
+// ErrNoPermission dipakai bila user tidak punya hak akses.
+var ErrNoPermission = errors.New("Anda tidak memiliki hak akses untuk tindakan ini.")
 
 // Login memvalidasi Turnstile, memeriksa kredensial ke Supabase, lalu
-// memastikan user terdaftar di pusdatin dengan izin aplikasi e-arsip.
+// memastikan user terdaftar di tabel internal kemenag_arsip.users.
 func (s *AuthService) Login(ctx context.Context, email, password, turnstileToken string, rememberMe bool) (*LoginResult, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
 	password = strings.TrimSpace(password)
@@ -66,20 +66,33 @@ func (s *AuthService) Login(ctx context.Context, email, password, turnstileToken
 		return nil, err
 	}
 
-	// 3) Ambil metadata user dari pusdatin.
-	meta, err := s.pusdatin.GetUserByEmail(ctx, tokens.Email)
+	// 3) Ambil metadata user dari tabel mandiri kemenag_arsip.users.
+	user, err := s.userRepo.GetUserByEmail(ctx, tokens.Email)
 	if err != nil {
-		log.Printf("[AUTH ERROR] Gagal memuat data pengguna %s dari pusdatin: %v", tokens.Email, err)
-		return nil, fmt.Errorf("gagal memuat data pengguna dari sistem terpusat (%v)", err)
+		log.Printf("[AUTH ERROR] Gagal memuat data pengguna %s dari basis data: %v", tokens.Email, err)
+		return nil, fmt.Errorf("gagal memuat data profil pengguna (%v)", err)
 	}
-	if meta == nil {
-		return nil, errors.New("Akun Anda tidak terdaftar di sistem terpusat.")
+
+	// Auto-provisioning jika Super Admin utama baritoutara@kemenag.go.id belum terdaftar di tabel kemenag_arsip.users
+	if user == nil && strings.EqualFold(tokens.Email, "baritoutara@kemenag.go.id") {
+		autoUser := &domain.User{
+			ID:       tokens.UserID,
+			Email:    tokens.Email,
+			Username: "baritoutara",
+			FullName: "ADMIN KABUPATEN",
+			Role:     "Super Admin",
+			IsActive: true,
+		}
+		if createErr := s.userRepo.CreateUser(ctx, autoUser); createErr == nil {
+			user = autoUser
+		}
 	}
-	if !strings.EqualFold(meta.Status, "active") {
+
+	if user == nil {
+		return nil, errors.New("Akun Anda belum terdaftar dalam sistem SI BETANG.")
+	}
+	if !user.IsActive {
 		return nil, ErrAccountInactive
-	}
-	if !meta.HasPermission(s.cfg.PusdatinAppID) {
-		return nil, ErrNoPermission
 	}
 
 	// 4) Susun sesi.
@@ -93,10 +106,10 @@ func (s *AuthService) Login(ctx context.Context, email, password, turnstileToken
 
 	return &LoginResult{
 		Session:      session,
-		Name:         meta.Name,
-		Role:         meta.Role,
-		Email:        meta.Email,
-		IsSuperAdmin: meta.IsSuperAdmin(),
+		Name:         user.FullName,
+		Role:         user.Role,
+		Email:        user.Email,
+		IsSuperAdmin: user.IsSuperAdmin(),
 	}, nil
 }
 
@@ -182,7 +195,7 @@ func (s *AuthService) verifyTurnstile(ctx context.Context, token string) error {
 	return nil
 }
 
-// UserMeta mengambil metadata pusdatin untuk user yang sedang login.
-func (s *AuthService) UserMeta(ctx context.Context, email string) (*domain.PusdatinUser, error) {
-	return s.pusdatin.GetUserByEmail(ctx, email)
+// UserMeta mengambil metadata profil untuk user yang sedang login dari kemenag_arsip.users.
+func (s *AuthService) UserMeta(ctx context.Context, email string) (*domain.User, error) {
+	return s.userRepo.GetUserByEmail(ctx, email)
 }

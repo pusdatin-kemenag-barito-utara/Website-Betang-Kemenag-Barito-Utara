@@ -16,6 +16,7 @@ import (
 // Services mengumpulkan seluruh service agar mudah di-inject ke handler.
 type Services struct {
 	Auth        *AuthService
+	User        *UserService
 	Bidang      *BidangService
 	Folder      *FolderService
 	File        *FileService
@@ -24,9 +25,9 @@ type Services struct {
 	Storage     *StorageService
 	Maintenance *MaintenanceService
 
-	repos   *repository.Repos
-	r2      *storage.R2Storage
-	cfg     *config.Config
+	repos    *repository.Repos
+	r2       *storage.R2Storage
+	cfg      *config.Config
 	supabase *auth.SupabaseClient
 }
 
@@ -38,8 +39,9 @@ func New(repos *repository.Repos, r2 *storage.R2Storage, supabase *auth.Supabase
 		cfg:      cfg,
 		supabase: supabase,
 	}
-	s.Auth = &AuthService{supabase: supabase, pusdatin: repos.Pusdatin, cfg: cfg}
-	s.Bidang = &BidangService{repo: repos.Bidang, audits: s}
+	s.Auth = &AuthService{supabase: supabase, userRepo: repos.User, cfg: cfg}
+	s.User = NewUserService(repos.User, supabase, s)
+	s.Bidang = &BidangService{repo: repos.Bidang, folders: repos.Folder, audits: s}
 	s.Folder = &FolderService{folders: repos.Folder, files: repos.File, r2: r2, audits: s}
 	s.File = &FileService{files: repos.File, folders: repos.Folder, r2: r2, audits: s}
 	s.Trash = &TrashService{trash: repos.Trash, folders: repos.Folder, files: repos.File, audits: s}
@@ -57,9 +59,9 @@ func (s *Services) LogAudit(ctx context.Context, email, action, target string, b
 	return s.repos.Pusdatin.LogAudit(ctx, action, target, "kemenag_arsip", email, before, after, ip)
 }
 
-// PusdatinUserByEmail mengambil meta user dari sistem pusdatin.
-func (s *Services) PusdatinUserByEmail(ctx context.Context, email string) (*domain.PusdatinUser, error) {
-	return s.repos.Pusdatin.GetUserByEmail(ctx, email)
+// UserByEmail mengambil data profil user dari kemenag_arsip.users.
+func (s *Services) UserByEmail(ctx context.Context, email string) (*domain.User, error) {
+	return s.repos.User.GetUserByEmail(ctx, email)
 }
 
 // ErrNotFound dipakai untuk membedakan error "tidak ditemukan".

@@ -48,6 +48,17 @@ export async function request<T = any>(
     const result: any = { success: false, error: msg };
     if (res.status === 401) {
       result.unauthorized = true;
+      if (
+        typeof window !== "undefined" &&
+        window.location.pathname !== "/login" &&
+        path !== "/auth/login"
+      ) {
+        try {
+          localStorage.removeItem("is_logged_in");
+          sessionStorage.clear();
+        } catch {}
+        window.location.replace("/login");
+      }
     }
     return result as T;
   }

@@ -94,7 +94,17 @@ func (m *AuthMiddleware) RequireAuth(c fiber.Ctx) error {
 		m.SetSessionCookie(c, validSession, c.Cookies("session_only") == "true")
 	}
 
-	c.Locals(KeyAuthUser, &domain.AuthUser{ID: validSession.UserID, Email: validSession.Email})
+	authUser := &domain.AuthUser{
+		ID:    validSession.UserID,
+		Email: validSession.Email,
+	}
+	if meta, err := m.authService.UserMeta(c.Context(), validSession.Email); err == nil && meta != nil {
+		authUser.Role = meta.Role
+		authUser.BidangID = meta.BidangID
+		authUser.IsSuperAdmin = meta.IsSuperAdmin()
+	}
+
+	c.Locals(KeyAuthUser, authUser)
 	return c.Next()
 }
 

@@ -5,6 +5,7 @@ import { MoveItemModal } from "../MoveItemModal";
 import { VersionHistoryModal } from "../VersionHistoryModal";
 import { FolderColorModal } from "../FolderColorModal";
 import { ShareLinkModal } from "../ShareLinkModal";
+import { FileDetailsPanel } from "../FileDetailsPanel";
 import { renameItem, updateFolderColor } from "@/lib/api";
 import { toast } from "sonner";
 import type { FileItem } from "@/lib/types";
@@ -22,6 +23,7 @@ interface FileTableModalsProps {
   versionHistoryFile: FileItem | null;
   itemsToMove: FileItem[];
   moveModalMode: "move" | "copy";
+  itemForDetails?: FileItem | null;
   onClosePreview: () => void;
   onCloseDelete: () => void;
   onConfirmDelete: () => void;
@@ -30,6 +32,14 @@ interface FileTableModalsProps {
   onCloseColor: () => void;
   onCloseShare: () => void;
   onCloseVersion: () => void;
+  onCloseDetails?: () => void;
+  onTriggerPreview?: (item: FileItem) => void;
+  onTriggerDownload?: (item: FileItem) => void;
+  onTriggerToggleStar?: (item: FileItem) => void;
+  onTriggerRename?: (item: FileItem) => void;
+  onTriggerChangeColor?: (item: FileItem) => void;
+  onTriggerShare?: (item: FileItem) => void;
+  onTriggerDelete?: (item: FileItem) => void;
   onRefresh?: () => void;
 }
 
@@ -46,6 +56,7 @@ export function FileTableModals({
   versionHistoryFile,
   itemsToMove,
   moveModalMode,
+  itemForDetails,
   onClosePreview,
   onCloseDelete,
   onConfirmDelete,
@@ -54,6 +65,14 @@ export function FileTableModals({
   onCloseColor,
   onCloseShare,
   onCloseVersion,
+  onCloseDetails,
+  onTriggerPreview,
+  onTriggerDownload,
+  onTriggerToggleStar,
+  onTriggerRename,
+  onTriggerChangeColor,
+  onTriggerShare,
+  onTriggerDelete,
   onRefresh,
 }: FileTableModalsProps) {
   return (
@@ -150,6 +169,36 @@ export function FileTableModals({
           file={versionHistoryFile}
           folderId={folderId || "root"}
           onClose={onCloseVersion}
+        />
+      )}
+
+      {itemForDetails && (
+        <FileDetailsPanel
+          isOpen={!!itemForDetails}
+          item={itemForDetails}
+          onClose={onCloseDetails || (() => {})}
+          onPreview={(item) => {
+            onCloseDetails?.();
+            onTriggerPreview?.(item);
+          }}
+          onDownload={onTriggerDownload}
+          onToggleStar={onTriggerToggleStar}
+          onShare={(item) => {
+            onCloseDetails?.();
+            onTriggerShare?.(item);
+          }}
+          onRename={(item) => {
+            onCloseDetails?.();
+            onTriggerRename?.(item);
+          }}
+          onChangeColor={(item) => {
+            onCloseDetails?.();
+            onTriggerChangeColor?.(item);
+          }}
+          onDelete={(item) => {
+            onCloseDetails?.();
+            onTriggerDelete?.(item);
+          }}
         />
       )}
     </>

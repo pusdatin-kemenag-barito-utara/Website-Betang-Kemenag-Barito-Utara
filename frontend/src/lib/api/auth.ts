@@ -34,14 +34,23 @@ export async function getCurrentUser() {
   return request("/auth/me");
 }
 
-/**
- * Keluar dari sesi dan redirect ke halaman login.
- */
 export async function logoutAction() {
   try {
+    try {
+      localStorage.removeItem("is_logged_in");
+      sessionStorage.clear();
+    } catch {}
     await request("/auth/logout", { method: "POST" });
-    window.location.href = "/login";
-  } catch {
-    window.location.href = "/login";
+  } catch (err) {
+    console.warn("Logout request failed:", err);
+  } finally {
+    try {
+      localStorage.removeItem("is_logged_in");
+      localStorage.removeItem("login_user_name");
+      localStorage.removeItem("login_success_flash");
+      sessionStorage.clear();
+    } catch {}
+    // Menggunakan replace agar riwayat halaman saat ini dihapus dari browser history
+    window.location.replace("/login");
   }
 }

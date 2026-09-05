@@ -1,0 +1,84 @@
+---
+import DashboardLayout from "@/layouts/DashboardLayout.astro";
+import PageBanner from "@/components/ui/PageBanner.astro";
+import { Users } from "lucide-react";
+import { UsersManagementView } from "@/components/users/UsersManagementView";
+import { apiGet, requireUser } from "@/lib/server";
+import type { UserItem } from "@/lib/api";
+
+let auth: any = { ok: false, user: null };
+let usersRes: any = { ok: false, body: null };
+let bidangRes: any = { ok: false, body: null };
+let rootsRes: any = { ok: false, body: null };
+
+try {
+  const cookie = Astro.request.headers.get("cookie") || "";
+  [auth, usersRes, bidangRes, rootsRes] = await Promise.all([
+    requireUser(cookie, Astro.response.headers),
+    apiGet("/users", cookie, false, Astro.response.headers),
+    apiGet("/bidang", cookie, false, Astro.response.headers),
+    apiGet("/folders/root", cookie, false, Astro.response.headers),
+  ]);
+} catch (e) {
+  console.error("Users SSR Error:", e);
+}
+
+if (!auth?.ok) {
+  return Astro.redirect("/login");
+}
+
+// Hanya Super Admin yang berhak mengakses halaman Manajemen Pengguna
+const isSuperAdmin = auth?.user?.isSuperAdmin === true || auth?.user?.role === "super_admin" || auth?.user?.role === "Super Admin";
+if (!isSuperAdmin) {
+  return Astro.redirect("/");
+}
+
+const users: UserItem[] = usersRes?.ok && usersRes.body?.data?.users ? usersRes.body.data.users : [];
+
+const bidangRaw: {
+  id: string;
+  name: string;
+  sort_order: number;
+  doc_count: number;
+  accessible_folder_ids?: string[];
+  accessible_folder_names?: string[];
+}[] = bidangRes?.ok ? (bidangRes.body?.data ?? []) : [];
+
+const bidangList = bidangRaw.map((b) => ({
+  id: b.id,
+  name: b.name,
+  count: b.doc_count ?? 0,
+  sort_order: b.sort_order ?? 0,
+  accessibleFolderIds: b.accessible_folder_ids ?? [],
+  accessibleFolderNames: b.accessible_folder_names ?? [],
+}));
+
+const allRootFolders = (rootsRes?.ok ? (rootsRes.body?.data?.folders ?? []) : []).map((f: any) => {
+  const obj = f.folder || f;
+  return {
+    id: obj.id,
+    name: obj.name || "Folder Tanpa Nama",
+  };
+});
+
+const currentUserId = auth?.user?.id || "";
+---
+
+<DashboardLayout title="Manajemen Pengguna & Hak Akses">
+  <div class="flex flex-col gap-6 pb-10">
+    <PageBanner
+      title="Manajemen Pengguna & Hak Akses"
+      description="Kelola akun pengguna, penempatan seksi/bidang, serta kontrol hak akses folder root (RBAC)"
+    >
+      <Users className="h-7 w-7 md:h-8 md:w-8 text-white" slot="icon" />
+    </PageBanner>
+
+    <UsersManagementView
+      client:load
+      initialUsers={users}
+      bidangList={bidangList}
+      allRootFolders={allRootFolders}
+      currentUserId={currentUserId}
+    />
+  </div>
+</DashboardLayout>

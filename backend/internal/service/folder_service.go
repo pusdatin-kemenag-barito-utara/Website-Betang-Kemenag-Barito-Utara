@@ -47,11 +47,39 @@ type FolderContents struct {
 }
 
 // Contents mengambil isi direktori; jika query diisi, pencarian dilakukan
-// global (mengabaikan parent) seperti perilaku lama.
-func (s *FolderService) Contents(ctx context.Context, parentID *string, query string) (*FolderContents, error) {
+// global (mengabaikan parent). Admin Bidang dibatasi hanya pada bidang miliknya.
+func (s *FolderService) Contents(ctx context.Context, parentID *string, query string, user *domain.AuthUser) (*FolderContents, error) {
+	var bidangFilter *string
+	if user != nil && !user.IsSuperAdmin && user.BidangID != nil && *user.BidangID != "" {
+		bidangFilter = user.BidangID
+	}
+
+	// Validasi kepemilikan folder bila membuka subfolder tertentu
+	if parentID != nil && *parentID != "" && *parentID != "root" {
+		parentFolder, err := s.folders.GetByID(ctx, *parentID)
+		if err != nil {
+			return nil, err
+		}
+		if parentFolder == nil {
+			return nil, errors.New("Folder tidak ditemukan.")
+		}
+		if bidangFilter != nil {
+			allowed, err := s.folders.CanBidangAccess(ctx, *bidangFilter, *parentID)
+			if err != nil {
+				return nil, err
+			}
+			if !allowed {
+				return nil, errors.New("Anda tidak memiliki izin untuk mengakses folder bidang lain.")
+			}
+		}
+	}
+
 	cacheKey := "root"
 	if parentID != nil && *parentID != "" {
 		cacheKey = *parentID
+	}
+	if bidangFilter != nil {
+		cacheKey += ":bidang:" + *bidangFilter
 	}
 	if query != "" {
 		cacheKey += ":q:" + query
@@ -70,20 +98,20 @@ func (s *FolderService) Contents(ctx context.Context, parentID *string, query st
 	var err error
 
 	if query != "" {
-		folders, err = s.folders.Search(ctx, query)
+		folders, err = s.folders.Search(ctx, query, bidangFilter)
 		if err != nil {
 			return nil, err
 		}
-		files, err = s.files.Search(ctx, query)
+		files, err = s.files.Search(ctx, query, bidangFilter)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		folders, err = s.folders.ListByParent(ctx, parentID)
+		folders, err = s.folders.ListByParent(ctx, parentID, bidangFilter)
 		if err != nil {
 			return nil, err
 		}
-		files, err = s.files.ListByFolder(ctx, parentID)
+		files, err = s.files.ListByFolder(ctx, parentID, bidangFilter)
 		if err != nil {
 			return nil, err
 		}
@@ -117,8 +145,8 @@ func (s *FolderService) Contents(ctx context.Context, parentID *string, query st
 	return result, nil
 }
 
-// Create membuat folder baru di bawah parent. Bidang diwarisi dari parent.
-func (s *FolderService) Create(ctx context.Context, name string, parentID *string, actorID, actorEmail, ip string) (*domain.Folder, error) {
+// Create membuat folder baru di bawah parent. Bidang diwarisi dari parent atau dari user jika root.
+func (s *FolderService) Create(ctx context.Context, name string, parentID *string, actorID, actorEmail, ip string, userBidangID *string) (*domain.Folder, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return nil, errors.New("Nama folder tidak boleh kosong.")
@@ -126,6 +154,9 @@ func (s *FolderService) Create(ctx context.Context, name string, parentID *strin
 	bidangID, err := s.BidangIDForParent(ctx, parentID)
 	if err != nil {
 		return nil, err
+	}
+	if bidangID == nil && userBidangID != nil && *userBidangID != "" {
+		bidangID = userBidangID
 	}
 	created, err := s.folders.Create(ctx, name, parentID, bidangID, &actorID)
 	if err != nil {
@@ -223,13 +254,17 @@ func (s *FolderService) UpdateColor(ctx context.Context, folderID string, color 
 	return s.folders.UpdateColor(ctx, folderID, color)
 }
 
-// ListStarred mengambil seluruh folder dan file yang dibintangi.
-func (s *FolderService) ListStarred(ctx context.Context) (*FolderContents, error) {
-	starredFolders, err := s.folders.ListStarred(ctx)
+// ListStarred mengambil seluruh folder dan file yang dibintangi, dengan filter bidang bila Admin Bidang.
+func (s *FolderService) ListStarred(ctx context.Context, user *domain.AuthUser) (*FolderContents, error) {
+	var bidangFilter *string
+	if user != nil && !user.IsSuperAdmin && user.BidangID != nil && *user.BidangID != "" {
+		bidangFilter = user.BidangID
+	}
+	starredFolders, err := s.folders.ListStarred(ctx, bidangFilter)
 	if err != nil {
 		return nil, err
 	}
-	starredFiles, err := s.files.ListStarred(ctx)
+	starredFiles, err := s.files.ListStarred(ctx, bidangFilter)
 	if err != nil {
 		return nil, err
 	}

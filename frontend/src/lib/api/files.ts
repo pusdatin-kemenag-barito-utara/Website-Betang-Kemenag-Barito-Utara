@@ -1,5 +1,27 @@
 import { request, API_ORIGIN } from "./client";
 
+/**
+ * Custom Cloudflare Worker CDN domain untuk data arsip dan dokumen Kemenag Barito Utara.
+ * Dilengkapi dengan HTTP/3, Edge Caching 1 tahun, Range Streaming untuk PDF, dan zero CORS issues.
+ */
+export const R2_CDN_ORIGIN = "https://files.kemenag-baritoutara.com";
+
+/**
+ * Mengubah object key di Cloudflare R2 menjadi URL publik cepat melalui Cloudflare Worker CDN.
+ * Contoh output: https://files.kemenag-baritoutara.com/arsip/global/<folderId>/<file>
+ */
+export function getR2FileUrl(objectKey?: string | null): string {
+  if (!objectKey) return "";
+  if (objectKey.startsWith("http://") || objectKey.startsWith("https://")) {
+    return objectKey;
+  }
+  const cleanKey = objectKey.replace(/^\/+/, "");
+  if (cleanKey.startsWith("arsip/")) {
+    return `${R2_CDN_ORIGIN}/${cleanKey}`;
+  }
+  return `${R2_CDN_ORIGIN}/arsip/${cleanKey}`;
+}
+
 export async function saveFileMetadata({
   name,
   folderId,

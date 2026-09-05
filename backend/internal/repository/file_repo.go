@@ -29,18 +29,28 @@ func scanFile(row pgx.Row) (*domain.File, error) {
 	return &f, nil
 }
 
-// ListByFolder mengambil file aktif milik satu folder (nil = root).
-func (r *FileRepo) ListByFolder(ctx context.Context, folderID *string) ([]domain.File, error) {
+// ListByFolder mengambil file aktif milik satu folder (nil = root), dengan filter opsional bidangID.
+func (r *FileRepo) ListByFolder(ctx context.Context, folderID *string, bidangID *string) ([]domain.File, error) {
 	var query string
 	var args []any
 	if folderID == nil || *folderID == "" || *folderID == "root" {
-		query = `SELECT ` + fileColumns + ` FROM kemenag_arsip.files WHERE deleted_at IS NULL AND folder_id IS NULL ORDER BY created_at DESC`
+		if bidangID != nil && *bidangID != "" {
+			query = `SELECT ` + fileColumns + ` FROM kemenag_arsip.files WHERE deleted_at IS NULL AND folder_id IS NULL AND bidang_id = $1::uuid ORDER BY created_at DESC`
+			args = append(args, *bidangID)
+		} else {
+			query = `SELECT ` + fileColumns + ` FROM kemenag_arsip.files WHERE deleted_at IS NULL AND folder_id IS NULL ORDER BY created_at DESC`
+		}
 	} else {
 		if len(*folderID) != 36 {
 			return []domain.File{}, nil
 		}
-		query = `SELECT ` + fileColumns + ` FROM kemenag_arsip.files WHERE deleted_at IS NULL AND folder_id = $1::uuid ORDER BY created_at DESC`
-		args = append(args, *folderID)
+		if bidangID != nil && *bidangID != "" {
+			query = `SELECT ` + fileColumns + ` FROM kemenag_arsip.files WHERE deleted_at IS NULL AND folder_id = $1::uuid AND bidang_id = $2::uuid ORDER BY created_at DESC`
+			args = append(args, *folderID, *bidangID)
+		} else {
+			query = `SELECT ` + fileColumns + ` FROM kemenag_arsip.files WHERE deleted_at IS NULL AND folder_id = $1::uuid ORDER BY created_at DESC`
+			args = append(args, *folderID)
+		}
 	}
 
 	rows, err := r.pool.Query(ctx, query, args...)

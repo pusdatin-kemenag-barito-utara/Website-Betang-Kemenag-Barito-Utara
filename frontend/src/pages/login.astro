@@ -73,4 +73,10 @@ const year = new Date().getFullYear();
       </p>
     </div>
   </div>
+
+  <script is:inline>
+    try {
+      localStorage.removeItem("is_logged_in");
+    } catch (e) {}
+  </script>
 </BaseLayout>
