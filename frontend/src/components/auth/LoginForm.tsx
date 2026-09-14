@@ -74,7 +74,7 @@ export function LoginForm({ siteKey }: LoginFormProps) {
         setIsPending(false);
       } else {
         setIsSuccess(true);
-        const displayName = result.user?.name || email.split("@")[0] || "Admin";
+        const displayName = result.user?.fullName || result.user?.name || email.split("@")[0] || "Admin";
 
         trackEvent("login", {
           method: "password",

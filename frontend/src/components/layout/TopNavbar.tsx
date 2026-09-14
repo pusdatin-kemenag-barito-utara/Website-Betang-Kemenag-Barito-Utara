@@ -32,14 +32,15 @@ export function TopNavbar({ onMenuClick, initialUser }: TopNavbarProps) {
     if (initialUser) {
       if (initialUser.name) setUserName(initialUser.name);
       if (initialUser.role) {
-        setUserRole(
+        const roleLabel =
           initialUser.role === "super_admin" || initialUser.role === "Super Admin"
             ? "Super Admin"
             : initialUser.role === "operator"
             ? "Operator"
-            : initialUser.role
-        );
+            : initialUser.role;
+        setUserRole(roleLabel);
       }
+      return;
     }
 
     async function getUser() {
@@ -47,7 +48,7 @@ export function TopNavbar({ onMenuClick, initialUser }: TopNavbarProps) {
         const res = await getCurrentUser();
         if (res.success && res.data?.user) {
           const user = res.data.user;
-          const name = user.name || user.email?.split("@")[0] || "Admin Name";
+          const name = user.fullName || user.name || user.email?.split("@")[0] || "Admin Name";
           setUserName(name);
 
           const role = user.role;

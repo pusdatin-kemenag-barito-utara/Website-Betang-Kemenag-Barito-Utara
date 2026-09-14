@@ -1,4 +1,4 @@
-import { request, API_ORIGIN } from "./client";
+import { request, buildApiUrl } from "./client";
 
 /**
  * Custom Cloudflare Worker CDN domain untuk data arsip dan dokumen Kemenag Barito Utara.
@@ -68,7 +68,7 @@ export async function uploadFileDirect(file: File, folderId: string | null, name
     formData.append("folderId", cleanFolderId);
     formData.append("name", name || file.name);
 
-    const res = await fetch(`${API_ORIGIN}/api/v1/files/upload`, {
+    const res = await fetch(buildApiUrl("/files/upload"), {
       method: "POST",
       body: formData,
       credentials: "include",

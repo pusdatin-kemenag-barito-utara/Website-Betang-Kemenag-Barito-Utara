@@ -3,21 +3,12 @@ package main
 import (
 	"context"
 	"log"
-	"os"
-
-	"github.com/joho/godotenv"
 
 	"github.com/kemenag-baritoutara/betang-kemenag/internal/config"
 	"github.com/kemenag-baritoutara/betang-kemenag/internal/server"
 )
 
 func main() {
-	// Muat .env jika tersedia (development); periksa file satu per satu
-	for _, envPath := range []string{".env", "../.env", "../../.env"} {
-		if _, err := os.Stat(envPath); err == nil {
-			_ = godotenv.Overload(envPath)
-		}
-	}
 
 	cfg, err := config.Load()
 	if err != nil {

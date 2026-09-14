@@ -38,7 +38,7 @@ Astro.response.headers.set("Surrogate-Control", "no-store");
 
 const isSuperAdmin = auth?.ok && auth?.user?.isSuperAdmin === true;
 const initialUser = auth?.ok && auth?.user ? {
-  name: auth.user.email?.split("@")[0] || "Admin",
+  name: auth.user.fullName || auth.user.name || auth.user.email?.split("@")[0] || "Admin",
   role: auth.user.role || (isSuperAdmin ? "super_admin" : "user"),
   email: auth.user.email,
 } : undefined;
@@ -115,6 +115,7 @@ const disableRightClick = settings?.ok ? (settings.body?.data?.disable_right_cli
 
     // Proteksi Keamanan: Cegah navigasi Back / Forward membuka cache halaman setelah logout
     (function () {
+      var lastCheck = Date.now();
       function guardSessionHistory() {
         // 1. Cek instan synchronous via localStorage (0 ms, langsung lempar ke login sebelum render/fetch)
         try {
@@ -124,7 +125,11 @@ const disableRightClick = settings?.ok ? (settings.body?.data?.disable_right_cli
           }
         } catch (e) {}
 
-        // 2. Verifikasi ke backend API
+        var now = Date.now();
+        if (now - lastCheck < 15000) return;
+        lastCheck = now;
+
+        // 2. Verifikasi ke backend API jika sesi aktif
         fetch("/api/v1/auth/me", {
           method: "GET",
           headers: { "Cache-Control": "no-cache, no-store" },
@@ -142,13 +147,14 @@ const disableRightClick = settings?.ok ? (settings.body?.data?.disable_right_cli
           .catch(function () {});
       }
 
-      // Jalankan langsung saat script dieksekusi
-      guardSessionHistory();
+      // Hanya jalankan saat halaman dipulihkan dari BFCache (Back/Forward Cache)
+      window.addEventListener("pageshow", function (e) {
+        if (e.persisted) {
+          guardSessionHistory();
+        }
+      });
 
-      // Jalankan setiap kali halaman dimunculkan (termasuk BFCache back/forward)
-      window.addEventListener("pageshow", guardSessionHistory);
-
-      // Jalankan saat tab kembali aktif
+      // Jalankan saat tab kembali aktif dengan jeda minimal 15 detik
       document.addEventListener("visibilitychange", function () {
         if (document.visibilityState === "visible") {
           guardSessionHistory();

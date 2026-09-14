@@ -27,14 +27,40 @@ export async function loginAction(_prevState: { error: string | null } | null, f
   }
 }
 
+let pendingCurrentUser: Promise<any> | null = null;
+let cachedCurrentUser: { data: any; expiresAt: number } | null = null;
+
 /**
- * Informasi user yang sedang login (nama, role, email).
+ * Informasi user yang sedang login (nama, role, email) dengan deduplikasi dan in-memory cache 15s.
  */
-export async function getCurrentUser() {
-  return request("/auth/me");
+export async function getCurrentUser(forceRefresh = false) {
+  const now = Date.now();
+  if (!forceRefresh && cachedCurrentUser && cachedCurrentUser.expiresAt > now) {
+    return cachedCurrentUser.data;
+  }
+  if (!forceRefresh && pendingCurrentUser) {
+    return pendingCurrentUser;
+  }
+
+  pendingCurrentUser = request("/auth/me")
+    .then((res) => {
+      if (res.success) {
+        cachedCurrentUser = { data: res, expiresAt: Date.now() + 15000 };
+      }
+      pendingCurrentUser = null;
+      return res;
+    })
+    .catch((err) => {
+      pendingCurrentUser = null;
+      throw err;
+    });
+
+  return pendingCurrentUser;
 }
 
 export async function logoutAction() {
+  cachedCurrentUser = null;
+  pendingCurrentUser = null;
   try {
     try {
       localStorage.removeItem("is_logged_in");

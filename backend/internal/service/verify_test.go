@@ -3,21 +3,14 @@ package service
 import (
 	"context"
 	"fmt"
-	"os"
 	"testing"
 
-	"github.com/joho/godotenv"
 	"github.com/kemenag-baritoutara/betang-kemenag/internal/config"
 	"github.com/kemenag-baritoutara/betang-kemenag/internal/domain"
 	"github.com/kemenag-baritoutara/betang-kemenag/internal/repository"
 )
 
 func TestDataSync(t *testing.T) {
-	for _, envPath := range []string{"../../.env", "../../../.env", ".env"} {
-		if _, err := os.Stat(envPath); err == nil {
-			_ = godotenv.Overload(envPath)
-		}
-	}
 
 	cfg, err := config.Load()
 	if err != nil {

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { X, Loader2, FolderPlus, Folder, CheckSquare, Square } from "lucide-react"
+import { X, Loader2, Folder, CheckSquare, Square } from "lucide-react"
 import { createBidang, reloadSoon } from "@/lib/api"
 import { toast } from "sonner"
 import type { RootFolderOption } from "./FolderAccessModal"

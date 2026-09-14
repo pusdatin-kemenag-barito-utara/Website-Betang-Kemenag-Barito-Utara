@@ -3,13 +3,21 @@
  * Mengirim kredensial cookie secara otomatis via same-origin reverse proxy.
  */
 
-export const API_ORIGIN = (import.meta.env.PUBLIC_API_URL || "").replace(/\/+$/, "");
+// Bersihkan API_ORIGIN agar tidak menduplikasi /api/v1 jika env PUBLIC_API_URL bernilai "/api/v1" atau berakhiran "/api/v1"
+const rawOrigin = (import.meta.env.PUBLIC_API_URL || "").replace(/\/+$/, "");
+export const API_ORIGIN = rawOrigin.replace(/\/api\/v1\/?$/, "");
+
+export function buildApiUrl(path: string): string {
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  const normalizedPath = cleanPath.startsWith("/api/v1") ? cleanPath : `/api/v1${cleanPath}`;
+  return `${API_ORIGIN}${normalizedPath}`;
+}
 
 export async function request<T = any>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
-  const res = await fetch(`${API_ORIGIN}/api/v1${path}`, {
+  const res = await fetch(buildApiUrl(path), {
     ...options,
     credentials: "include",
     headers: {

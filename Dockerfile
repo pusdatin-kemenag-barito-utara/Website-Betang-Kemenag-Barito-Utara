@@ -27,7 +27,12 @@ RUN npm run build --workspace=betang-kemenag-frontend
 # --- Stage 3: Production Runtime ---
 FROM node:22-alpine AS runtime
 
-RUN apk add --no-cache ca-certificates tzdata wget curl bash
+# ca-certificates, tzdata, curl, bash, dan Infisical CLI untuk injeksi runtime dinamis
+RUN apk add --no-cache ca-certificates tzdata wget curl bash && \
+    (curl -1sLf 'https://artifacts-cli.infisical.com/setup.alpine.sh' | bash || \
+     curl -1sLf 'https://dl.cloudsmith.io/public/infisical/infisical-cli/setup.alpine.sh' | bash) && \
+    apk add --no-cache infisical
+
 ENV TZ=Asia/Jakarta
 
 WORKDIR /app
@@ -50,9 +55,16 @@ RUN npm install --omit=dev --no-audit && npm cache clean --force
 # Salin hasil build Astro SSR ke /app/dist
 COPY --from=frontend-builder /build/frontend/dist /app/dist
 
+# Salin skrip startup dan entrypoint Infisical Universal Auth
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+COPY start.sh /usr/local/bin/start.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/start.sh
+
 EXPOSE 3000
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD wget -qO- http://localhost:3000/api/health || exit 1
 
-CMD ["sh", "-c", "/app/betang-api & node /app/dist/server/entry.mjs"]
+ENTRYPOINT ["docker-entrypoint.sh"]
+CMD ["/usr/local/bin/start.sh"]
+

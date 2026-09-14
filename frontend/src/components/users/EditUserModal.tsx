@@ -1,36 +1,30 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect } from "react"
 import {
   Pencil,
   X,
-  Check,
   Eye,
   EyeOff,
   Lock,
-  Building2,
-  ShieldCheck,
-  Plus,
-  FolderKey,
-  Folder,
   User,
   Mail,
   Loader2,
-  AlertCircle,
   CheckCircle2,
-} from "lucide-react";
-import type { Bidang, RootFolderOption, EditUserFormState } from "./types";
-import type { UserItem } from "@/lib/api";
-import { AddBidangModal } from "@/components/Bidang/AddBidangModal";
+} from "lucide-react"
+import type { Bidang, RootFolderOption, EditUserFormState } from "./types"
+import type { UserItem } from "@/lib/api"
+import { UserRoleSelector } from "./components/UserRoleSelector"
+import { BidangSelector } from "./components/BidangSelector"
 
 interface EditUserModalProps {
-  user: UserItem | null;
-  onClose: () => void;
-  onSubmit: (data: EditUserFormState) => Promise<void>;
-  bidangList: Bidang[];
-  allRootFolders?: RootFolderOption[];
-  isSubmitting: boolean;
-  onOpenFolderAccessForBidang?: (bidangId: string, bidangName: string) => void;
-  onBidangAdded?: (newBidang: Bidang) => void;
-  isSelf?: boolean;
+  user: UserItem | null
+  onClose: () => void
+  onSubmit: (data: EditUserFormState) => Promise<void>
+  bidangList: Bidang[]
+  allRootFolders?: RootFolderOption[]
+  isSubmitting: boolean
+  onOpenFolderAccessForBidang?: (bidangId: string, bidangName: string) => void
+  onBidangAdded?: (newBidang: Bidang) => void
+  isSelf?: boolean
 }
 
 export function EditUserModal({
@@ -50,9 +44,8 @@ export function EditUserModal({
     bidang_id: null,
     is_active: true,
     password: "",
-  });
-  const [showPassword, setShowPassword] = useState(false);
-  const [isAddBidangOpen, setIsAddBidangOpen] = useState(false);
+  })
+  const [showPassword, setShowPassword] = useState(false)
 
   useEffect(() => {
     if (user) {
@@ -65,52 +58,23 @@ export function EditUserModal({
         bidang_id: user.bidang_id || null,
         is_active: user.is_active ?? true,
         password: "",
-      });
-      setShowPassword(false);
+      })
     }
-  }, [user]);
+  }, [user])
 
-  // Dukungan tombol Escape untuk menutup modal
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !isSubmitting && !isAddBidangOpen) {
-        onClose();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose, isSubmitting, isAddBidangOpen]);
-
-  if (!user) return null;
-
-  const selectedBidang = bidangList.find((b) => b.id === form.bidang_id);
-
-  const handleBidangCreated = (created?: { id: string; name: string }) => {
-    if (created) {
-      const newB: Bidang = {
-        id: created.id,
-        name: created.name,
-        accessibleFolderNames: [created.name],
-      };
-      if (onBidangAdded) {
-        onBidangAdded(newB);
-      }
-      setForm((p) => ({ ...p, bidang_id: created.id }));
-    }
-    setIsAddBidangOpen(false);
-  };
+  if (!user) return null
 
   const handleSubmit = async (e: React.SyntheticEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    await onSubmit(form);
-  };
+    e.preventDefault()
+    await onSubmit(form)
+  }
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200"
       onClick={(e) => {
         if (e.target === e.currentTarget && !isSubmitting) {
-          onClose();
+          onClose()
         }
       }}
     >
@@ -146,7 +110,7 @@ export function EditUserModal({
           </button>
         </div>
 
-        {/* Konten Form 2 Kolom (Skala Lebih Besar & Nyaman) */}
+        {/* Konten Form 2 Kolom */}
         <form onSubmit={handleSubmit} className="flex flex-col">
           {/* Banner Akun Terpilih */}
           <div className="mx-7 sm:mx-8 mt-5 p-4 rounded-2xl bg-gradient-to-r from-slate-50 via-emerald-50/30 to-slate-50 border border-slate-200/80 flex flex-wrap items-center justify-between gap-4">
@@ -209,7 +173,7 @@ export function EditUserModal({
             </div>
           </div>
 
-          {/* Grid 2 Kolom Utama (Wider & Comfortable) */}
+          {/* Grid 2 Kolom Utama */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-7 sm:p-8">
             {/* KOLOM KIRI: Profil & Keamanan */}
             <div className="space-y-4.5 flex flex-col justify-between">
@@ -316,191 +280,30 @@ export function EditUserModal({
             {/* KOLOM KANAN: Peran & Seksi/Bidang */}
             <div className="space-y-4.5 flex flex-col justify-between">
               {/* Pilihan Peran (Role) */}
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 mb-2">
-                  Peran Hak Akses (Role) <span className="text-rose-500">*</span>
-                </label>
-                <div className="grid grid-cols-2 gap-3">
-                  {/* Admin Bidang */}
-                  <button
-                    type="button"
-                    disabled={isSelf}
-                    onClick={() =>
-                      setForm((p) => ({ ...p, role: "Admin Bidang" }))
-                    }
-                    className={`flex items-center gap-3 p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
-                      isSelf
-                        ? "opacity-60 cursor-not-allowed border-slate-200 bg-slate-50"
-                        : form.role === "Admin Bidang"
-                        ? "border-blue-500 bg-blue-50/60 ring-2 ring-blue-500/20 shadow-xs"
-                        : "border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50"
-                    }`}
-                  >
-                    <div
-                      className={`p-2 rounded-xl ${
-                        form.role === "Admin Bidang"
-                          ? "bg-blue-600 text-white"
-                          : "bg-slate-100 text-slate-600"
-                      }`}
-                    >
-                      <Building2 className="h-4.5 w-4.5" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs sm:text-sm font-bold text-slate-900 truncate">
-                        Admin Bidang
-                      </div>
-                      <div className="text-xs text-slate-500 leading-tight mt-0.5">
-                        Arsip Seksi
-                      </div>
-                    </div>
-                    {form.role === "Admin Bidang" && (
-                      <Check className="h-4 w-4 text-blue-600 shrink-0" />
-                    )}
-                  </button>
+              <UserRoleSelector
+                role={form.role}
+                onChange={(role) =>
+                  setForm((p) => ({
+                    ...p,
+                    role,
+                    ...(role === "Super Admin" ? { bidang_id: null } : {}),
+                  }))
+                }
+                isSelf={isSelf}
+              />
 
-                  {/* Super Admin */}
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setForm((p) => ({
-                        ...p,
-                        role: "Super Admin",
-                        bidang_id: null,
-                      }))
-                    }
-                    className={`flex items-center gap-3 p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
-                      form.role === "Super Admin"
-                        ? "border-purple-500 bg-purple-50/60 ring-2 ring-purple-500/20 shadow-xs"
-                        : "border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50"
-                    }`}
-                  >
-                    <div
-                      className={`p-2 rounded-xl ${
-                        form.role === "Super Admin"
-                          ? "bg-purple-600 text-white"
-                          : "bg-slate-100 text-slate-600"
-                      }`}
-                    >
-                      <ShieldCheck className="h-4.5 w-4.5" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-xs sm:text-sm font-bold text-slate-900 truncate">
-                        Super Admin
-                      </div>
-                      <div className="text-xs text-slate-500 leading-tight mt-0.5">
-                        Akses Penuh
-                      </div>
-                    </div>
-                    {form.role === "Super Admin" && (
-                      <Check className="h-4 w-4 text-purple-600 shrink-0" />
-                    )}
-                  </button>
-                </div>
-
-                {isSelf && (
-                  <p className="mt-2 text-xs text-amber-600 flex items-center gap-1.5 font-medium">
-                    <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                    Akun Anda: Peran Super Admin dikunci agar tidak kehilangan akses.
-                  </p>
-                )}
-              </div>
-
-              {/* Penempatan Seksi / Bidang (jika Admin Bidang) */}
-              {form.role === "Admin Bidang" ? (
-                <div className="space-y-3 rounded-2xl bg-slate-50/90 p-4 sm:p-4.5 border border-slate-200/80">
-                  <div className="flex items-center justify-between">
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700">
-                      Penempatan Seksi / Bidang <span className="text-rose-500">*</span>
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setIsAddBidangOpen(true)}
-                      className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-800 hover:underline cursor-pointer"
-                    >
-                      <Plus className="h-3.5 w-3.5" />
-                      <span>Tambah Bidang Baru</span>
-                    </button>
-                  </div>
-
-                  <select
-                    value={form.bidang_id || ""}
-                    required
-                    onChange={(e) =>
-                      setForm((p) => ({
-                        ...p,
-                        bidang_id: e.target.value || null,
-                      }))
-                    }
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 font-medium focus:border-emerald-500 focus:outline-none focus:ring-3 focus:ring-emerald-500/15 cursor-pointer shadow-2xs"
-                  >
-                    <option value="">-- Pilih Seksi / Bidang Penempatan --</option>
-                    {bidangList.map((b) => (
-                      <option key={b.id} value={b.id}>
-                        {b.name}
-                      </option>
-                    ))}
-                  </select>
-
-                  {/* RBAC Folder Access Ringkas */}
-                  {selectedBidang ? (
-                    <div className="rounded-xl bg-white p-3 border border-emerald-100 shadow-2xs space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
-                          <FolderKey className="h-4 w-4 text-emerald-600" />
-                          <span>Hak Akses Folder (RBAC):</span>
-                        </div>
-                        {onOpenFolderAccessForBidang && (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              onOpenFolderAccessForBidang(
-                                selectedBidang.id,
-                                selectedBidang.name
-                              )
-                            }
-                            className="inline-flex items-center text-xs font-bold text-emerald-700 hover:text-emerald-800 hover:underline cursor-pointer"
-                          >
-                            Atur Hak Akses
-                          </button>
-                        )}
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
-                        {selectedBidang.accessibleFolderNames &&
-                        selectedBidang.accessibleFolderNames.length > 0 ? (
-                          selectedBidang.accessibleFolderNames.map((fn, idx) => (
-                            <span
-                              key={idx}
-                              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800 border border-emerald-200/60"
-                            >
-                              <Folder className="h-3.5 w-3.5 text-emerald-600" />
-                              <span>{fn}</span>
-                            </span>
-                          ))
-                        ) : (
-                          <span className="text-xs text-amber-700 bg-amber-50 px-2.5 py-1 rounded-lg font-medium border border-amber-200/50">
-                            Belum ada folder root yang dikaitkan.
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-xs text-slate-400 italic pl-0.5">
-                      Pilih seksi/bidang penugasan agar akun ini memiliki izin akses folder arsip.
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <div className="p-4 rounded-2xl bg-purple-50/60 border border-purple-100 flex items-start gap-3">
-                  <ShieldCheck className="h-5 w-5 text-purple-600 shrink-0 mt-0.5" />
-                  <div className="text-xs text-purple-900 leading-relaxed">
-                    <p className="font-bold text-sm">Akses Global Super Admin</p>
-                    <p className="text-xs text-purple-700 mt-1">
-                      Pengguna ini memiliki hak penuh membuka seluruh folder, berkas arsip, manajemen pengguna, dan pengaturan sistem tanpa batasan bidang.
-                    </p>
-                  </div>
-                </div>
-              )}
+              {/* Penempatan Seksi / Bidang */}
+              <BidangSelector
+                role={form.role}
+                bidangId={form.bidang_id}
+                onChangeBidang={(bidang_id) =>
+                  setForm((p) => ({ ...p, bidang_id }))
+                }
+                bidangList={bidangList}
+                allRootFolders={allRootFolders}
+                onOpenFolderAccessForBidang={onOpenFolderAccessForBidang}
+                onBidangAdded={onBidangAdded}
+              />
             </div>
           </div>
 
@@ -534,16 +337,6 @@ export function EditUserModal({
           </div>
         </form>
       </div>
-
-      {/* Submodal Tambah Bidang Cepat */}
-      {isAddBidangOpen && (
-        <AddBidangModal
-          isOpen={isAddBidangOpen}
-          onClose={() => setIsAddBidangOpen(false)}
-          allRootFolders={allRootFolders}
-          onSuccess={handleBidangCreated}
-        />
-      )}
     </div>
-  );
+  )
 }

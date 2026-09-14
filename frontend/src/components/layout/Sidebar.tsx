@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { FolderIcon, LayoutDashboard, Trash2, Settings, X, Star, Users, Building2 } from "lucide-react";
+import { FolderIcon, LayoutDashboard, Trash2, Settings, X, Star, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StorageQuotaWidget } from "./StorageQuotaWidget";
 import { getCurrentUser } from "@/lib/api";

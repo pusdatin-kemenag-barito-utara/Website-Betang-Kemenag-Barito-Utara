@@ -1,0 +1,83 @@
+---
+import { Building2, FolderOpen, HelpCircle, CheckCircle2 } from "lucide-react";
+
+interface Props {
+  userBidang: string;
+  myAccessibleFolders: string[];
+}
+
+const { userBidang, myAccessibleFolders } = Astro.props;
+---
+
+<!-- Profil Singkat Seksi Bidang -->
+<div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
+  <div class="flex items-center gap-3 border-b border-slate-100 pb-3 mb-4">
+    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200/80">
+      <Building2 className="h-5 w-5" />
+    </div>
+    <div class="min-w-0">
+      <h3 class="text-sm font-bold text-slate-900 truncate">
+        {userBidang || "Seksi Kerja"}
+      </h3>
+      <span class="text-[11px] font-medium text-slate-400">
+        Kemenag Kabupaten Barito Utara
+      </span>
+    </div>
+  </div>
+
+  <div class="space-y-2 text-xs">
+    <div class="flex items-center justify-between py-1.5 text-slate-600">
+      <span class="text-slate-400">Peran Akun</span>
+      <span class="font-semibold text-slate-800">Admin Bidang</span>
+    </div>
+    <div class="flex items-center justify-between py-1.5 text-slate-600">
+      <span class="text-slate-400">Status Akses</span>
+      <span class="inline-flex items-center gap-1 font-semibold text-emerald-700">
+        <span class="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+        <span>Terverifikasi Aktif</span>
+      </span>
+    </div>
+    <div class="flex items-center justify-between py-1.5 text-slate-600">
+      <span class="text-slate-400">Folder Kerja</span>
+      <span class="font-semibold text-slate-800">{myAccessibleFolders.length} Folder Dikelola</span>
+    </div>
+  </div>
+
+  <div class="mt-4 pt-3 border-t border-slate-100">
+    <a
+      href="/folders/root"
+      class="flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 transition-colors shadow-xs"
+    >
+      <FolderOpen className="h-4 w-4" />
+      <span>Buka Berkas Seksi</span>
+    </a>
+  </div>
+</div>
+
+<!-- Petunjuk Pengarsipan Dokumen Resmi -->
+<div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
+  <div class="flex items-center gap-2 mb-3">
+    <HelpCircle className="h-4 w-4 text-slate-500" />
+    <h3 class="text-xs font-bold text-slate-900 uppercase tracking-wider">
+      Petunjuk Pengarsipan
+    </h3>
+  </div>
+  <ul class="space-y-2 text-xs text-slate-600">
+    <li class="flex items-start gap-2">
+      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 mt-0.5 shrink-0" />
+      <span>Unggah berkas resmi dalam format <strong>PDF</strong> atau <strong>Gambar</strong> resolusi jelas.</span>
+    </li>
+    <li class="flex items-start gap-2">
+      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 mt-0.5 shrink-0" />
+      <span>Gunakan format penamaan standar instansi (misal: <em>SK_Nomor_Tahun.pdf</em>).</span>
+    </li>
+    <li class="flex items-start gap-2">
+      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 mt-0.5 shrink-0" />
+      <span>Berkas yang dihapus tersimpan selama <strong>30 hari</strong> di Tempat Sampah sebelum dibersihkan permanen.</span>
+    </li>
+    <li class="flex items-start gap-2">
+      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 mt-0.5 shrink-0" />
+      <span>Tandai berkas penting dengan <strong>Berbintang</strong> agar mudah diakses kembali.</span>
+    </li>
+  </ul>
+</div>

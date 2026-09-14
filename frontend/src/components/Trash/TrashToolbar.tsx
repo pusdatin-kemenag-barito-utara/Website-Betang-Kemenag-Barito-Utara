@@ -1,4 +1,4 @@
-import { Search, X, RotateCcw, Trash2, Loader2, Filter } from "lucide-react";
+import { Search, X, RotateCcw, Trash2, Loader2 } from "lucide-react";
 
 interface TrashToolbarProps {
   searchQuery: string;

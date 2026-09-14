@@ -1,0 +1,69 @@
+---
+interface Props {
+  percentDisplay: string;
+  percentUsed: number;
+  usedBytes: number;
+  limitBytes: number;
+}
+
+const { percentDisplay, percentUsed, usedBytes, limitBytes } = Astro.props;
+
+function formatBytes(bytes: number, decimals = 2) {
+  if (!+bytes) return "0 B";
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+}
+---
+
+<!-- Kapasitas Cloud Storage (Hanya Super Admin) -->
+<div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
+  <div class="flex items-center justify-between mb-4">
+    <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wider">Kapasitas Cloud R2</h3>
+    <span class="text-xs font-mono font-bold text-slate-600">
+      {percentDisplay}%
+    </span>
+  </div>
+
+  <div class="space-y-2">
+    <div class="flex items-center justify-between text-xs font-medium text-slate-600">
+      <span>{formatBytes(usedBytes)}</span>
+      <span class="text-slate-400">{formatBytes(limitBytes)}</span>
+    </div>
+    <div class="h-2 w-full rounded-full bg-slate-100 overflow-hidden border border-slate-200">
+      <div
+        class="h-full rounded-full bg-emerald-600 transition-all"
+        style={`width: ${Math.max(1, percentUsed)}%`}
+      />
+    </div>
+    <div class="flex items-center justify-between text-[11px] text-slate-400 pt-1">
+      <span>Kapasitas Tersedia</span>
+      <span class="font-medium text-slate-600">{formatBytes(Math.max(0, limitBytes - usedBytes))}</span>
+    </div>
+  </div>
+</div>
+
+<!-- Status Sistem (Hanya Super Admin) -->
+<div class="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-xs">
+  <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wider mb-3">Status Sistem</h3>
+  <div class="space-y-2.5">
+    <div class="flex items-center justify-between py-2 border-b border-slate-100 text-xs">
+      <span class="text-slate-500">Core Backend</span>
+      <span class="font-medium text-slate-800">Go Fiber v3</span>
+    </div>
+    <div class="flex items-center justify-between py-2 border-b border-slate-100 text-xs">
+      <span class="text-slate-500">Database</span>
+      <span class="font-medium text-slate-800">PostgreSQL</span>
+    </div>
+    <div class="flex items-center justify-between py-2 border-b border-slate-100 text-xs">
+      <span class="text-slate-500">Akses Folder</span>
+      <span class="font-medium text-emerald-700">RBAC Aktif</span>
+    </div>
+    <div class="flex items-center justify-between py-2 text-xs">
+      <span class="text-slate-500">Cloud Storage</span>
+      <span class="font-medium text-slate-800">Cloudflare R2</span>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,130 @@
+---
+import { FolderKey, FolderOpen, ArrowRight, CheckCircle2 } from "lucide-react";
+
+interface BidangItem {
+  id: string;
+  name: string;
+  sort_order: number;
+  doc_count: number;
+}
+
+interface Props {
+  isSuperAdmin: boolean;
+  totalFiles: number;
+  bidangs: BidangItem[];
+  myAccessibleFolders: string[];
+}
+
+const { isSuperAdmin, totalFiles, bidangs, myAccessibleFolders } = Astro.props;
+---
+
+{isSuperAdmin ? (
+  /* Khusus Super Admin: Distribusi Arsip Seluruh Bidang */
+  <div class="rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-6 shadow-xs">
+    <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+      <div>
+        <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wider">
+          Distribusi Arsip per Bidang
+        </h3>
+        <p class="text-xs text-slate-500 mt-0.5">
+          Sebaran jumlah dokumen digital berdasarkan seksi kerja
+        </p>
+      </div>
+      <a
+        href="/users"
+        class="text-xs font-bold text-slate-600 hover:text-emerald-700 transition-colors"
+      >
+        <span>Atur Hak Akses →</span>
+      </a>
+    </div>
+
+    {bidangs.length === 0 ? (
+      <div class="py-6 text-center text-slate-400">
+        <p class="text-xs">Belum ada seksi/bidang terdaftar</p>
+      </div>
+    ) : (
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {bidangs.map((b) => {
+          const docCount = b.doc_count || 0;
+          const ratio = totalFiles > 0 ? Math.round((docCount / totalFiles) * 100) : 0;
+          return (
+            <div class="p-3.5 rounded-xl border border-slate-200/60 bg-slate-50/40 flex flex-col justify-between">
+              <div class="flex items-center justify-between gap-2">
+                <span class="font-bold text-slate-800 text-xs truncate" title={b.name}>
+                  {b.name}
+                </span>
+                <span class="text-xs font-mono font-bold text-slate-600 shrink-0">
+                  {docCount} dok
+                </span>
+              </div>
+              <div class="mt-2.5">
+                <div class="h-1.5 w-full rounded-full bg-slate-200 overflow-hidden">
+                  <div
+                    class="h-full rounded-full bg-slate-600 transition-all"
+                    style={`width: ${ratio}%`}
+                  />
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    )}
+  </div>
+) : (
+  /* Khusus Admin Bidang: Daftar Folder Root Kerja yang Diberikan Hak Akses */
+  <div class="rounded-2xl border border-slate-200/80 bg-white p-5 sm:p-6 shadow-xs">
+    <div class="flex items-center justify-between border-b border-slate-100 pb-3 mb-4">
+      <div>
+        <h3 class="text-sm font-bold text-slate-900 uppercase tracking-wider">
+          Folder Root yang Dapat Anda Kelola
+        </h3>
+        <p class="text-xs text-slate-500 mt-0.5">
+          Folder utama yang diberikan hak akses oleh Super Admin untuk seksi Anda
+        </p>
+      </div>
+      <a
+        href="/folders/root"
+        class="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 hover:text-emerald-800 hover:underline"
+      >
+        <span>Buka di File Browser</span>
+        <ArrowRight className="h-3.5 w-3.5" />
+      </a>
+    </div>
+
+    {myAccessibleFolders.length === 0 ? (
+      <div class="p-6 text-center text-slate-400 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+        <FolderKey className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+        <p class="text-xs font-bold text-slate-600">Belum Ada Hak Akses Folder Root</p>
+        <p class="text-[11px] text-slate-400 mt-0.5">
+          Hubungi Super Admin untuk menambahkan hak akses folder root bagi seksi Anda.
+        </p>
+      </div>
+    ) : (
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {myAccessibleFolders.map((folderName: string) => (
+          <a
+            href="/folders/root"
+            class="group flex items-center justify-between p-3.5 rounded-xl border border-slate-200/70 bg-slate-50/40 hover:bg-slate-100/80 hover:border-slate-300 transition-all cursor-pointer"
+          >
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-emerald-700 border border-emerald-100 shadow-2xs">
+                <FolderOpen className="h-4.5 w-4.5" />
+              </div>
+              <div class="min-w-0">
+                <span class="block text-xs font-bold text-slate-800 truncate group-hover:text-emerald-800 transition-colors">
+                  {folderName}
+                </span>
+                <span class="block text-[10px] text-slate-400">Folder Kerja Resmi</span>
+              </div>
+            </div>
+            <span class="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200/60 shrink-0">
+              <CheckCircle2 className="h-3 w-3" />
+              <span>Aktif</span>
+            </span>
+          </a>
+        ))}
+      </div>
+    )}
+  </div>
+)}

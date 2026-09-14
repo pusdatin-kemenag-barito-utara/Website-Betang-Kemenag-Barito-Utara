@@ -39,7 +39,7 @@ func New(repos *repository.Repos, r2 *storage.R2Storage, supabase *auth.Supabase
 		cfg:      cfg,
 		supabase: supabase,
 	}
-	s.Auth = &AuthService{supabase: supabase, userRepo: repos.User, cfg: cfg}
+	s.Auth = NewAuthService(supabase, repos.User, cfg)
 	s.User = NewUserService(repos.User, supabase, s)
 	s.Bidang = &BidangService{repo: repos.Bidang, folders: repos.Folder, audits: s}
 	s.Folder = &FolderService{folders: repos.Folder, files: repos.File, r2: r2, audits: s}

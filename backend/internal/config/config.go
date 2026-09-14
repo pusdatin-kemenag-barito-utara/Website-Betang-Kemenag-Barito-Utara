@@ -52,14 +52,14 @@ type Config struct {
 // Load membaca konfigurasi dari environment dengan nilai default yang aman.
 func Load() (*Config, error) {
 	backendPort := getEnvFirst([]string{"BACKEND_PORT", "API_PORT", "PORT"}, "8080")
-	// Jika PORT=3000 ada di .env (untuk frontend), pastikan backend tetap memakai port 8080 kecuali ditentukan khusus.
+	// Jika PORT=3000 diwariskan container, pastikan backend tetap memakai port 8080 kecuali ditentukan khusus.
 	if backendPort == "3000" && getEnv("BACKEND_PORT", "") == "" && getEnv("API_PORT", "") == "" {
 		backendPort = "8080"
 	}
 
 	cfg := &Config{
 		Port:               backendPort,
-		SupabaseURL:        getEnvFirst([]string{"SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL", "PUBLIC_SUPABASE_URL"}, "https://db.kemenag-baritoutara.com"),
+		SupabaseURL:        getEnvFirst([]string{"SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL", "PUBLIC_SUPABASE_URL"}, ""),
 		SupabaseAnonKey:        getEnvFirst([]string{"SUPABASE_ANON_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "PUBLIC_SUPABASE_ANON_KEY"}, ""),
 		SupabaseJWTSecret:      getEnvFirst([]string{"SUPABASE_JWT_SECRET", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEY"}, ""),
 		SupabaseServiceRoleKey: getEnvFirst([]string{"SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SERVICE_KEY", "SERVICE_ROLE_KEY"}, ""),
@@ -71,7 +71,7 @@ func Load() (*Config, error) {
 		R2SecretAccessKey:  getEnvFirst([]string{"R2_SECRET_ACCESS_KEY", "CLOUDFLARE_SECRET_ACCESS_KEY", "CF_SECRET_ACCESS_KEY"}, ""),
 		R2BucketName:       getEnvFirst([]string{"R2_BUCKET_NAME", "R2_BUCKET_ARSIP", "R2_BUCKET"}, "data-arsip"),
 		TurnstileSecretKey: getEnvFirst([]string{"TURNSTILE_SECRET_KEY", "CLOUDFLARE_TURNSTILE_SECRET_KEY"}, ""),
-		PusdatinURL:        getEnvFirst([]string{"PUSDATIN_URL", "NEXT_PUBLIC_PUSDATIN_URL", "PUBLIC_PUSDATIN_URL"}, "https://pusdatin.kemenag-baritoutara.com"),
+		PusdatinURL:        getEnvFirst([]string{"PUSDATIN_URL", "NEXT_PUBLIC_PUSDATIN_URL", "PUBLIC_PUSDATIN_URL"}, ""),
 		PusdatinAppID:      getEnvFirst([]string{"PUSDATIN_APP_ID"}, "e-arsip-kemenag"),
 		CookieName:         getEnvFirst([]string{"COOKIE_NAME"}, "earsip-auth"),
 		CookieDomain:       getEnvFirst([]string{"COOKIE_DOMAIN"}, ""),
@@ -96,10 +96,13 @@ func Load() (*Config, error) {
 	return cfg, nil
 }
 
-// validate memastikan konfigurasi penting database terisi.
+// validate memastikan seluruh konfigurasi krusial terisi dari Infisical Cloud.
 func (c *Config) validate() error {
 	if c.DatabaseURL == "" {
-		return fmt.Errorf("environment variable DATABASE_URL (atau DIRECT_URL) wajib diisi")
+		return fmt.Errorf("environment variable DATABASE_URL (atau DIRECT_URL) wajib terisi dari Infisical Cloud")
+	}
+	if c.SupabaseURL == "" {
+		return fmt.Errorf("environment variable SUPABASE_URL wajib terisi dari Infisical Cloud")
 	}
 	return nil
 }

@@ -7,13 +7,21 @@
     "frontend"
   ],
   "scripts": {
-    "dev": "concurrently -n \"Backend,FrontEnd\" -c \"magenta.bold,cyan.bold\" --kill-others-on-fail \"npm run dev:backend\" \"npm run dev:frontend\"",
-    "dev:frontend": "npm run dev --workspace=frontend",
-    "dev:backend": "cd backend && air",
-    "dev:backend:go": "cd backend && go run ./cmd/api",
+    "dev": "infisical run --env=dev --path=/betang-kemenag -- concurrently -n \"Backend,FrontEnd\" -c \"magenta.bold,cyan.bold\" --kill-others-on-fail \"npm run dev:backend:raw\" \"npm run dev:frontend:raw\"",
+    "dev:frontend": "infisical run --env=dev --path=/betang-kemenag -- npm run dev --workspace=frontend",
+    "dev:backend": "infisical run --env=dev --path=/betang-kemenag -- cd backend && air",
+    "dev:backend:go": "infisical run --env=dev --path=/betang-kemenag -- cd backend && go run ./cmd/api",
+    "dev:standalone": "concurrently -n \"Backend,FrontEnd\" -c \"magenta.bold,cyan.bold\" --kill-others-on-fail \"npm run dev:backend:raw\" \"npm run dev:frontend:raw\"",
+    "dev:frontend:raw": "npm run dev --workspace=frontend",
+    "dev:backend:raw": "cd backend && air",
     "build:frontend": "npm run build --workspace=frontend",
     "build:backend": "cd backend && go build -o bin/betang-api ./cmd/api",
-    "build": "npm run build:backend && npm run build:frontend"
+    "build": "npm run build:backend && npm run build:frontend",
+    "install:frontend": "npm install --workspace=frontend",
+    "install:backend": "cd backend && go mod download && go mod tidy",
+    "install:all": "npm install && cd backend && go mod download && go mod tidy",
+    "infisical:dev": "infisical run --env=dev --path=/betang-kemenag --",
+    "infisical:prod": "infisical run --env=prod --path=/betang-kemenag --"
   },
   "engines": {
     "node": ">=20"

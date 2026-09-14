@@ -1,56 +1,76 @@
 # ==============================================================================
 # SI BETANG - Monorepo .gitignore (Go Fiber v3 + Astro v7)
+# Standar Arsitektur Enterprise PUSDATIN & Kemenag Barito Utara
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
-# Dependencies
+# Dependencies (Root & Workspaces)
 # ------------------------------------------------------------------------------
 node_modules/
+**/node_modules/
 .pnp
 .pnp.*
 package-lock.json.bak
 
 # ------------------------------------------------------------------------------
-# Environment Variables & Secrets (CRITICAL)
+# Environment Variables & Secrets (CRITICAL - STRICTLY ZERO .ENV)
+# Seluruh secrets dan konfigurasi dikelola terpusat di Infisical Cloud (/betang-kemenag)
 # ------------------------------------------------------------------------------
 .env
 .env.*
 *.env
-backend/.env
-frontend/.env
-!*.env.example
-!*.env.template
+**/.env*
+**/*.env
+*.env.example
+*.env.template
+*.pem
+*.key
+*.cert
+*.crt
+id_rsa*
 
 # ------------------------------------------------------------------------------
-# Frontend (Astro v7 + Vite + React)
+# Frontend (Astro v7 + Vite + React) & Build Outputs
 # ------------------------------------------------------------------------------
 .astro/
-frontend/.astro/
+**/.astro/
 dist/
-frontend/dist/
+**/dist/
 out/
+**/out/
 build/
+**/build/
 .vite/
-frontend/.vite/
+**/.vite/
+.cache/
+**/.cache/
 *.tsbuildinfo
 .next/
+**/.next/
+.turbo/
+.parcel-cache/
+.eslintcache
 
 # ------------------------------------------------------------------------------
-# Backend (Go + Fiber v3 + Air)
+# Backend (Go + Fiber v3 + Air) & Binaries
 # ------------------------------------------------------------------------------
 bin/
-backend/bin/
+**/bin/
 tmp/
-backend/tmp/
+**/tmp/
 *.test
 *.out
 *.exe
 *.dll
 *.so
 *.dylib
+api
+betang-api
+backend/api*
 /app/betang-api
 /build/bin/
-
+build-errors.log
+.air.pid
 
 # ------------------------------------------------------------------------------
 # Logs & Process
@@ -60,11 +80,13 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+lerna-debug.log*
 
 # ------------------------------------------------------------------------------
 # Testing & Code Coverage
 # ------------------------------------------------------------------------------
 coverage/
+**/coverage/
 .coverage/
 test-results/
 playwright-report/
@@ -79,6 +101,8 @@ playwright-report/
 .Trashes
 ehthumbs.db
 Thumbs.db
+[Dd]esktop.ini
+$RECYCLE.BIN/
 
 # ------------------------------------------------------------------------------
 # IDEs & Editors
@@ -97,5 +121,6 @@ Thumbs.db
 .opencode/
 .antigravitycli/
 .gemini/
+**/.gemini/
 scratch/
 scripts/

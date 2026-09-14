@@ -56,6 +56,7 @@ func (h *AuthHandler) Login(c fiber.Ctx) error {
 	return writeOK(c, fiber.Map{
 		"user": fiber.Map{
 			"name":         result.Name,
+			"fullName":     result.Name,
 			"email":        result.Email,
 			"role":         result.Role,
 			"isSuperAdmin": result.IsSuperAdmin,
