@@ -1,6 +1,8 @@
 package middleware
 
 import (
+	"strings"
+
 	"github.com/gofiber/fiber/v3"
 
 	"github.com/kemenag-baritoutara/betang-kemenag/internal/config"
@@ -24,6 +26,15 @@ func NewCORSHandler(cfg *config.Config) *CORSHandler {
 
 // Handle adalah middleware CORS utama.
 func (h *CORSHandler) Handle(c fiber.Ctx) error {
+	// Khusus rute WebDAV untuk Microsoft Office Desktop:
+	// Lewatkan sepenuhnya agar OPTIONS, PROPFIND, LOCK, dll ditangani langsung oleh WebDAV handler resmi
+	if strings.HasPrefix(c.Path(), "/api/v1/dav") {
+		c.Set("Access-Control-Allow-Origin", "*")
+		c.Set("Access-Control-Allow-Methods", "GET, HEAD, POST, PUT, DELETE, OPTIONS, PROPFIND, PROPPATCH, LOCK, UNLOCK")
+		c.Set("Access-Control-Allow-Headers", "*")
+		return c.Next()
+	}
+
 	origin := c.Get("Origin")
 
 	// Bukan request lintas-asal (browser same-origin): lanjutkan langsung.

@@ -26,21 +26,24 @@ type Handlers struct {
 	Storage     *StorageHandler
 	Maintenance *MaintenanceHandler
 	User        *UserHandler
+	WebDAV      *WebDAVHandler
 }
 
 // New membuat seluruh handler dari service dan pool database yang tersedia.
-func New(services *service.Services, pool *pgxpool.Pool) *Handlers {
+func New(services *service.Services, pool *pgxpool.Pool, jwtSecret []byte) *Handlers {
+	webdav := NewWebDAVHandler(services.File, jwtSecret)
 	return &Handlers{
 		Auth:        NewAuthHandler(services.Auth, services),
 		Health:      NewHealthHandler(pool),
 		Bidang:      NewBidangHandler(services.Bidang),
-		Folder:      NewFolderHandler(services.Folder, services.File),
-		File:        NewFileHandler(services.File),
+		Folder:      NewFolderHandler(services.Folder, services.File, webdav),
+		File:        NewFileHandler(services.File, webdav),
 		Trash:       NewTrashHandler(services.Trash),
 		Settings:    NewSettingsHandler(services.Settings, services.Auth),
 		Storage:     NewStorageHandler(services.Storage),
 		Maintenance: NewMaintenanceHandler(services.Maintenance),
 		User:        NewUserHandler(services.User, services.Auth),
+		WebDAV:      webdav,
 	}
 }
 

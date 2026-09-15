@@ -20,7 +20,9 @@ try {
   [auth, contentsRes, breadcrumbsRes] = await Promise.all([
     requireUser(cookie, Astro.response.headers),
     apiGet(`/folders/${encodeURIComponent(folderId)}${q ? `?q=${encodeURIComponent(q)}` : ""}`, cookie, false, Astro.response.headers),
-    apiGet(`/folders/${encodeURIComponent(folderId)}/breadcrumbs`, cookie, false, Astro.response.headers),
+    folderId !== "root" && folderId !== ""
+      ? apiGet(`/folders/${encodeURIComponent(folderId)}/breadcrumbs`, cookie, false, Astro.response.headers)
+      : Promise.resolve({ ok: true, body: { data: [] } }),
   ]);
 } catch (e) {
   console.error("Folder SSR Error:", e);
@@ -86,7 +88,13 @@ const items = [
       objectKey: f.r2_object_key || f.r2ObjectKey || f.object_key || f.objectKey,
     };
   }),
-];
+].sort((a, b) => {
+  if (a.type !== b.type) return a.type === "folder" ? -1 : 1;
+  if (folderId === "root") {
+    return b.name.localeCompare(a.name, "id-ID", { sensitivity: "base" });
+  }
+  return a.name.localeCompare(b.name, "id-ID", { sensitivity: "base" });
+});
 
 // Breadcrumbs backend berurutan daun -> akar; balik agar akar -> daun.
 const breadcrumbs: { id: string; name: string }[] =

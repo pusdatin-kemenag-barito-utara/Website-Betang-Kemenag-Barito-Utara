@@ -114,7 +114,16 @@ export function FileTableBatchBar({
 
         <button
           type="button"
-          onClick={onMoveBatch}
+          onClick={() => {
+            const lockedItem = selectedItems.find((i) => i.isLocked);
+            if (lockedItem) {
+              toast.error(
+                `Berkas "${lockedItem.name}" sedang dibuka & diedit di Microsoft Office oleh ${lockedItem.lockedBy || "pengguna lain"}. Pemindahan massal tidak dapat dilakukan.`
+              );
+              return;
+            }
+            onMoveBatch();
+          }}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer shadow-2xs"
         >
           <FolderInput className="h-3.5 w-3.5 text-indigo-600" />
@@ -132,7 +141,16 @@ export function FileTableBatchBar({
 
         <button
           type="button"
-          onClick={onDeleteBatch}
+          onClick={() => {
+            const lockedItem = selectedItems.find((i) => i.isLocked);
+            if (lockedItem) {
+              toast.error(
+                `Berkas "${lockedItem.name}" sedang dibuka & diedit di Microsoft Office oleh ${lockedItem.lockedBy || "pengguna lain"}. Penghapusan massal tidak dapat dilakukan.`
+              );
+              return;
+            }
+            onDeleteBatch();
+          }}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600 text-xs font-bold text-white hover:bg-rose-500 transition-colors cursor-pointer shadow-2xs"
         >
           <Trash2 className="h-3.5 w-3.5" />

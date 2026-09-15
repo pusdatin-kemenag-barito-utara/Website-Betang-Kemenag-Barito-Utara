@@ -168,3 +168,56 @@ func (s *FileService) BidangIDForFolder(ctx context.Context, folderID *string) (
 	}
 	return s.folders.GetBidangID(ctx, *folderID)
 }
+
+// GetByID mengambil data file berdasarkan ID.
+func (s *FileService) GetByID(ctx context.Context, id string) (*domain.File, error) {
+	return s.files.GetByID(ctx, id)
+}
+
+// SaveWebDAVEdit menyimpan perubahan dokumen yang dikirim dari Microsoft Office Desktop via WebDAV (Ctrl + S).
+// Dilengkapi proteksi debounce: jika createVersionSnapshot bernilai true, versi lama dicadangkan ke file_versions.
+func (s *FileService) SaveWebDAVEdit(ctx context.Context, fileID string, body io.Reader, sizeBytes int64, actorID, actorEmail, ip string, createVersionSnapshot bool) (*domain.File, error) {
+	existing, err := s.files.GetByID(ctx, fileID)
+	if err != nil || existing == nil {
+		return nil, errors.New("berkas tidak ditemukan")
+	}
+
+	cleanName := sanitizeFileName(existing.Name)
+	timestamp := time.Now().UnixNano() / int64(time.Millisecond)
+	folderSegment := "root"
+	if existing.FolderID != nil && *existing.FolderID != "" {
+		folderSegment = *existing.FolderID
+	}
+	bidangSegment := "global"
+	if existing.BidangID != nil && *existing.BidangID != "" {
+		bidangSegment = *existing.BidangID
+	}
+	newKey := fmt.Sprintf("arsip/%s/%s/%d-%s", bidangSegment, folderSegment, timestamp, cleanName)
+
+	// 1. Unggah stream dokumen terbaru ke Cloudflare R2
+	if err := s.r2.PutObject(ctx, newKey, body, sizeBytes, existing.MimeType); err != nil {
+		return nil, fmt.Errorf("gagal mengunggah ke Cloudflare R2: %w", err)
+	}
+
+	// 2. Proteksi Spam / Debounce: Simpan versi lama hanya jika diperlukan
+	if createVersionSnapshot {
+		_ = s.files.InsertVersion(ctx, existing.ID, existing.R2ObjectKey, existing.SizeBytes, &actorID)
+	} else if existing.R2ObjectKey != "" && existing.R2ObjectKey != newKey {
+		// Hapus objek intermediate sebelumnya dari R2 agar bucket tetap bersih dan hemat penyimpanan
+		_ = s.r2.DeleteObject(ctx, existing.R2ObjectKey)
+	}
+
+	// 3. Perbarui r2_object_key dan ukuran berkas utama
+	if err := s.files.UpdateObjectKey(ctx, existing.ID, newKey, existing.MimeType, sizeBytes, &actorID); err != nil {
+		return nil, err
+	}
+
+	updated, err := s.files.GetByID(ctx, existing.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	InvalidateFolderCache()
+	_ = s.audits.LogAudit(ctx, actorEmail, "UPDATE", "WebDAV Auto-Save: "+existing.Name, existing, updated, ip)
+	return updated, nil
+}

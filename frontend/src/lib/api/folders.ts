@@ -1,6 +1,15 @@
 import { request } from "./client";
 
-export async function getFolderContents(folderId: string, query = "") {
+const clientFolderCache = new Map<string, { data: any; expiresAt: number }>();
+
+/**
+ * Membersihkan cache folder client saat terjadi mutasi (upload, delete, rename, move, copy).
+ */
+export function invalidateClientFolderCache() {
+  clientFolderCache.clear();
+}
+
+export async function getFolderContents(folderId: string, query = "", forceRefresh = false) {
   try {
     if (folderId === "starred") {
       const res = await request("/starred");
@@ -8,9 +17,28 @@ export async function getFolderContents(folderId: string, query = "") {
       return { success: true, data: res.data };
     }
     const cleanId = folderId || "root";
+    const cacheKey = `${cleanId}:${query}`;
+    const now = Date.now();
+
+    // Cache lookup untuk navigasi instan seperti Google Drive (0 ms)
+    if (!forceRefresh && !query) {
+      const cached = clientFolderCache.get(cacheKey);
+      if (cached && cached.expiresAt > now) {
+        return { success: true, data: cached.data };
+      }
+    }
+
     const q = query ? `?q=${encodeURIComponent(query)}` : "";
     const res = await request(`/folders/${encodeURIComponent(cleanId)}${q}`);
     if (!res.success) throw new Error(res.error || "Gagal memuat isi folder");
+
+    if (!query && res.data) {
+      clientFolderCache.set(cacheKey, {
+        data: res.data,
+        expiresAt: now + 60000, // 60 detik cache di memory browser
+      });
+    }
+
     return { success: true, data: res.data };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : String(error) };
@@ -23,6 +51,10 @@ export async function getBreadcrumbs(folderId: string) {
       return { success: true, data: [{ id: "starred", name: "Berbintang" }] };
     }
     const cleanId = folderId || "root";
+    // Root folder tidak memiliki breadcrumbs parent (kembalikan instan 0 ms)
+    if (cleanId === "root") {
+      return { success: true, data: [] };
+    }
     const res = await request(`/folders/${encodeURIComponent(cleanId)}/breadcrumbs`);
     if (!res.success) throw new Error(res.error || "Gagal memuat breadcrumbs");
     const data = Array.isArray(res.data) ? [...res.data].reverse() : [];
@@ -34,6 +66,7 @@ export async function getBreadcrumbs(folderId: string) {
 
 export async function createFolder(name: string, parentId: string | null) {
   try {
+    invalidateClientFolderCache();
     const res = await request("/folders", {
       method: "POST",
       body: JSON.stringify({ name, parentId: parentId || "root" }),
@@ -47,6 +80,7 @@ export async function createFolder(name: string, parentId: string | null) {
 
 export async function deleteItem(id: string, type: "folder" | "file", _folderId: string | null) {
   try {
+    invalidateClientFolderCache();
     const res = await request("/folders/delete", {
       method: "POST",
       body: JSON.stringify({ id, type }),
@@ -60,6 +94,7 @@ export async function deleteItem(id: string, type: "folder" | "file", _folderId:
 
 export async function deleteItemsBatch(items: { id: string; type: "folder" | "file" }[], _folderId: string | null) {
   try {
+    invalidateClientFolderCache();
     const res = await request("/folders/delete-batch", {
       method: "POST",
       body: JSON.stringify({ items }),
@@ -73,6 +108,7 @@ export async function deleteItemsBatch(items: { id: string; type: "folder" | "fi
 
 export async function renameItem(id: string, type: "folder" | "file", newName: string, _folderId: string | null) {
   try {
+    invalidateClientFolderCache();
     const res = await request("/folders/rename", {
       method: "POST",
       body: JSON.stringify({ id, type, newName }),
@@ -94,6 +130,7 @@ export async function moveItem(
     if (itemType === "folder" && itemId === targetFolderId) {
       throw new Error("Tidak dapat memindahkan folder ke dalam dirinya sendiri");
     }
+    invalidateClientFolderCache();
     const res = await request("/folders/move", {
       method: "POST",
       body: JSON.stringify({ id: itemId, type: itemType, targetFolderId: targetFolderId || "root" }),
@@ -115,6 +152,7 @@ export async function copyItem(
     if (itemType === "folder" && itemId === targetFolderId) {
       throw new Error("Tidak dapat menyalin folder ke dalam dirinya sendiri");
     }
+    invalidateClientFolderCache();
     const res = await request("/folders/copy", {
       method: "POST",
       body: JSON.stringify({ id: itemId, type: itemType, targetFolderId: targetFolderId || "root" }),
@@ -139,6 +177,7 @@ export async function getFoldersByBidang() {
 
 export async function updateFolderColor(folderId: string, color: string | null) {
   try {
+    invalidateClientFolderCache();
     const res = await request(`/folders/${encodeURIComponent(folderId)}/color`, {
       method: "PATCH",
       body: JSON.stringify({ color }),

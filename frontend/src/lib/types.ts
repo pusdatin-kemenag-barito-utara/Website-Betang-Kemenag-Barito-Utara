@@ -13,6 +13,9 @@ export interface FileItem {
   isStarred?: boolean
   color?: string | null
   objectKey?: string
+  isLocked?: boolean
+  lockedBy?: string | null
+  lockedAt?: string | null
 }
 
 export interface BreadcrumbItem {

@@ -11,7 +11,12 @@ import {
   Info,
   Star,
   FolderInput,
+  ExternalLink,
+  Lock,
 } from "lucide-react";
+import { toast } from "sonner";
+import { getOfficeFileType, openInDesktopOffice } from "@/lib/officeUri";
+import { getR2FileUrl } from "@/lib/api";
 import type { FileItem } from "@/lib/types";
 
 interface FileContextMenuProps {
@@ -58,9 +63,10 @@ export function FileContextMenu({
   if (!visible || !item) return null;
 
   const isFolder = item.type === "folder";
-  const isPreviewable = !isFolder && (item.mimeType?.includes("pdf") || item.mimeType?.includes("image"));
+  const isPreviewable = !isFolder;
+  const officeApp = !isFolder ? getOfficeFileType(item.name, item.mimeType) : null;
 
-  const topPos = typeof window !== "undefined" ? Math.max(12, Math.min(y, window.innerHeight - 380)) : y;
+  const topPos = typeof window !== "undefined" ? Math.max(12, Math.min(y, window.innerHeight - 430)) : y;
   const leftPos = typeof window !== "undefined" ? Math.max(12, Math.min(x, window.innerWidth - 230)) : x;
 
   return (
@@ -74,7 +80,7 @@ export function FileContextMenu({
         }}
       />
       <div
-        className="fixed z-[9999] min-w-[210px] rounded-2xl bg-white p-1.5 shadow-2xl ring-1 ring-slate-200/90 animate-in fade-in zoom-in-95 select-none"
+        className="fixed z-[9999] min-w-[220px] rounded-2xl bg-white p-1.5 shadow-2xl ring-1 border border-slate-200/90 animate-in fade-in zoom-in-95 select-none"
         style={{ top: topPos, left: leftPos }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -89,6 +95,36 @@ export function FileContextMenu({
           >
             <Eye className="h-4 w-4 text-emerald-600 shrink-0" />
             <span>Pratinjau Berkas</span>
+          </button>
+        )}
+
+        {officeApp && (
+          <button
+            type="button"
+            onClick={() => {
+              const fileUrl = getR2FileUrl(item.objectKey || item.id);
+              openInDesktopOffice(fileUrl, item.name, item.mimeType, item.id);
+              onClose();
+            }}
+            className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-700 transition-colors text-left cursor-pointer"
+          >
+            <ExternalLink
+              className={`h-4 w-4 shrink-0 ${
+                officeApp === "word"
+                  ? "text-blue-600"
+                  : officeApp === "excel"
+                    ? "text-emerald-600"
+                    : "text-amber-600"
+              }`}
+            />
+            <span>
+              Buka di Microsoft{" "}
+              {officeApp === "word"
+                ? "Word"
+                : officeApp === "excel"
+                  ? "Excel"
+                  : "PowerPoint"}
+            </span>
           </button>
         )}
 
@@ -134,14 +170,33 @@ export function FileContextMenu({
 
         <button
           type="button"
+          disabled={item.isLocked}
           onClick={() => {
+            if (item.isLocked) {
+              toast.error(
+                `Berkas sedang dibuka & diedit di Microsoft Office oleh ${item.lockedBy || "pengguna lain"}. Pemindahan dinonaktifkan sementara.`
+              );
+              return;
+            }
             onMove(item);
             onClose();
           }}
-          className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors text-left cursor-pointer"
+          className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-semibold transition-colors text-left ${
+            item.isLocked
+              ? "opacity-50 cursor-not-allowed bg-slate-50 text-slate-400"
+              : "text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 cursor-pointer"
+          }`}
+          title={
+            item.isLocked
+              ? `Sedang dibuka & diedit di Microsoft Office oleh ${item.lockedBy || "pengguna lain"}`
+              : undefined
+          }
         >
-          <FolderInput className="h-4 w-4 text-indigo-600 shrink-0" />
-          <span>Pindahkan ke...</span>
+          <div className="flex items-center gap-2.5">
+            <FolderInput className={`h-4 w-4 shrink-0 ${item.isLocked ? "text-slate-400" : "text-indigo-600"}`} />
+            <span>Pindahkan ke...</span>
+          </div>
+          {item.isLocked && <Lock className="h-3.5 w-3.5 text-amber-500 shrink-0" />}
         </button>
 
         <button
@@ -172,14 +227,33 @@ export function FileContextMenu({
 
         <button
           type="button"
+          disabled={item.isLocked}
           onClick={() => {
+            if (item.isLocked) {
+              toast.error(
+                `Berkas sedang dibuka & diedit di Microsoft Office oleh ${item.lockedBy || "pengguna lain"}. Ganti nama dinonaktifkan sementara.`
+              );
+              return;
+            }
             onRename(item);
             onClose();
           }}
-          className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 transition-colors text-left cursor-pointer"
+          className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-semibold transition-colors text-left ${
+            item.isLocked
+              ? "opacity-50 cursor-not-allowed bg-slate-50 text-slate-400"
+              : "text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 cursor-pointer"
+          }`}
+          title={
+            item.isLocked
+              ? `Sedang dibuka & diedit di Microsoft Office oleh ${item.lockedBy || "pengguna lain"}`
+              : undefined
+          }
         >
-          <Pencil className="h-4 w-4 text-amber-600 shrink-0" />
-          <span>Ganti Nama</span>
+          <div className="flex items-center gap-2.5">
+            <Pencil className={`h-4 w-4 shrink-0 ${item.isLocked ? "text-slate-400" : "text-amber-600"}`} />
+            <span>Ganti Nama</span>
+          </div>
+          {item.isLocked && <Lock className="h-3.5 w-3.5 text-amber-500 shrink-0" />}
         </button>
 
         {isFolder && (
@@ -226,14 +300,33 @@ export function FileContextMenu({
 
         <button
           type="button"
+          disabled={item.isLocked}
           onClick={() => {
+            if (item.isLocked) {
+              toast.error(
+                `Berkas sedang dibuka & diedit di Microsoft Office oleh ${item.lockedBy || "pengguna lain"}. Penghapusan dinonaktifkan sementara.`
+              );
+              return;
+            }
             onDelete(item);
             onClose();
           }}
-          className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 transition-colors text-left cursor-pointer"
+          className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-semibold transition-colors text-left ${
+            item.isLocked
+              ? "opacity-50 cursor-not-allowed bg-slate-50 text-slate-400"
+              : "text-rose-600 hover:bg-rose-50 cursor-pointer"
+          }`}
+          title={
+            item.isLocked
+              ? `Sedang dibuka & diedit di Microsoft Office oleh ${item.lockedBy || "pengguna lain"}`
+              : undefined
+          }
         >
-          <Trash2 className="h-4 w-4 shrink-0" />
-          <span>Hapus</span>
+          <div className="flex items-center gap-2.5">
+            <Trash2 className="h-4 w-4 shrink-0" />
+            <span>Hapus</span>
+          </div>
+          {item.isLocked && <Lock className="h-3.5 w-3.5 text-amber-500 shrink-0" />}
         </button>
       </div>
     </>

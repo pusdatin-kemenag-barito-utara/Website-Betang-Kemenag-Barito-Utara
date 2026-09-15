@@ -4,7 +4,7 @@ import { getStorageUsage } from "@/lib/api";
 import { formatFileSize } from "@/lib/utils";
 import { trackEvent } from "@/lib/analytics";
 
-const DEFAULT_LIMIT_BYTES = 15 * 1024 * 1024 * 1024; // 15 GB
+const DEFAULT_LIMIT_BYTES = 100 * 1024 * 1024 * 1024; // 100 GB
 
 let cachedStorage: {
   usedBytes: number;
@@ -62,8 +62,9 @@ export function StorageQuotaWidget() {
   }, []);
 
   const usedBytes = usage?.usedBytes ?? 0;
-  const limitBytes = usage?.limitBytes ?? DEFAULT_LIMIT_BYTES;
-  const percentage = usage ? Math.min(usage.percentage, 100) : 0;
+  const rawLimit = usage?.limitBytes ?? DEFAULT_LIMIT_BYTES;
+  const limitBytes = rawLimit <= 15 * 1024 * 1024 * 1024 ? DEFAULT_LIMIT_BYTES : rawLimit;
+  const percentage = limitBytes > 0 ? Math.min((usedBytes / limitBytes) * 100, 100) : 0;
 
   return (
     <div className="rounded-2xl bg-slate-800/50 border border-slate-700/50 p-4">

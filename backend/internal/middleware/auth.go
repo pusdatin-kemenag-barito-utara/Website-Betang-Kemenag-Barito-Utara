@@ -99,6 +99,7 @@ func (m *AuthMiddleware) RequireAuth(c fiber.Ctx) error {
 		Email: validSession.Email,
 	}
 	if meta, err := m.authService.UserMeta(c.Context(), validSession.Email); err == nil && meta != nil {
+		authUser.FullName = meta.FullName
 		authUser.Role = meta.Role
 		authUser.BidangID = meta.BidangID
 		authUser.IsSuperAdmin = meta.IsSuperAdmin()

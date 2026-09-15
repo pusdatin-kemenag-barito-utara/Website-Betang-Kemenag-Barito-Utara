@@ -17,7 +17,11 @@ sleep 1
 
 # 2. Jalankan Frontend Astro v7 SSR di background pada port 3000
 echo "[2/2] Menjalankan Astro v7 SSR Frontend pada port $FE_PORT..."
-HOST="0.0.0.0" PORT="$FE_PORT" BACKEND_INTERNAL_URL="http://127.0.0.1:$BE_PORT" node /app/frontend/dist/server/entry.mjs &
+ENTRY_FILE="/app/dist/server/entry.mjs"
+if [ ! -f "$ENTRY_FILE" ]; then
+    ENTRY_FILE="/app/frontend/dist/server/entry.mjs"
+fi
+HOST="0.0.0.0" PORT="$FE_PORT" BACKEND_INTERNAL_URL="http://127.0.0.1:$BE_PORT" node "$ENTRY_FILE" &
 FRONTEND_PID=$!
 
 # Tangani graceful shutdown (SIGTERM / SIGINT)

@@ -78,9 +78,9 @@ func Load() (*Config, error) {
 		CookieSecure:       getEnvBool("COOKIE_SECURE", false),
 	}
 
-	quota, err := strconv.ParseFloat(getEnv("STORAGE_QUOTA_GB", "15"), 64)
+	quota, err := strconv.ParseFloat(getEnv("STORAGE_QUOTA_GB", "100"), 64)
 	if err != nil || quota <= 0 {
-		quota = 15
+		quota = 100
 	}
 	cfg.StorageQuotaGB = quota
 

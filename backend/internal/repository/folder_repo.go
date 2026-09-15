@@ -34,10 +34,10 @@ func (r *FolderRepo) ListByParent(ctx context.Context, parentID *string, bidangI
 	var args []any
 	if parentID == nil || *parentID == "" || *parentID == "root" {
 		if bidangID != nil && *bidangID != "" {
-			query = `SELECT ` + folderColumns + ` FROM kemenag_arsip.folders WHERE deleted_at IS NULL AND parent_id IS NULL AND (id IN (SELECT folder_id FROM kemenag_arsip.bidang_folders WHERE bidang_id = $1::uuid) OR bidang_id = $1::uuid) ORDER BY name ASC`
+			query = `SELECT ` + folderColumns + ` FROM kemenag_arsip.folders WHERE deleted_at IS NULL AND parent_id IS NULL AND (id IN (SELECT folder_id FROM kemenag_arsip.bidang_folders WHERE bidang_id = $1::uuid) OR bidang_id = $1::uuid) ORDER BY name DESC`
 			args = append(args, *bidangID)
 		} else {
-			query = `SELECT ` + folderColumns + ` FROM kemenag_arsip.folders WHERE deleted_at IS NULL AND parent_id IS NULL ORDER BY name ASC`
+			query = `SELECT ` + folderColumns + ` FROM kemenag_arsip.folders WHERE deleted_at IS NULL AND parent_id IS NULL ORDER BY name DESC`
 		}
 	} else {
 		if len(*parentID) != 36 {

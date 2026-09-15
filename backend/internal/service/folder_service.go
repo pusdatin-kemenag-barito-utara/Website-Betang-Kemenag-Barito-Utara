@@ -93,28 +93,40 @@ func (s *FolderService) Contents(ctx context.Context, parentID *string, query st
 	}
 	folderContentsCacheMu.RUnlock()
 
-	var folders []domain.Folder
-	var files []domain.File
-	var err error
+	var (
+		folders []domain.Folder
+		files   []domain.File
+		fErr    error
+		flErr   error
+		wg      sync.WaitGroup
+	)
 
-	if query != "" {
-		folders, err = s.folders.Search(ctx, query, bidangFilter)
-		if err != nil {
-			return nil, err
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		if query != "" {
+			folders, fErr = s.folders.Search(ctx, query, bidangFilter)
+		} else {
+			folders, fErr = s.folders.ListByParent(ctx, parentID, bidangFilter)
 		}
-		files, err = s.files.Search(ctx, query, bidangFilter)
-		if err != nil {
-			return nil, err
+	}()
+
+	go func() {
+		defer wg.Done()
+		if query != "" {
+			files, flErr = s.files.Search(ctx, query, bidangFilter)
+		} else {
+			files, flErr = s.files.ListByFolder(ctx, parentID, bidangFilter)
 		}
-	} else {
-		folders, err = s.folders.ListByParent(ctx, parentID, bidangFilter)
-		if err != nil {
-			return nil, err
-		}
-		files, err = s.files.ListByFolder(ctx, parentID, bidangFilter)
-		if err != nil {
-			return nil, err
-		}
+	}()
+
+	wg.Wait()
+
+	if fErr != nil {
+		return nil, fErr
+	}
+	if flErr != nil {
+		return nil, flErr
 	}
 
 	// Ukuran folder dihitung via RPC batch.
@@ -134,11 +146,11 @@ func (s *FolderService) Contents(ctx context.Context, parentID *string, query st
 		}
 	}
 
-	// Simpan ke cache RAM selama 30 detik
+	// Simpan ke cache RAM selama 5 menit (otomatis dibersihkan saat ada mutasi file/folder)
 	folderContentsCacheMu.Lock()
 	folderContentsCache[cacheKey] = folderCacheEntry{
 		contents:  result,
-		expiresAt: time.Now().Add(30 * time.Second),
+		expiresAt: time.Now().Add(5 * time.Minute),
 	}
 	folderContentsCacheMu.Unlock()
 

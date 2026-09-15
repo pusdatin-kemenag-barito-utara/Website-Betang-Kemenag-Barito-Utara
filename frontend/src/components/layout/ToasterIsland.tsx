@@ -1,5 +1,6 @@
 import { Toaster, toast } from "sonner";
 import { useEffect } from "react";
+import { OfficeLaunchModal } from "@/components/FileBrowser/OfficeLaunchModal";
 
 export function ToasterIsland() {
   useEffect(() => {
@@ -22,11 +23,24 @@ export function ToasterIsland() {
   }, []);
 
   return (
-    <Toaster
-      position="bottom-right"
-      closeButton
-      expand={false}
-      duration={3000}
-    />
+    <>
+      <Toaster
+        position="top-right"
+        richColors
+        closeButton
+        expand={false}
+        duration={3500}
+        toastOptions={{
+          style: {
+            borderRadius: "14px",
+            fontWeight: 600,
+            fontSize: "13px",
+            boxShadow: "0 10px 30px -5px rgba(0, 0, 0, 0.12), 0 4px 6px -2px rgba(0, 0, 0, 0.05)",
+          },
+        }}
+      />
+      <OfficeLaunchModal />
+    </>
   );
 }
+

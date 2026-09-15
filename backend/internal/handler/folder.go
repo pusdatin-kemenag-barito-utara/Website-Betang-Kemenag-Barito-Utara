@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/gofiber/fiber/v3"
@@ -13,11 +14,26 @@ import (
 type FolderHandler struct {
 	folders *service.FolderService
 	files   *service.FileService
+	webdav  *WebDAVHandler
 }
 
 // NewFolderHandler membuat handler folder.
-func NewFolderHandler(folders *service.FolderService, files *service.FileService) *FolderHandler {
-	return &FolderHandler{folders: folders, files: files}
+func NewFolderHandler(folders *service.FolderService, files *service.FileService, webdav *WebDAVHandler) *FolderHandler {
+	return &FolderHandler{folders: folders, files: files, webdav: webdav}
+}
+
+// enrichWithLocks melampirkan status lock WebDAV secara real-time pada daftar file.
+func (h *FolderHandler) enrichWithLocks(contents *service.FolderContents) {
+	if contents == nil || h.webdav == nil {
+		return
+	}
+	for i := range contents.Files {
+		if lock := h.webdav.GetActiveLock(contents.Files[i].ID); lock != nil {
+			contents.Files[i].IsLocked = true
+			contents.Files[i].LockedBy = &lock.Owner
+			contents.Files[i].LockedAt = &lock.CreatedAt
+		}
+	}
 }
 
 // Contents mengambil isi direktori (folder + file), dengan dukungan
@@ -38,6 +54,7 @@ func (h *FolderHandler) Contents(c fiber.Ctx) error {
 		}
 		return writeFail(c, fiber.StatusInternalServerError, "Gagal memuat isi folder.")
 	}
+	h.enrichWithLocks(contents)
 	return writeOK(c, contents)
 }
 
@@ -106,6 +123,11 @@ func (h *FolderHandler) RenameItem(c fiber.Ctx) error {
 			return writeError(c, err)
 		}
 	case "file":
+		if h.webdav != nil {
+			if lock := h.webdav.GetActiveLock(req.ID); lock != nil {
+				return writeFail(c, fiber.StatusConflict, fmt.Sprintf("Berkas sedang dibuka dan diedit di Microsoft Office oleh %s. Ganti nama tidak dapat dilakukan saat ini.", lock.Owner))
+			}
+		}
 		if err := h.files.Rename(c.Context(), req.ID, req.NewName, user.Email, clientIP(c)); err != nil {
 			return writeError(c, err)
 		}
@@ -138,6 +160,11 @@ func (h *FolderHandler) MoveItem(c fiber.Ctx) error {
 			return writeError(c, err)
 		}
 	case "file":
+		if h.webdav != nil {
+			if lock := h.webdav.GetActiveLock(req.ID); lock != nil {
+				return writeFail(c, fiber.StatusConflict, fmt.Sprintf("Berkas sedang dibuka dan diedit di Microsoft Office oleh %s. Pemindahan berkas tidak dapat dilakukan saat ini.", lock.Owner))
+			}
+		}
 		if err := h.files.Move(c.Context(), req.ID, target, user.Email, clientIP(c)); err != nil {
 			return writeError(c, err)
 		}
@@ -196,6 +223,11 @@ func (h *FolderHandler) DeleteItem(c fiber.Ctx) error {
 			return writeError(c, err)
 		}
 	case "file":
+		if h.webdav != nil {
+			if lock := h.webdav.GetActiveLock(req.ID); lock != nil {
+				return writeFail(c, fiber.StatusConflict, fmt.Sprintf("Berkas sedang dibuka dan diedit di Microsoft Office oleh %s. Penghapusan berkas tidak dapat dilakukan saat ini.", lock.Owner))
+			}
+		}
 		if err := h.files.SoftDelete(c.Context(), req.ID, user.Email, clientIP(c)); err != nil {
 			return writeError(c, err)
 		}
@@ -217,6 +249,16 @@ func (h *FolderHandler) DeleteItemsBatch(c fiber.Ctx) error {
 		return writeFail(c, fiber.StatusBadRequest, "Data permintaan tidak valid.")
 	}
 	user := currentUser(c)
+
+	if h.webdav != nil {
+		for _, item := range req.Items {
+			if item.Type == "file" {
+				if lock := h.webdav.GetActiveLock(item.ID); lock != nil {
+					return writeFail(c, fiber.StatusConflict, fmt.Sprintf("Sebagian berkas sedang dibuka dan diedit di Microsoft Office oleh %s. Hapus massal dibatalkan demi keamanan data.", lock.Owner))
+				}
+			}
+		}
+	}
 
 	items := make([]domain.TrashItem, 0, len(req.Items))
 	for _, item := range req.Items {
@@ -266,5 +308,6 @@ func (h *FolderHandler) Starred(c fiber.Ctx) error {
 	if err != nil {
 		return writeFail(c, fiber.StatusInternalServerError, "Gagal memuat item berbintang.")
 	}
+	h.enrichWithLocks(contents)
 	return writeOK(c, contents)
 }

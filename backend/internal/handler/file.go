@@ -13,12 +13,13 @@ import (
 
 // FileHandler menangani endpoint khusus file.
 type FileHandler struct {
-	svc *service.FileService
+	svc    *service.FileService
+	webdav *WebDAVHandler
 }
 
 // NewFileHandler membuat handler file.
-func NewFileHandler(svc *service.FileService) *FileHandler {
-	return &FileHandler{svc: svc}
+func NewFileHandler(svc *service.FileService, webdav *WebDAVHandler) *FileHandler {
+	return &FileHandler{svc: svc, webdav: webdav}
 }
 
 // PresignUpload membuat URL PUT presigned untuk upload langsung ke R2.
@@ -120,6 +121,9 @@ func (h *FileHandler) PresignDownload(c fiber.Ctx) error {
 	if req.DownloadName != "" {
 		name = &req.DownloadName
 	}
+	if h.webdav != nil {
+		h.webdav.FlushAll()
+	}
 	url, err := h.svc.PresignDownload(c.Context(), key, name)
 	if err != nil {
 		return writeError(c, err)
@@ -134,7 +138,25 @@ func (h *FileHandler) StreamFile(c fiber.Ctx) error {
 		key = c.Query("r2ObjectKey")
 	}
 	if key == "" {
-		return writeFail(c, fiber.StatusBadRequest, "Parameter key wajib diisi.")
+		fileID := c.Query("id")
+		if fileID == "" {
+			fileID = c.Query("fileId")
+		}
+		if fileID != "" {
+			if clean := cleanUUID(fileID); clean != nil {
+				if f, err := h.svc.GetByID(c.Context(), *clean); err == nil && f != nil {
+					key = f.R2ObjectKey
+				}
+			}
+		}
+	}
+	if key == "" {
+		return writeFail(c, fiber.StatusBadRequest, "Parameter key atau id wajib diisi.")
+	}
+
+	// Pastikan buffer WebDAV yang masih pending di-flush ke R2 sebelum disajikan
+	if h.webdav != nil {
+		h.webdav.FlushAll()
 	}
 
 	obj, err := h.svc.GetObjectStream(c.Context(), key)
@@ -147,9 +169,39 @@ func (h *FileHandler) StreamFile(c fiber.Ctx) error {
 	} else {
 		c.Set(fiber.HeaderContentType, "application/octet-stream")
 	}
-	c.Set(fiber.HeaderCacheControl, "public, max-age=3600")
+	// Pastikan peramban tidak men-cache respons berkas lama agar pratinjau selalu segar
+	c.Set(fiber.HeaderCacheControl, "no-cache, no-store, must-revalidate")
 
 	return c.SendStream(obj.Body)
+}
+
+// GetFile mengembalikan detail file terbaru berdasarkan ID, lengkap dengan status lock WebDAV aktif.
+func (h *FileHandler) GetFile(c fiber.Ctx) error {
+	fileID := c.Params("fileId")
+	cleanID := cleanUUID(fileID)
+	if cleanID == nil {
+		return writeFail(c, fiber.StatusBadRequest, "ID berkas tidak valid.")
+	}
+
+	// Pastikan buffer WebDAV yang masih pending di-flush ke R2/DB sebelum disajikan
+	if h.webdav != nil {
+		h.webdav.FlushAll()
+	}
+
+	file, err := h.svc.GetByID(c.Context(), *cleanID)
+	if err != nil {
+		return writeFail(c, fiber.StatusNotFound, "Berkas tidak ditemukan.")
+	}
+
+	if h.webdav != nil {
+		if lock := h.webdav.GetActiveLock(file.ID); lock != nil {
+			file.IsLocked = true
+			file.LockedBy = &lock.Owner
+			file.LockedAt = &lock.CreatedAt
+		}
+	}
+
+	return writeOK(c, file)
 }
 
 // Versions mengambil riwayat versi sebuah file.
@@ -179,6 +231,11 @@ func (h *FileHandler) RestoreVersion(c fiber.Ctx) error {
 	cleanVersionID := cleanUUID(req.VersionID)
 	if cleanFileID == nil || cleanVersionID == nil {
 		return writeFail(c, fiber.StatusBadRequest, "ID berkas atau versi tidak valid.")
+	}
+	if h.webdav != nil {
+		if lock := h.webdav.GetActiveLock(*cleanFileID); lock != nil {
+			return writeFail(c, fiber.StatusConflict, fmt.Sprintf("Berkas sedang dibuka dan diedit di Microsoft Office oleh %s. Tidak dapat memulihkan versi saat ini.", lock.Owner))
+		}
 	}
 	user := currentUser(c)
 	if err := h.svc.RestoreVersion(c.Context(), *cleanFileID, *cleanVersionID, user.ID, user.Email, clientIP(c)); err != nil {

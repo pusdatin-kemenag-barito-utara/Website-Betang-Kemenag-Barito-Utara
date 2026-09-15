@@ -1,4 +1,4 @@
-import { Star, MoreVertical } from "lucide-react";
+import { Star, MoreVertical, Lock } from "lucide-react";
 import { formatFileSize } from "@/lib/utils";
 import { getFileIcon } from "./FileTableColumns";
 import type { FileItem } from "@/lib/types";
@@ -55,7 +55,7 @@ export function FileGridView({
         return (
           <div
             key={item.id}
-            draggable
+            draggable={!item.isLocked}
             onDragStart={(e) => onDragStart(e, item)}
             onDragOver={(e) => onDragOver(e, item)}
             onDragLeave={onDragLeave}
@@ -129,7 +129,20 @@ export function FileGridView({
             </div>
 
             {/* Thumbnail / Icon */}
-            <div className="flex items-center justify-center h-20 w-full rounded-xl bg-slate-50 mb-2.5 overflow-hidden">
+            <div className="relative flex items-center justify-center h-20 w-full rounded-xl bg-slate-50 mb-2.5 overflow-hidden">
+              {item.isLocked && (
+                <div
+                  className="absolute top-1.5 left-1.5 z-10 flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-amber-500 text-white text-[9px] font-bold shadow-xs select-none animate-in fade-in"
+                  title={`Sedang dibuka & diedit di Microsoft Office oleh ${item.lockedBy || "pengguna lain"}`}
+                >
+                  <span className="relative flex h-1 w-1">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-1 w-1 bg-white"></span>
+                  </span>
+                  <Lock className="w-2.5 h-2.5" />
+                  <span>Diedit</span>
+                </div>
+              )}
               <div className="scale-125 transition-transform group-hover:scale-135">
                 {getFileIcon(item)}
               </div>
@@ -140,9 +153,14 @@ export function FileGridView({
               <span className="text-xs font-semibold text-slate-800 truncate" title={item.name}>
                 {item.name}
               </span>
-              <span className="text-[10px] text-slate-400 mt-0.5">
-                {displaySize}
-              </span>
+              <div className="flex items-center justify-between text-[10px] text-slate-400 mt-0.5 min-w-0">
+                <span>{displaySize}</span>
+                {item.isLocked && (
+                  <span className="text-amber-600 font-bold truncate max-w-[75px]" title={`Sedang diedit oleh ${item.lockedBy}`}>
+                    {item.lockedBy ? item.lockedBy.split("@")[0] : "Diedit"}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         );

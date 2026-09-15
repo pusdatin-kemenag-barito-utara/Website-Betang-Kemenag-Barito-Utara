@@ -35,6 +35,9 @@ export default defineConfig({
         "tailwind-merge",
         "lucide-react",
         "pdfjs-dist",
+        "xlsx",
+        "docx-preview",
+        "jszip",
         "@marsidev/react-turnstile",
       ],
       exclude: [
@@ -46,7 +49,7 @@ export default defineConfig({
       ],
     },
     ssr: {
-      external: ["pdfjs-dist"],
+      external: ["pdfjs-dist", "xlsx", "docx-preview"],
     },
     server: {
       proxy: {

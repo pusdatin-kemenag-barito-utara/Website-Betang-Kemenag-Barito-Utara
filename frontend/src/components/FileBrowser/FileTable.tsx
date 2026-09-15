@@ -2,10 +2,9 @@ import {
   getCoreRowModel,
   useReactTable,
   getPaginationRowModel,
-  getSortedRowModel,
 } from "@tanstack/react-table";
 import type { SortingState } from "@tanstack/react-table";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { FileTableProps, ContextMenuState } from "./FileTable/types";
 import { useFileDragDrop } from "./FileTable/useFileDragDrop";
@@ -29,10 +28,39 @@ export function FileTable({
   folderId,
   searchQuery = "",
   viewMode = "list",
+  sortBy = (!folderId || folderId === "root") ? "name-desc" : "name-asc",
+  onSortChange,
 }: FileTableProps) {
-  const [sorting, setSorting] = useState<SortingState>([]);
+  const isRoot = !folderId || folderId === "root";
+  // Default sorting: di root menggunakan descending (panah bawah), di dalam subfolder tetap urutan awal (ascending)
+  const [sorting, setSorting] = useState<SortingState>([
+    { id: "name", desc: isRoot },
+  ]);
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
   const [detailsItem, setDetailsItem] = useState<FileItem | null>(null);
+
+  // Update sorting saat folderId berpindah
+  useEffect(() => {
+    const isRootFolder = !folderId || folderId === "root";
+    setSorting([{ id: "name", desc: isRootFolder }]);
+  }, [folderId]);
+
+  // Sinkronkan sorting tabel saat opsi sortBy di dropdown berubah
+  useEffect(() => {
+    if (sortBy === "name-asc") {
+      setSorting([{ id: "name", desc: false }]);
+    } else if (sortBy === "name-desc") {
+      setSorting([{ id: "name", desc: true }]);
+    } else if (sortBy === "date-desc") {
+      setSorting([{ id: "updatedAt", desc: true }]);
+    } else if (sortBy === "date-asc") {
+      setSorting([{ id: "updatedAt", desc: false }]);
+    } else if (sortBy === "size-desc") {
+      setSorting([{ id: "size", desc: true }]);
+    } else if (sortBy === "size-asc") {
+      setSorting([{ id: "size", desc: false }]);
+    }
+  }, [sortBy]);
 
   const [contextMenu, setContextMenu] = useState<ContextMenuState>({
     visible: false,
@@ -153,11 +181,26 @@ export function FileTable({
     columns,
     state: { sorting, rowSelection },
     enableRowSelection: true,
+    manualSorting: true,
     getRowId: (row) => row.id,
-    onSortingChange: setSorting,
+    onSortingChange: (updaterOrValue) => {
+      setSorting((prev) => {
+        const next = typeof updaterOrValue === "function" ? updaterOrValue(prev) : updaterOrValue;
+        if (next && next.length > 0 && onSortChange) {
+          const first = next[0];
+          if (first.id === "name") {
+            onSortChange(first.desc ? "name-desc" : "name-asc");
+          } else if (first.id === "updatedAt") {
+            onSortChange(first.desc ? "date-desc" : "date-asc");
+          } else if (first.id === "size") {
+            onSortChange(first.desc ? "size-desc" : "size-asc");
+          }
+        }
+        return next;
+      });
+    },
     onRowSelectionChange: setRowSelection,
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
   });
 

@@ -71,7 +71,7 @@ func (r *FileRepo) Stats(ctx context.Context) (totalFiles, totalStorage, recent2
 	}
 
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, name, mime_type, size_bytes, created_at
+		SELECT id, name, mime_type, size_bytes, created_at, COALESCE(r2_object_key, '')
 		FROM kemenag_arsip.files
 		WHERE deleted_at IS NULL
 		ORDER BY created_at DESC
@@ -84,7 +84,7 @@ func (r *FileRepo) Stats(ctx context.Context) (totalFiles, totalStorage, recent2
 	recent = []domain.RecentUpload{}
 	for rows.Next() {
 		var u domain.RecentUpload
-		if err := rows.Scan(&u.ID, &u.Name, &u.MimeType, &u.SizeBytes, &u.CreatedAt); err != nil {
+		if err := rows.Scan(&u.ID, &u.Name, &u.MimeType, &u.SizeBytes, &u.CreatedAt, &u.R2ObjectKey); err != nil {
 			return 0, 0, 0, 0, nil, err
 		}
 		recent = append(recent, u)

@@ -50,15 +50,17 @@ func Build(ctx context.Context, cfg *config.Config) (*fiber.App, func(), error) 
 	services.Maintenance = service.NewMaintenanceService(cfg.PusdatinURL, cfg.PusdatinAppID)
 
 	// 5) Handler dan middleware.
-	handlers := handler.New(services, pool)
+	handlers := handler.New(services, pool, []byte(cfg.SupabaseJWTSecret))
 	authMW := middleware.NewAuthMiddleware(services.Auth, cfg)
 	handlers.Auth.SetAuthMiddleware(authMW)
 	cors := middleware.NewCORSHandler(cfg)
 
 	// 6) Aplikasi Fiber & Middleware Performa + Keamanan.
 	app := fiber.New(fiber.Config{
-		AppName:      "SI BETANG (E-Arsip) API",
-		ServerHeader: "betang-api",
+		AppName:        "SI BETANG (E-Arsip) API",
+		ServerHeader:   "betang-api",
+		BodyLimit:      500 * 1024 * 1024, // Dukung unggahan dokumen & arsip besar hingga 500 MB (PPTX, PDF, Video, Zip)
+		RequestMethods: append(fiber.DefaultMethods, "PROPFIND", "PROPPATCH", "LOCK", "UNLOCK"),
 	})
 
 	// Rate limiting: general API (120 req / 10s) dan Auth login (10 req / 1m).
@@ -101,6 +103,33 @@ func Build(ctx context.Context, cfg *config.Config) (*fiber.App, func(), error) 
 	app.Get("/api/v1/health", handlers.Health.Check)
 	app.Post("/api/v1/auth/login", authLimiter, handlers.Auth.Login)
 
+	// Interceptor SharePoint / Office 365 REST API:
+	// Microsoft Office 365 otomatis mengirim permintaan verifikasi hak sharing ke /_api/web/... saat menyimpan (Ctrl + S).
+	// Mengembalikan respons minimal agar Office memvalidasi penyimpanan tanpa error.
+	app.All("/_api/*", func(c fiber.Ctx) error {
+		c.Set("Content-Type", "application/json; odata.metadata=minimal")
+		return c.Status(fiber.StatusOK).JSON(fiber.Map{
+			"value": []any{},
+		})
+	})
+
+	// Rute WebDAV resmi untuk Microsoft Office Desktop (Word, Excel, PowerPoint)
+	// Diautentikasi lewat signed token pada path URL, sehingga Office tidak memunculkan popup password Windows.
+	webdavMethods := []string{
+		fiber.MethodGet,
+		fiber.MethodHead,
+		fiber.MethodPost,
+		fiber.MethodPut,
+		fiber.MethodOptions,
+		"PROPFIND",
+		"PROPPATCH",
+		"LOCK",
+		"UNLOCK",
+	}
+	app.Add(webdavMethods, "/api/v1/dav/:token/:filename", handlers.WebDAV.HandleWebDAV)
+	app.Add(webdavMethods, "/api/v1/dav/:token", handlers.WebDAV.HandleWebDAV)
+	app.Add(webdavMethods, "/api/v1/dav", handlers.WebDAV.HandleWebDAV)
+
 	// Kelompok route terproteksi.
 	protected := app.Group("/api/v1", authMW.RequireAuth)
 
@@ -141,6 +170,9 @@ func Build(ctx context.Context, cfg *config.Config) (*fiber.App, func(), error) 
 	protected.Post("/files/restore-version", handlers.File.RestoreVersion)
 	protected.Post("/files/zip", handlers.File.ZipDownload)
 	protected.Post("/files/:id/share-link", handlers.File.ShareLink)
+	protected.Post("/files/:fileId/webdav-link", handlers.WebDAV.GenerateLink)
+	protected.Get("/files/locks", handlers.WebDAV.GetLocks)
+	protected.Get("/files/:fileId", handlers.File.GetFile)
 	protected.Get("/stats", handlers.File.Stats)
 
 	protected.Get("/trash", handlers.Trash.List)

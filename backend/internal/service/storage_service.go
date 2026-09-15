@@ -19,7 +19,11 @@ func (s *StorageService) Usage(ctx context.Context) (*domain.StorageUsage, error
 	if err != nil {
 		return nil, err
 	}
-	limit := int64(s.quotaGB * 1024 * 1024 * 1024)
+	quota := s.quotaGB
+	if quota <= 15 {
+		quota = 100
+	}
+	limit := int64(quota * 1024 * 1024 * 1024)
 	percentage := 0.0
 	if limit > 0 {
 		percentage = float64(used) / float64(limit) * 100

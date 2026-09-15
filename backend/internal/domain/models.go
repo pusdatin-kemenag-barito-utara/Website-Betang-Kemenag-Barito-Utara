@@ -58,6 +58,9 @@ type File struct {
 	CreatedAt    time.Time  `json:"created_at"`
 	UpdatedAt    time.Time  `json:"updated_at"`
 	DeletedAt    *time.Time `json:"deleted_at"`
+	IsLocked     bool       `json:"is_locked"`
+	LockedBy     *string    `json:"locked_by,omitempty"`
+	LockedAt     *time.Time `json:"locked_at,omitempty"`
 }
 
 // UserBrief berisi ringkasan nama pengguna (untuk join versi file).
@@ -150,6 +153,7 @@ type Session struct {
 type AuthUser struct {
 	ID           string
 	Email        string
+	FullName     string
 	Role         string
 	BidangID     *string
 	IsSuperAdmin bool
@@ -205,11 +209,12 @@ type DownloadFileRequest struct {
 
 // RecentUpload adalah ringkasan satu file untuk daftar unggahan terbaru.
 type RecentUpload struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	MimeType  string    `json:"mime_type"`
-	SizeBytes int64     `json:"size_bytes"`
-	CreatedAt time.Time `json:"created_at"`
+	ID          string    `json:"id"`
+	Name        string    `json:"name"`
+	MimeType    string    `json:"mime_type"`
+	SizeBytes   int64     `json:"size_bytes"`
+	CreatedAt   time.Time `json:"created_at"`
+	R2ObjectKey string    `json:"r2_object_key"`
 }
 
 // DashboardStats adalah ringkasan statistik untuk halaman dashboard.

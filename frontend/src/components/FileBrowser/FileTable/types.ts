@@ -11,6 +11,8 @@ export interface FileTableProps {
   viewMode?: "list" | "grid";
   filterType?: string;
   filterDate?: string;
+  sortBy?: string;
+  onSortChange?: (sort: any) => void;
 }
 
 export interface ContextMenuState {

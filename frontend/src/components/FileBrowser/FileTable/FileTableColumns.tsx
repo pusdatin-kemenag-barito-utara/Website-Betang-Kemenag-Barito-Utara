@@ -4,13 +4,17 @@ import {
   FileText,
   Image as ImageIcon,
   FileArchive,
+  FileSpreadsheet,
+  Presentation,
   Star,
   MoreVertical,
   Info,
+  Lock,
 } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { formatFileSize } from "@/lib/utils";
 import type { FileItem } from "@/lib/types";
+import { getFolderContents } from "@/lib/api";
 
 export const getFileIcon = (item: FileItem) => {
   if (item.type === "folder") {
@@ -23,6 +27,27 @@ export const getFileIcon = (item: FileItem) => {
     );
   }
   if (item.mimeType?.includes("pdf")) return <FileText className="h-5 w-5 shrink-0 text-rose-500" />;
+  if (
+    item.mimeType?.includes("spreadsheet") ||
+    item.mimeType?.includes("excel") ||
+    /\.(xlsx|xls|xlsm|ods|csv|tsv)$/i.test(item.name)
+  ) {
+    return <FileSpreadsheet className="h-5 w-5 shrink-0 text-emerald-600" />;
+  }
+  if (
+    item.mimeType?.includes("wordprocessingml") ||
+    item.mimeType?.includes("msword") ||
+    /\.(docx|doc|dotx)$/i.test(item.name)
+  ) {
+    return <FileText className="h-5 w-5 shrink-0 text-blue-600" />;
+  }
+  if (
+    item.mimeType?.includes("presentationml") ||
+    item.mimeType?.includes("ms-powerpoint") ||
+    /\.(pptx|ppt|ppsx)$/i.test(item.name)
+  ) {
+    return <Presentation className="h-5 w-5 shrink-0 text-orange-500" />;
+  }
   if (item.mimeType?.includes("image")) return <ImageIcon className="h-5 w-5 shrink-0 text-emerald-500" />;
   if (item.mimeType?.includes("zip") || item.name.endsWith(".zip"))
     return <FileArchive className="h-5 w-5 shrink-0 text-amber-500" />;
@@ -102,9 +127,25 @@ export function createFileTableColumns({
 
         const content = (
           <div className="flex flex-col min-w-0 flex-1 overflow-hidden">
-            <span className="font-semibold text-slate-800 hover:text-emerald-600 transition-colors truncate block w-full text-xs sm:text-sm">
-              {item.name}
-            </span>
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="font-semibold text-slate-800 hover:text-emerald-600 transition-colors truncate block text-xs sm:text-sm">
+                {item.name}
+              </span>
+              {item.isLocked && (
+                <span
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-300 shadow-xs shrink-0 animate-in fade-in select-none"
+                  title={`Sedang dibuka & diedit di Microsoft Office oleh ${item.lockedBy || "pengguna lain"}`}
+                >
+                  <span className="relative flex h-1.5 w-1.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-amber-500"></span>
+                  </span>
+                  <Lock className="w-2.5 h-2.5 text-amber-600 shrink-0" />
+                  <span className="hidden sm:inline">Diedit ({item.lockedBy ? item.lockedBy.split("@")[0] : "Office"})</span>
+                  <span className="sm:hidden">Diedit</span>
+                </span>
+              )}
+            </div>
             {/* Subtitle metadata khusus tampilan mobile (< sm) */}
             <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-medium mt-0.5 sm:hidden truncate overflow-hidden">
               {displaySize ? (
@@ -143,6 +184,11 @@ export function createFileTableColumns({
             {isFolder ? (
               <a
                 href={`/folders/${item.id}`}
+                onMouseEnter={() => {
+                  if (item.id) {
+                    getFolderContents(item.id);
+                  }
+                }}
                 onClick={(e) => {
                   e.stopPropagation();
                   if (onNavigate) {
@@ -213,8 +259,12 @@ export function createFileTableColumns({
                 ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/70"
                 : ["ZIP", "RAR", "7Z", "TAR", "GZ"].includes(formatLabel)
                 ? "bg-amber-50 text-amber-700 ring-1 ring-amber-200/70"
-                : ["DOC", "DOCX", "XLS", "XLSX", "PPT", "PPTX"].includes(formatLabel)
-                ? "bg-indigo-50 text-indigo-700 ring-1 ring-indigo-200/70"
+                : ["XLS", "XLSX", "CSV", "ODS"].includes(formatLabel)
+                ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200/70"
+                : ["DOC", "DOCX", "DOTX"].includes(formatLabel)
+                ? "bg-blue-50 text-blue-700 ring-1 ring-blue-200/70"
+                : ["PPT", "PPTX", "PPSX"].includes(formatLabel)
+                ? "bg-orange-50 text-orange-700 ring-1 ring-orange-200/70"
                 : "bg-slate-100 text-slate-700 ring-1 ring-slate-200"
             }`}
           >

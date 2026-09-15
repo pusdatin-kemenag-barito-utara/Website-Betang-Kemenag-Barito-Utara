@@ -16,6 +16,13 @@ export function useFileDragDrop({
   const [optimisticHiddenIds, setOptimisticHiddenIds] = useState<string[]>([]);
 
   const handleDragStart = (e: React.DragEvent, item: FileItem) => {
+    if (item.isLocked) {
+      e.preventDefault();
+      toast.error(
+        `Berkas sedang dibuka & diedit di Microsoft Office oleh ${item.lockedBy || "pengguna lain"}. Pemindahan dinonaktifkan sementara.`
+      );
+      return;
+    }
     setDraggedItem(item);
     e.dataTransfer.setData("application/json", JSON.stringify(item));
     e.dataTransfer.effectAllowed = "move";
@@ -42,6 +49,14 @@ export function useFileDragDrop({
     setDragOverFolderId(null);
 
     if (!draggedItem || draggedItem.id === targetFolder.id || targetFolder.type !== "folder") {
+      return;
+    }
+
+    if (draggedItem.isLocked) {
+      toast.error(
+        `Berkas sedang dibuka & diedit di Microsoft Office oleh ${draggedItem.lockedBy || "pengguna lain"}. Pemindahan tidak dapat dilakukan.`
+      );
+      setDraggedItem(null);
       return;
     }
 

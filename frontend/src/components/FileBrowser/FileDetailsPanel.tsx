@@ -15,6 +15,7 @@ import {
   Edit2,
   Palette,
   FileArchive,
+  Lock,
 } from "lucide-react";
 import type { FileItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -190,23 +191,51 @@ export function FileDetailsPanel({
 
             <button
               type="button"
+              disabled={item.isLocked}
               onClick={() => onRename?.(item)}
-              className="p-1.5 text-slate-600 hover:bg-slate-200 rounded-xl transition-colors border border-slate-200 cursor-pointer"
-              title="Ubah Nama"
+              className={cn(
+                "p-1.5 rounded-xl transition-colors border",
+                item.isLocked
+                  ? "text-slate-300 border-slate-100 bg-slate-50 cursor-not-allowed"
+                  : "text-slate-600 hover:bg-slate-200 border-slate-200 cursor-pointer"
+              )}
+              title={item.isLocked ? `Sedang diedit oleh ${item.lockedBy}` : "Ubah Nama"}
             >
               <Edit2 className="w-4 h-4" />
             </button>
 
             <button
               type="button"
+              disabled={item.isLocked}
               onClick={() => onDelete?.(item)}
-              className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-xl transition-colors border border-rose-200 cursor-pointer"
-              title="Hapus ke Recycle Bin"
+              className={cn(
+                "p-1.5 rounded-xl transition-colors border",
+                item.isLocked
+                  ? "text-slate-300 border-slate-100 bg-slate-50 cursor-not-allowed"
+                  : "text-rose-500 hover:bg-rose-50 border-rose-200 cursor-pointer"
+              )}
+              title={item.isLocked ? `Sedang diedit oleh ${item.lockedBy}` : "Hapus ke Recycle Bin"}
             >
               <Trash2 className="w-4 h-4" />
             </button>
           </div>
         </div>
+
+        {/* Banner Peringatan Dokumen Terkunci di Microsoft Office */}
+        {item.isLocked && (
+          <div className="mx-5 mt-4 p-3 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 flex items-start gap-2.5 text-xs shadow-2xs animate-in fade-in">
+            <Lock className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-amber-900">Sedang Dibuka di Microsoft Office</p>
+              <p className="text-[11px] text-amber-800 mt-0.5 leading-relaxed">
+                Berkas ini sedang disunting oleh <span className="font-semibold">{item.lockedBy || "pengguna lain"}</span>.
+              </p>
+              <p className="text-[10px] text-amber-700/90 mt-1">
+                Fitur ubah nama, pemindahan, dan penghapusan dinonaktifkan sementara demi keamanan integritas data.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Metadata Detail List */}
         <div className="p-5 space-y-4 text-xs">

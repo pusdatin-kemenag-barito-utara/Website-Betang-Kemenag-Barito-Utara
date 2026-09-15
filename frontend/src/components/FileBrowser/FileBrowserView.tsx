@@ -4,7 +4,7 @@ import { FileBrowserHeader, type FileSortOption } from "./FileBrowser/FileBrowse
 import { FileFilterChips } from "./FileBrowser/FileFilterChips";
 import { FileBrowserModals } from "./FileBrowser/FileBrowserModals";
 import type { FileItem } from "@/lib/types";
-import { getFolderContents, getBreadcrumbs } from "@/lib/api";
+import { getFolderContents, getBreadcrumbs, getActiveFileLocks } from "@/lib/api";
 import { formatFileSize } from "@/lib/utils";
 import { format } from "date-fns";
 import { id } from "date-fns/locale";
@@ -70,6 +70,9 @@ const formatFolderContentsToItems = (contents: any): FileItem[] => {
         isRestricted: f.is_restricted || f.isRestricted || false,
         isStarred: f.is_starred || f.isStarred || false,
         objectKey: f.r2_object_key || f.r2ObjectKey || f.object_key || f.objectKey,
+        isLocked: Boolean(f.is_locked || f.isLocked),
+        lockedBy: f.locked_by || f.lockedBy || null,
+        lockedAt: f.locked_at || f.lockedAt || null,
       };
     }),
   ];
@@ -91,6 +94,8 @@ export function FileBrowserView({
     setCurrentFolderId(initialFolderId || "root");
     setItems(initialItems);
     setBreadcrumbsList(initialBreadcrumbs);
+    const isRoot = !initialFolderId || initialFolderId === "root";
+    setSortBy(isRoot ? "name-desc" : "name-asc");
   }, [initialFolderId, initialItems, initialBreadcrumbs]);
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -99,7 +104,8 @@ export function FileBrowserView({
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [filterType, setFilterType] = useState<string>("all");
-  const [sortBy, setSortBy] = useState<FileSortOption>("name-asc");
+  const isInitialRoot = !initialFolderId || initialFolderId === "root";
+  const [sortBy, setSortBy] = useState<FileSortOption>(isInitialRoot ? "name-desc" : "name-asc");
   const [selectedItemForInfo, setSelectedItemForInfo] = useState<FileItem | null>(null);
 
   // External file drag & drop states
@@ -126,9 +132,11 @@ export function FileBrowserView({
       }
 
       setCurrentFolderId(targetId);
+      const isTargetRoot = !targetId || targetId === "root";
+      setSortBy(isTargetRoot ? "name-desc" : "name-asc");
 
       if (pushState && typeof window !== "undefined") {
-        const nextUrl = targetId === "root" ? "/" : `/folders/${targetId}`;
+        const nextUrl = targetId === "root" ? "/folders/root" : `/folders/${targetId}`;
         window.history.pushState({ folderId: targetId }, "", nextUrl);
       }
     } catch {
@@ -136,6 +144,96 @@ export function FileBrowserView({
     } finally {
       setIsLoadingFolder(false);
     }
+  }, []);
+
+  // Sinkronisasi status lock berkas (WebDAV) secara berkala (tiap 6 detik) dan saat tab aktif
+  useEffect(() => {
+    let isMounted = true;
+    const syncLocks = async () => {
+      try {
+        const locks = await getActiveFileLocks();
+        if (!isMounted) return;
+        let hadUnlockedRelease = false;
+        setItems((prevItems) => {
+          let hasDiff = false;
+          const updated = prevItems.map((item) => {
+            if (item.type !== "file") return item;
+            const lock = locks[item.id];
+            const isLocked = Boolean(lock?.isLocked);
+            const lockedBy = lock?.lockedBy || null;
+            const lockedAt = lock?.lockedAt || null;
+            // Jika sebelumnya terkunci lalu terdeteksi lepas (user selesai edit dan menutup Office)
+            if (item.isLocked && !isLocked) {
+              hadUnlockedRelease = true;
+            }
+            if (
+              item.isLocked !== isLocked ||
+              item.lockedBy !== lockedBy ||
+              item.lockedAt !== lockedAt
+            ) {
+              hasDiff = true;
+              return {
+                ...item,
+                isLocked,
+                lockedBy,
+                lockedAt,
+              };
+            }
+            return item;
+          });
+          return hasDiff ? updated : prevItems;
+        });
+
+        // Bila berkas selesai disunting & kunci dilepas, segarkan isi folder otomatis
+        // agar r2_object_key baru, ukuran, dan waktu modifikasi langsung terupdate tanpa F5
+        if (hadUnlockedRelease) {
+          loadFolder(currentFolderId, false);
+          window.dispatchEvent(new CustomEvent("folder-content-updated"));
+        }
+      } catch {
+        // silent fail polling
+      }
+    };
+
+    syncLocks();
+    const interval = setInterval(syncLocks, 6000);
+    const onFocus = () => {
+      syncLocks();
+      // Saat pengguna berpindah dari Microsoft Office kembali ke peramban,
+      // langsung segarkan isi folder agar perubahan terbaru muncul seketika
+      loadFolder(currentFolderId, false);
+    };
+    window.addEventListener("focus", onFocus);
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [currentFolderId, loadFolder]);
+
+  // Dengarkan event saat user membuka Office Desktop untuk langsung memicu refresh lock
+  useEffect(() => {
+    const handleOfficeLaunch = () => {
+      setTimeout(() => {
+        getActiveFileLocks().then((locks) => {
+          setItems((prev) =>
+            prev.map((item) => {
+              if (item.type !== "file") return item;
+              const lock = locks[item.id];
+              if (lock) {
+                return { ...item, isLocked: true, lockedBy: lock.lockedBy, lockedAt: lock.lockedAt };
+              }
+              return item;
+            })
+          );
+        });
+      }, 500);
+    };
+    window.addEventListener("betang:open-office-launch", handleOfficeLaunch);
+    return () => {
+      window.removeEventListener("betang:open-office-launch", handleOfficeLaunch);
+    };
   }, []);
 
   const handleNavigate = useCallback((targetId: string) => {
@@ -315,6 +413,8 @@ export function FileBrowserView({
           onRefresh={() => loadFolder(currentFolderId, false)}
           searchQuery={searchQuery}
           viewMode={viewMode}
+          sortBy={sortBy}
+          onSortChange={setSortBy}
         />
       )}
 

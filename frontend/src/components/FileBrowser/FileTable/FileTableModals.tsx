@@ -80,6 +80,7 @@ export function FileTableModals({
       {previewFile && (
         <FilePreviewModal
           isOpen={!!previewFile}
+          fileId={previewFile.id}
           fileName={previewFile.name}
           mimeType={previewFile.mimeType || "application/octet-stream"}
           fileUrl={previewUrl}

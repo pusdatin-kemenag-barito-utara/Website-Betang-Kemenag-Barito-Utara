@@ -87,7 +87,7 @@ export function FileTableView({
             return (
               <tr
                 key={row.id}
-                draggable
+                draggable={!item.isLocked}
                 onDragStart={(e) => onDragStart(e, item)}
                 onDragOver={(e) => onDragOver(e, item)}
                 onDragLeave={onDragLeave}

@@ -1,4 +1,5 @@
 import { request, buildApiUrl } from "./client";
+import { invalidateClientFolderCache } from "./folders";
 
 /**
  * Custom Cloudflare Worker CDN domain untuk data arsip dan dokumen Kemenag Barito Utara.
@@ -36,6 +37,7 @@ export async function saveFileMetadata({
   sizeBytes: number;
 }) {
   try {
+    invalidateClientFolderCache();
     const cleanFolderId =
       folderId && folderId !== "root" && folderId !== "undefined" && folderId !== "null" && folderId !== "starred"
         ? folderId
@@ -78,6 +80,7 @@ export async function uploadFileDirect(file: File, folderId: string | null, name
     if (!res.ok || !body?.success) {
       throw new Error(body?.error || "Gagal mengunggah file.");
     }
+    invalidateClientFolderCache();
     return { success: true, data: body.data };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : String(error) };
@@ -131,6 +134,7 @@ export async function restoreFileVersion(fileId: string, versionId: string, _fol
       body: JSON.stringify({ fileId, versionId }),
     });
     if (!res.success) throw new Error(res.error || "Gagal memulihkan versi");
+    invalidateClientFolderCache();
     return { success: true };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : String(error) };
@@ -154,5 +158,90 @@ export async function createShareLink(fileId: string, expiryHours = 24) {
     return { success: true, shareUrl: res.data.shareUrl, expiryHours: res.data.expiryHours };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/**
+ * Meminta tautan WebDAV terenkripsi untuk mengedit berkas di Microsoft Office Desktop
+ * dengan fitur Auto-Save (Ctrl + S langsung tersimpan ke server SI BETANG).
+ */
+export async function getOfficeWebDavLink(fileId: string) {
+  try {
+    const res = await request<{
+      success: boolean;
+      webdavPath?: string;
+      fileName?: string;
+      error?: string;
+    }>(`/files/${encodeURIComponent(fileId)}/webdav-link`, {
+      method: "POST",
+    });
+    return res;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+}
+
+export interface FileLockInfo {
+  isLocked: boolean;
+  lockedBy?: string | null;
+  lockedAt?: string | null;
+  expiresAt?: string | null;
+}
+
+/**
+ * Mengambil snapshot berkas yang sedang aktif dibuka/diedit di Microsoft Office Desktop
+ */
+export async function getActiveFileLocks(): Promise<Record<string, FileLockInfo>> {
+  try {
+    const res = await request<{
+      success: boolean;
+      data?: Record<string, FileLockInfo>;
+      error?: string;
+    }>("/files/locks");
+    if (res.success && res.data) {
+      return res.data;
+    }
+    return {};
+  } catch {
+    return {};
+  }
+}
+
+export interface BackendFileDetail {
+  id: string;
+  name: string;
+  folder_id?: string | null;
+  bidang_id?: string | null;
+  r2_object_key: string;
+  mime_type: string;
+  size_bytes: number;
+  is_starred?: boolean;
+  is_locked?: boolean;
+  locked_by?: string | null;
+  locked_at?: string | null;
+  updated_at: string;
+  created_at: string;
+}
+
+/**
+ * Mengambil detail berkas terbaru langsung dari backend, termasuk r2_object_key terkini
+ * setelah berkas disunting melalui WebDAV di Microsoft Office Desktop.
+ */
+export async function getFileDetail(fileId: string): Promise<{ success: boolean; data?: BackendFileDetail; error?: string }> {
+  try {
+    const res = await request<{
+      success: boolean;
+      data?: BackendFileDetail;
+      error?: string;
+    }>(`/files/${encodeURIComponent(fileId)}`);
+    return res;
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    };
   }
 }

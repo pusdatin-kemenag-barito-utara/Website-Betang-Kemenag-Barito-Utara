@@ -49,6 +49,9 @@ func (r *R2Storage) PresignUpload(ctx context.Context, key, contentType string, 
 		Bucket: aws.String(r.bucket),
 		Key:    aws.String(key),
 	}
+	if contentType != "" {
+		input.ContentType = aws.String(contentType)
+	}
 	presigned, err := presigner.PresignPutObject(ctx, input, s3.WithPresignExpires(expiresIn))
 	if err != nil {
 		return "", fmt.Errorf("gagal membuat presigned URL upload: %w", err)
@@ -122,6 +125,18 @@ func (r *R2Storage) CopyObject(ctx context.Context, sourceKey, targetKey string)
 	})
 	if err != nil {
 		return fmt.Errorf("gagal menyalin object %s: %w", sourceKey, err)
+	}
+	return nil
+}
+
+// DeleteObject menghapus object dari bucket R2.
+func (r *R2Storage) DeleteObject(ctx context.Context, key string) error {
+	_, err := r.client.DeleteObject(ctx, &s3.DeleteObjectInput{
+		Bucket: aws.String(r.bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return fmt.Errorf("gagal menghapus object %s dari R2: %w", key, err)
 	}
 	return nil
 }

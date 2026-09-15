@@ -57,7 +57,11 @@ export function useFileTableModals({
     setPreviewLoading(false);
     const key = item.objectKey || item.id;
     const directUrl = getR2FileUrl(key);
-    setPreviewUrl(directUrl);
+    // Tambahkan timestamp dinamis agar peramban selalu mengambil file versi terbaru
+    const freshUrl = directUrl
+      ? `${directUrl}${directUrl.includes("?") ? "&" : "?"}t=${Date.now()}`
+      : null;
+    setPreviewUrl(freshUrl);
   };
 
   const handleDownload = async (item: FileItem) => {
