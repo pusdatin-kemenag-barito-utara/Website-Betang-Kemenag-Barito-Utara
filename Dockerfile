@@ -29,9 +29,11 @@ FROM node:22-alpine AS runtime
 
 # ca-certificates, tzdata, curl, bash, dan Infisical CLI untuk injeksi runtime dinamis
 RUN apk add --no-cache ca-certificates tzdata wget curl bash && \
-    (curl -1sLf 'https://artifacts-cli.infisical.com/setup.alpine.sh' | bash || \
-     curl -1sLf 'https://dl.cloudsmith.io/public/infisical/infisical-cli/setup.alpine.sh' | bash) && \
-    apk add --no-cache infisical
+    ((curl -1sLf 'https://artifacts-cli.infisical.com/setup.apk.sh' | sh || \
+      wget -qO- 'https://artifacts-cli.infisical.com/setup.apk.sh' | sh) && \
+     apk add --no-cache infisical) || \
+    (wget -qO- https://github.com/Infisical/cli/releases/download/v0.43.132/cli_0.43.132_linux_amd64.tar.gz | tar -xz -C /usr/local/bin infisical && chmod +x /usr/local/bin/infisical) && \
+    infisical --version
 
 ENV TZ=Asia/Jakarta
 
@@ -47,18 +49,16 @@ ENV BACKEND_INTERNAL_URL=http://127.0.0.1:8080
 COPY --from=backend-builder /build/bin/betang-api /app/betang-api
 RUN chmod +x /app/betang-api
 
-# Salin package.json frontend dan install dependensi produksi bersih di /app
+# Salin package.json frontend, dependensi, dan hasil build Astro SSR
 COPY --from=frontend-builder /build/frontend/package.json /app/package.json
-COPY --from=frontend-builder /build/package-lock.json /app/package-lock.json
-RUN npm install --omit=dev --no-audit && npm cache clean --force
-
-# Salin hasil build Astro SSR ke /app/dist
+COPY --from=frontend-builder /build/node_modules /app/node_modules
 COPY --from=frontend-builder /build/frontend/dist /app/dist
 
 # Salin skrip startup dan entrypoint Infisical Universal Auth
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 COPY start.sh /usr/local/bin/start.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/start.sh
+RUN sed -i 's/\r$//' /usr/local/bin/docker-entrypoint.sh /usr/local/bin/start.sh && \
+    chmod +x /usr/local/bin/docker-entrypoint.sh /usr/local/bin/start.sh
 
 EXPOSE 3000
 

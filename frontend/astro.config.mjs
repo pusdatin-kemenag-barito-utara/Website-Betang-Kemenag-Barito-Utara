@@ -49,7 +49,7 @@ export default defineConfig({
       ],
     },
     ssr: {
-      external: ["pdfjs-dist", "xlsx", "docx-preview"],
+      external: ["pdfjs-dist", "xlsx", "docx-preview", "jszip"],
     },
     server: {
       proxy: {

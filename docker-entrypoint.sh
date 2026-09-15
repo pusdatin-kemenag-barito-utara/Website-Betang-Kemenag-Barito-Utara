@@ -18,6 +18,7 @@ TOKEN="$INFISICAL_TOKEN"
 
 # Login mesin headless menggunakan Universal Auth untuk mendapatkan Identity Access Token
 if [ -z "$TOKEN" ] && [ -n "$CLIENT_ID" ] && [ -n "$CLIENT_SECRET" ]; then
+    echo "[ENTRYPOINT] Melakukan autentikasi mesin ke Infisical via Universal Auth ($API_DOMAIN)..."
     TOKEN=$(infisical login --method=universal-auth --client-id="$CLIENT_ID" --client-secret="$CLIENT_SECRET" --domain="$API_DOMAIN" --plain --silent 2>/dev/null || true)
 fi
 
@@ -26,7 +27,9 @@ if [ -n "$TOKEN" ]; then
     if [ -n "$PROJECT_ID" ]; then
         PROJECT_ARG="--projectId=$PROJECT_ID"
     fi
+    echo "[ENTRYPOINT] Kredensial Infisical valid. Menginjeksi secrets dari path: $SECRET_PATH (env: $ENV_TARGET)..."
     exec infisical run --token="$TOKEN" --domain="$API_DOMAIN" --env="$ENV_TARGET" $PROJECT_ARG --silent --path="$SECRET_PATH" -- "$@"
 else
+    echo "[ENTRYPOINT] Infisical token tidak tersedia, melanjutkan proses dengan environment container..."
     exec "$@"
 fi

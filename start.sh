@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 set -e
 
 echo "=== Memulai SI BETANG Enterprise Production Monorepo ==="
