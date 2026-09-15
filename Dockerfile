@@ -23,6 +23,8 @@ COPY frontend/ ./frontend/
 ENV ASTRO_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 RUN npm run build --workspace=betang-kemenag-frontend
+# Pastikan modul di frontend/node_modules (jika ada) digabungkan ke root node_modules
+RUN if [ -d /build/frontend/node_modules ]; then cp -rn /build/frontend/node_modules/* /build/node_modules/ 2>/dev/null || true; fi
 
 # --- Stage 3: Production Runtime ---
 FROM node:22-alpine AS runtime
@@ -53,6 +55,7 @@ RUN chmod +x /app/betang-api
 COPY --from=frontend-builder /build/frontend/package.json /app/package.json
 COPY --from=frontend-builder /build/node_modules /app/node_modules
 COPY --from=frontend-builder /build/frontend/dist /app/dist
+RUN mkdir -p /app/frontend && ln -s /app/node_modules /app/frontend/node_modules
 
 # Salin skrip startup dan entrypoint Infisical Universal Auth
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
