@@ -61,7 +61,7 @@ export function CloudStorageSection({
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
               Seluruh permintaan unduh dan pratinjau dialirkan langsung melalui domain akselerasi Cloudflare Edge PoP.
             </p>
-            <div className="mt-3 p-2 rounded-xl bg-white/80 dark:bg-slate-900/80 border border-slate-200/60 dark:border-slate-750 font-mono text-[11px] text-blue-700 dark:text-blue-300 break-all">
+            <div className="mt-3 p-2 rounded-xl bg-white/80 dark:bg-slate-900/80 border border-slate-200/60 dark:border-slate-750 font-medium text-[11px] text-blue-700 dark:text-blue-300 break-all">
               https://files.kemenag-baritoutara.com/arsip
             </div>
           </div>

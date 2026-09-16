@@ -4,7 +4,6 @@ import PageBanner from "@/components/ui/PageBanner.astro";
 import { LayoutDashboard } from "lucide-react";
 import { apiGet, requireUser } from "@/lib/server";
 import DashboardMetrics from "@/components/Dashboard/DashboardMetrics.astro";
-import QuickAccessGrid from "@/components/Dashboard/QuickAccessGrid.astro";
 import { RecentUploadsTable } from "@/components/Dashboard/RecentUploadsTable";
 import BidangDistribution from "@/components/Dashboard/BidangDistribution.astro";
 import StorageQuotaWidget from "@/components/Dashboard/StorageQuotaWidget.astro";
@@ -108,9 +107,6 @@ const myAccessibleFolders = myBidang?.accessible_folder_names ?? [];
       recentFilesCount={recentFilesCount}
       thisMonthFilesCount={thisMonthFilesCount}
     />
-
-    <!-- AKSES CEPAT (Disesuaikan Peran) -->
-    <QuickAccessGrid isSuperAdmin={isSuperAdmin} />
 
     <!-- TATA LETAK DUA KOLOM -->
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">

@@ -1,0 +1,364 @@
+import { useState, useEffect, useRef } from "react";
+import { Upload, X, FileUp, AlertCircle, Trash2, Loader2, FolderArchive } from "lucide-react";
+import { formatFileSize } from "@/lib/utils";
+import { isZipFile } from "@/lib/zipUtils";
+import { useUploadManager } from "./UploadModal/useUploadManager";
+import { UploadDropzone } from "./UploadModal/UploadDropzone";
+import { UploadMinimizedWidget } from "./UploadModal/UploadMinimizedWidget";
+import { OPEN_UPLOAD_EVENT, type OpenUploadEventDetail } from "./globalUploadEvents";
+import { toast } from "sonner";
+
+/**
+ * GlobalUploadIsland adalah komponen persisten level layout yang mengelola
+ * seluruh siklus hidup proses pengunggahan berkas secara global di latar belakang.
+ * Dilengkapi proteksi transition:persist agar proses upload tidak pernah terhenti
+ * saat pengguna menjelajahi menu atau berpindah-pindah folder.
+ */
+export function GlobalUploadIsland() {
+  const [isOpen, setIsOpen] = useState(false);
+  const [folderId, setFolderId] = useState("root");
+  const [userBidangId, setUserBidangId] = useState("");
+  const [isFolderMode, setIsFolderMode] = useState(false);
+  const [initialFiles, setInitialFiles] = useState<File[] | undefined>(undefined);
+
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const folderInputRef = useRef<HTMLInputElement | null>(null);
+
+  const {
+    uploadItems,
+    isUploading,
+    isUnpacking,
+    unpackZipItem,
+    unpackAllZips,
+    isMinimized,
+    isCollapsed,
+    setIsCollapsed,
+    globalError,
+    setGlobalError,
+    addFiles,
+    removeFile,
+    handleUpload,
+    handleCancel,
+  } = useUploadManager({
+    isOpen,
+    folderId,
+    userBidangId,
+    initialFiles,
+    onClose: () => {
+      setIsOpen(false);
+      setInitialFiles(undefined);
+    },
+    onSuccess: () => {
+      window.dispatchEvent(new CustomEvent("folder-content-updated"));
+      window.dispatchEvent(new CustomEvent("storage-updated"));
+    },
+  });
+
+  // Dengarkan event global dari komponen mana pun yang ingin membuka modal upload atau menambah antrean
+  useEffect(() => {
+    const handleOpen = (e: Event) => {
+      const customEvent = e as CustomEvent<OpenUploadEventDetail>;
+      if (customEvent.detail) {
+        const targetFId = customEvent.detail.folderId || "root";
+        setFolderId(targetFId);
+        setUserBidangId(customEvent.detail.userBidangId || "");
+        setIsFolderMode(customEvent.detail.isFolderMode ?? false);
+
+        // Jika upload sedang berlangsung atau terminimalkan
+        if (isUploading || isMinimized) {
+          if (customEvent.detail.initialFiles && customEvent.detail.initialFiles.length > 0) {
+            // Berkas dari drag & drop langsung masuk antrean
+            addFiles(customEvent.detail.initialFiles, targetFId, undefined, true);
+            toast.info(
+              `${customEvent.detail.initialFiles.length} berkas ditambahkan ke antrean upload.`
+            );
+            return;
+          } else {
+            // Pengguna mengklik tombol di toolbar, picu pemilih berkas native
+            if (customEvent.detail.isFolderMode) {
+              folderInputRef.current?.click();
+            } else {
+              fileInputRef.current?.click();
+            }
+            return;
+          }
+        }
+
+        // Jika belum ada upload aktif, buka modal normal
+        setInitialFiles(customEvent.detail.initialFiles);
+        setIsOpen(true);
+      }
+    };
+
+    window.addEventListener(OPEN_UPLOAD_EVENT, handleOpen);
+    return () => window.removeEventListener(OPEN_UPLOAD_EVENT, handleOpen);
+  }, [isUploading, isMinimized, addFiles]);
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files ? Array.from(e.target.files) : [];
+    if (files.length > 0) {
+      addFiles(files, folderId, undefined, true);
+      toast.info(`${files.length} berkas ditambahkan ke antrean upload.`);
+    }
+    e.target.value = "";
+  };
+
+  const handleFolderInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files ? Array.from(e.target.files) : [];
+    if (files.length > 0) {
+      addFiles(files, folderId, undefined, true);
+      toast.info(`${files.length} berkas folder ditambahkan ke antrean upload.`);
+    }
+    e.target.value = "";
+  };
+
+  // Proteksi browser: Berikan peringatan jika tab/halaman sengaja di-refresh atau ditutup saat upload berlangsung
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isUploading) {
+        e.preventDefault();
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isUploading]);
+
+  const hasFiles = uploadItems.length > 0;
+  const zipItems = uploadItems.filter((item) => isZipFile(item.file));
+
+  return (
+    <>
+      {/* Input Berkas & Folder Tersembunyi untuk Penambahan Cepat ke Antrean */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        multiple
+        className="hidden"
+        onChange={handleFileInputChange}
+      />
+      <input
+        type="file"
+        ref={folderInputRef}
+        {...({ webkitdirectory: "", directory: "" } as any)}
+        multiple
+        className="hidden"
+        onChange={handleFolderInputChange}
+      />
+
+      {/* Jika sedang terminimalkan dan memiliki antrean upload, tampilkan widget melayang di pojok kanan bawah */}
+      {isMinimized && uploadItems.length > 0 && (
+        <UploadMinimizedWidget
+          uploadItems={uploadItems}
+          isCollapsed={isCollapsed}
+          onToggleCollapse={() => setIsCollapsed(!isCollapsed)}
+          onCancel={handleCancel}
+          onAddMoreFiles={() => fileInputRef.current?.click()}
+        />
+      )}
+
+      {/* Dialog Modal Lengkap (hanya aktif jika isOpen === true dan tidak terminimalkan) */}
+      {isOpen && !isMinimized && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+          <div className="w-full max-w-2xl animate-in zoom-in-95 rounded-3xl bg-white shadow-2xl ring-1 ring-slate-200 overflow-hidden flex flex-col max-h-[90vh]">
+            {/* Header */}
+            <div className="flex flex-shrink-0 items-center justify-between border-b border-slate-100 p-4 sm:p-6">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
+                  <Upload className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-bold text-slate-900">
+                    {isFolderMode ? "Upload Folder" : "Upload Dokumen (Batch)"}
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    {isFolderMode
+                      ? "Folder beserta struktur subfolder dan seluruh berkas akan diunggah otomatis"
+                      : "Maksimal 1000 file sekaligus"}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsOpen(false)}
+                disabled={isUploading || isUnpacking}
+                className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            {/* Konten Dropzone & Daftar Berkas */}
+            <div className="p-4 sm:p-6 overflow-y-auto custom-scrollbar flex-1">
+              <UploadDropzone
+                isFolderMode={isFolderMode}
+                onFilesSelected={addFiles}
+                onScanningState={setGlobalError}
+              />
+
+              {globalError && (
+                <div className="mt-4 flex items-center gap-2 rounded-xl bg-rose-50 p-3 text-xs font-semibold text-rose-600">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span>{globalError}</span>
+                </div>
+              )}
+
+              {/* Banner Ekstraksi ZIP jika terdeteksi berkas ZIP dalam antrean */}
+              {zipItems.length > 0 && (
+                <div className="mt-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-amber-50/90 border border-amber-200/80 text-amber-900 animate-in fade-in">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
+                      <FolderArchive className="h-4.5 w-4.5" />
+                    </div>
+                    <div className="text-xs">
+                      <p className="font-bold text-amber-950">
+                        {zipItems.length === 1
+                          ? `Arsip ZIP Terdeteksi: "${zipItems[0].file.name}"`
+                          : `${zipItems.length} Berkas Arsip ZIP Terdeteksi`}
+                      </p>
+                      <p className="text-amber-700 text-[11px]">
+                        Unggah sebagai berkas .zip utuh atau ekstrak isinya langsung ke folder ini.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={unpackAllZips}
+                    disabled={isUploading || isUnpacking}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 active:scale-95 text-white text-xs font-bold transition-all shrink-0 shadow-sm disabled:opacity-50 cursor-pointer"
+                  >
+                    {isUnpacking ? (
+                      <>
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        <span>Mengekstrak...</span>
+                      </>
+                    ) : (
+                      <>
+                        <FolderArchive className="h-3.5 w-3.5" />
+                        <span>Ekstrak Semua ZIP</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+
+              {hasFiles && (
+                <div className="mt-6 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-slate-700">
+                      Berkas Terpilih ({uploadItems.length})
+                    </span>
+                    <span className="text-[11px] text-slate-400 font-medium">
+                      Total:{" "}
+                      {formatFileSize(uploadItems.reduce((acc, item) => acc + item.file.size, 0))}
+                    </span>
+                  </div>
+
+                  <div className="max-h-48 overflow-y-auto space-y-2 custom-scrollbar pr-1">
+                    {uploadItems.map((item) => {
+                      const isZip = isZipFile(item.file);
+                      return (
+                        <div
+                          key={item.id}
+                          className="flex items-center justify-between p-2.5 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-slate-50 transition-colors"
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-2">
+                            <div
+                              className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg shadow-xs ${
+                                isZip ? "bg-amber-100 text-amber-700" : "bg-white text-slate-500"
+                              }`}
+                            >
+                              {isZip ? <FolderArchive className="h-4 w-4" /> : <FileUp className="h-4 w-4" />}
+                            </div>
+                            <div className="flex flex-col min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className="text-xs font-semibold text-slate-800 truncate"
+                                  title={item.relativePath || item.file.name}
+                                >
+                                  {item.file.name}
+                                </span>
+                                {isZip && (
+                                  <span className="shrink-0 px-1.5 py-0.5 rounded-md bg-amber-100 text-[10px] font-bold text-amber-800 border border-amber-200">
+                                    ZIP
+                                  </span>
+                                )}
+                              </div>
+                              {item.directorySegments && item.directorySegments.length > 0 && (
+                                <span
+                                  className="text-[10px] text-amber-700 font-medium truncate flex items-center gap-1 mt-0.5"
+                                  title={`Folder: ${item.directorySegments.join("/")}`}
+                                >
+                                  📁 {item.directorySegments.join("/")}
+                                </span>
+                              )}
+                              <span className="text-[10px] text-slate-400 mt-0.5">
+                                {formatFileSize(item.file.size)}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {isZip && (
+                              <button
+                                type="button"
+                                onClick={() => unpackZipItem(item.id, item.file)}
+                                disabled={isUploading || isUnpacking}
+                                className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold text-amber-700 bg-amber-100/70 hover:bg-amber-200/80 transition-colors disabled:opacity-50 cursor-pointer"
+                                title="Ekstrak berkas dari arsip ZIP ini"
+                              >
+                                {isUnpacking ? (
+                                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                  <FolderArchive className="h-3.5 w-3.5" />
+                                )}
+                                <span className="text-[11px] hidden sm:inline">Ekstrak</span>
+                              </button>
+                            )}
+                            <button
+                              onClick={() => removeFile(item.id)}
+                              disabled={isUploading || isUnpacking}
+                              className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors disabled:opacity-50 cursor-pointer"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Footer Aksi */}
+            <div className="flex flex-shrink-0 items-center justify-end gap-3 border-t border-slate-100 p-4 sm:p-6 bg-slate-50/50">
+              <button
+                onClick={() => setIsOpen(false)}
+                disabled={isUploading || isUnpacking}
+                className="px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-slate-600 hover:bg-slate-100 transition-colors disabled:opacity-50 cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleUpload}
+                disabled={!hasFiles || isUploading || isUnpacking}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-bold shadow-lg shadow-emerald-950/10 transition-all disabled:opacity-50 disabled:pointer-events-none cursor-pointer"
+              >
+                {isUploading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    <span>Mengunggah...</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-4 w-4" />
+                    <span>Mulai Unggah ({uploadItems.length})</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}

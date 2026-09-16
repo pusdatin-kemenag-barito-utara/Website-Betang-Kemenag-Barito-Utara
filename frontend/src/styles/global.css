@@ -1,12 +1,14 @@
+@import "@fontsource-variable/plus-jakarta-sans";
 @import "tailwindcss";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-sans: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 
-  /* Font default dari @fontsource-variable/plus-jakarta-sans */
-  --font-jakarta: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
+  /* Font default Plus Jakarta Sans */
+  --font-jakarta: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
@@ -105,12 +107,42 @@
 }
 
 @layer base {
-  * {
+  *,
+  *::before,
+  *::after {
     @apply border-border;
+    font-family: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
   }
+
+  html,
   body {
+    font-family: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
     @apply bg-background text-foreground antialiased;
   }
+
+  /* Seluruh elemen native (input, button, table, code, kbd, pre, angka) 100% Plus Jakarta Sans */
+  input,
+  button,
+  select,
+  textarea,
+  optgroup,
+  code,
+  kbd,
+  samp,
+  pre,
+  table,
+  th,
+  td {
+    font-family: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  }
+}
+
+/* Utilitas tabular figures untuk angka agar sejajar rapi di tabel/kartu tanpa mengubah typeface */
+.font-mono,
+.tabular-nums {
+  font-family: "Plus Jakarta Sans Variable", "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" on;
 }
 
 /* Scrollbar halus untuk daftar upload (paritas dari aplikasi lama) */

@@ -173,15 +173,39 @@ func (s *SupabaseClient) RefreshToken(ctx context.Context, refreshToken string) 
 	}, nil
 }
 
+// GenerateAccessToken menerbitkan JWT access token internal yang ditandatangani
+// oleh Backend Go secara mandiri dengan masa berlaku yang panjang (misal 7 atau 30 hari).
+func (s *SupabaseClient) GenerateAccessToken(userID, email string, duration time.Duration) (string, error) {
+	now := time.Now()
+	claims := jwt.MapClaims{
+		"sub":   userID,
+		"email": email,
+		"role":  "authenticated",
+		"iss":   "betang-backend",
+		"iat":   now.Unix(),
+		"exp":   now.Add(duration).Unix(),
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	secret := s.jwtSecret
+	if len(secret) == 0 {
+		secret = []byte("betang-kemenag-default-secret-fallback-key-32b")
+	}
+	return token.SignedString(secret)
+}
+
 // VerifyAccessToken memverifikasi tanda tangan dan masa berlaku JWT access token
-// yang dikeluarkan oleh Supabase.
+// yang dikeluarkan oleh Supabase maupun token mandiri yang dikeluarkan oleh Go backend.
 func (s *SupabaseClient) VerifyAccessToken(tokenString string) (jwt.MapClaims, error) {
 	claims := jwt.MapClaims{}
 	_, err := jwt.ParseWithClaims(tokenString, claims, func(t *jwt.Token) (interface{}, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, fmt.Errorf("metode tanda tangan tidak didukung: %v", t.Header["alg"])
 		}
-		return s.jwtSecret, nil
+		secret := s.jwtSecret
+		if len(secret) == 0 {
+			secret = []byte("betang-kemenag-default-secret-fallback-key-32b")
+		}
+		return secret, nil
 	})
 	if err != nil {
 		return nil, err

@@ -45,7 +45,7 @@ export function TextViewer({ textContent, textLoading, textError }: TextViewerPr
         </span>
       </div>
       <div className="flex-1 overflow-auto p-4 md:p-6 custom-scrollbar bg-slate-950">
-        <pre className="font-mono text-xs md:text-[13px] leading-relaxed text-slate-200 whitespace-pre-wrap break-all select-text font-normal">
+        <pre className="text-xs md:text-[13px] leading-relaxed text-slate-200 whitespace-pre-wrap break-all select-text font-normal">
           <code>{textContent ?? ""}</code>
         </pre>
       </div>

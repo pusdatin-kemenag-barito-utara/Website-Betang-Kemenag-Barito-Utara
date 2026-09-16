@@ -1,6 +1,7 @@
 ---
 import "@fontsource-variable/plus-jakarta-sans";
 import "@/styles/global.css";
+import { ClientRouter } from "astro:transitions";
 import { MaintenanceListener } from "@/components/layout/MaintenanceListener";
 import { ToasterIsland } from "@/components/layout/ToasterIsland";
 import MetaTags from "@/components/seo/MetaTags.astro";
@@ -72,6 +73,9 @@ const publicEnv = {
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="generator" content={Astro.generator} />
+
+    <!-- 🚀 Client-side Router untuk Transisi Cepat & Persistent Background Uploads -->
+    <ClientRouter />
 
     <!-- 🔑 Injeksi SSR Dinamis Variabel Publik Infisical Runtime -->
     <script is:inline define:vars={{ publicEnv }}>

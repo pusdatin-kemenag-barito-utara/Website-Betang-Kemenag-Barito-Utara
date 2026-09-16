@@ -56,26 +56,62 @@ func (r *FileRepo) Search(ctx context.Context, query string, bidangID *string) (
 
 // Stats menghitung ringkasan statistik dashboard: total file aktif, total
 // ukuran, unggahan 24 jam terakhir, unggahan bulan ini, dan 5 unggahan terbaru.
-func (r *FileRepo) Stats(ctx context.Context) (totalFiles, totalStorage, recent24h, thisMonth int64, recent []domain.RecentUpload, err error) {
-	err = r.pool.QueryRow(ctx, `
-		SELECT
-			COUNT(*)::bigint,
-			COALESCE(SUM(size_bytes), 0)::bigint,
-			COUNT(*) FILTER (WHERE created_at > now() - interval '24 hours')::bigint,
-			COUNT(*) FILTER (WHERE created_at >= date_trunc('month', now()))::bigint
-		FROM kemenag_arsip.files
-		WHERE deleted_at IS NULL`).
+// Bila bidangID disediakan (Admin Bidang), hanya data arsip yang relevan dengan bidang tersebut yang dihitung.
+func (r *FileRepo) Stats(ctx context.Context, bidangID *string) (totalFiles, totalStorage, recent24h, thisMonth int64, recent []domain.RecentUpload, err error) {
+	var (
+		countQuery  string
+		recentQuery string
+		args        []any
+	)
+
+	if bidangID != nil && *bidangID != "" {
+		countQuery = `
+			SELECT
+				COUNT(*)::bigint,
+				COALESCE(SUM(size_bytes), 0)::bigint,
+				COUNT(*) FILTER (WHERE created_at > now() - interval '24 hours')::bigint,
+				COUNT(*) FILTER (WHERE created_at >= date_trunc('month', now()))::bigint
+			FROM kemenag_arsip.files
+			WHERE deleted_at IS NULL
+			  AND (
+			    bidang_id = $1::uuid
+			    OR (folder_id IS NOT NULL AND kemenag_arsip.can_bidang_access_folder($1::uuid, folder_id))
+			  )`
+		recentQuery = `
+			SELECT id, name, mime_type, size_bytes, created_at, COALESCE(r2_object_key, '')
+			FROM kemenag_arsip.files
+			WHERE deleted_at IS NULL
+			  AND (
+			    bidang_id = $1::uuid
+			    OR (folder_id IS NOT NULL AND kemenag_arsip.can_bidang_access_folder($1::uuid, folder_id))
+			  )
+			ORDER BY created_at DESC
+			LIMIT 5`
+		args = append(args, *bidangID)
+	} else {
+		countQuery = `
+			SELECT
+				COUNT(*)::bigint,
+				COALESCE(SUM(size_bytes), 0)::bigint,
+				COUNT(*) FILTER (WHERE created_at > now() - interval '24 hours')::bigint,
+				COUNT(*) FILTER (WHERE created_at >= date_trunc('month', now()))::bigint
+			FROM kemenag_arsip.files
+			WHERE deleted_at IS NULL`
+		recentQuery = `
+			SELECT id, name, mime_type, size_bytes, created_at, COALESCE(r2_object_key, '')
+			FROM kemenag_arsip.files
+			WHERE deleted_at IS NULL
+			ORDER BY created_at DESC
+			LIMIT 5`
+	}
+
+	err = r.pool.QueryRow(ctx, countQuery, args...).
 		Scan(&totalFiles, &totalStorage, &recent24h, &thisMonth)
 	if err != nil {
 		return 0, 0, 0, 0, nil, err
 	}
 
-	rows, err := r.pool.Query(ctx, `
-		SELECT id, name, mime_type, size_bytes, created_at, COALESCE(r2_object_key, '')
-		FROM kemenag_arsip.files
-		WHERE deleted_at IS NULL
-		ORDER BY created_at DESC
-		LIMIT 5`)
+	rows, err := r.pool.Query(ctx, recentQuery, args...)
 	if err != nil {
 		return 0, 0, 0, 0, nil, err
 	}

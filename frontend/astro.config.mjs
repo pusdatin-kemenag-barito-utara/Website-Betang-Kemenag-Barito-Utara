@@ -81,7 +81,7 @@ export default defineConfig({
           scope: "/",
           display: "standalone",
           orientation: "any",
-          background_color: "#0f172a",
+          background_color: "#ffffff",
           theme_color: "#059669",
           categories: ["productivity", "utilities", "business", "government"],
           lang: "id-ID",

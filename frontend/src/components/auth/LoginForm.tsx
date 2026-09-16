@@ -2,7 +2,7 @@
 // serta notifikasi alert & toaster saat berhasil masuk ke sistem.
 import { KeyRound, Mail, AlertCircle, Eye, EyeOff, CheckCircle2, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { LoginTurnstile } from "./LoginTurnstile";
+import { LoginTurnstile, isLocalOrPrivateNetwork } from "./LoginTurnstile";
 import { loginAction } from "@/lib/api";
 import { trackEvent, setAnalyticsUser } from "@/lib/analytics";
 import { toast } from "sonner";
@@ -25,7 +25,7 @@ export function LoginForm({ siteKey }: LoginFormProps) {
   const [isPending, setIsPending] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [turnstileToken, setTurnstileToken] = useState("");
 
   const [mounted, setMounted] = useState(false);
@@ -49,10 +49,19 @@ export function LoginForm({ siteKey }: LoginFormProps) {
     const form = e.currentTarget;
     const formData = new FormData(form);
 
-    // Token Turnstile disuntikkan bila tersedia.
-    if (turnstileToken) {
-      formData.set("cf-turnstile-response", turnstileToken);
+    // Token Turnstile disuntikkan bila tersedia (atau dev bypass bila di jaringan lokal/HP).
+    let token = turnstileToken;
+    if (!token && isLocalOrPrivateNetwork()) {
+      token = "dev-turnstile-bypass";
     }
+
+    if (!token) {
+      setError("Silakan selesaikan verifikasi keamanan (Turnstile) terlebih dahulu.");
+      toast.warning("Verifikasi keamanan belum lengkap.");
+      return;
+    }
+
+    formData.set("cf-turnstile-response", token);
 
     setError(null);
     setIsPending(true);

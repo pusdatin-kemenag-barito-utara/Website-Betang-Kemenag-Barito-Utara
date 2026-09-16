@@ -67,7 +67,7 @@ export interface ZipExtractionResult {
  */
 export async function extractFilesFromZip(
   zipFileOrBlob: File | Blob,
-  maxFiles = 100,
+  maxFiles = 1000,
   defaultBaseName = "arsip",
 ): Promise<ZipExtractionResult> {
   const zip = await JSZip.loadAsync(zipFileOrBlob);
@@ -119,7 +119,7 @@ export async function extractFilesFromZip(
     const depthA = a.split("/").length;
     const depthB = b.split("/").length;
     if (depthA !== depthB) return depthA - depthB;
-    return a.localeCompare(b);
+    return a.localeCompare(b, "id-ID", { numeric: true, sensitivity: "base" });
   });
 
   const seenPaths = new Map<string, number>();
@@ -244,15 +244,20 @@ export async function ensureFolderPath(
     let targetFolderId: string | null = null;
     try {
       const contentsRes = await getFolderContents(currentParentId, "", true);
-      if (contentsRes.success && Array.isArray(contentsRes.data)) {
-        const existing = contentsRes.data.find(
-          (it: any) =>
-            it.type === "folder" &&
-            typeof it.name === "string" &&
-            it.name.trim().toLowerCase() === segment.toLowerCase(),
-        );
-        if (existing?.id) {
-          targetFolderId = existing.id;
+      if (contentsRes.success && contentsRes.data) {
+        const rawFolders = Array.isArray(contentsRes.data)
+          ? contentsRes.data
+          : (contentsRes.data.folders || []);
+
+        const existing = rawFolders.find((it: any) => {
+          const folderObj = it.folder || it;
+          const name = folderObj?.name || it?.name;
+          return typeof name === "string" && name.trim().toLowerCase() === segment.toLowerCase();
+        });
+
+        if (existing) {
+          const folderObj = existing.folder || existing;
+          targetFolderId = folderObj.id || existing.id;
         }
       }
     } catch (err) {

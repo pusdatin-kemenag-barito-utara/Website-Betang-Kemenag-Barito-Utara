@@ -82,12 +82,40 @@ async function traverseEntry(
   entry: FileSystemEntry,
   collectedFiles: File[],
   maxFiles: number,
+  basePath = "",
 ): Promise<void> {
   if (collectedFiles.length >= maxFiles) return;
+
+  const currentPath = basePath ? `${basePath}/${entry.name}` : entry.name;
 
   if (entry.isFile) {
     const file = await getFileFromEntry(entry as FileSystemFileEntry);
     if (file && collectedFiles.length < maxFiles) {
+      const lowerName = file.name.toLowerCase();
+      if (
+        lowerName === "desktop.ini" ||
+        lowerName === "thumbs.db" ||
+        lowerName === ".ds_store" ||
+        lowerName.startsWith("._")
+      ) {
+        return;
+      }
+
+      const fullPath = (entry.fullPath ? entry.fullPath.replace(/^\//, "") : currentPath) || file.name;
+      try {
+        Object.defineProperty(file, "webkitRelativePath", {
+          value: fullPath,
+          writable: true,
+          configurable: true,
+        });
+      } catch {
+        // Fallback jika browser mencegah override properti
+      }
+      (file as any).relativePath = fullPath;
+      const parts = fullPath.split("/").filter(Boolean);
+      if (parts.length > 1) {
+        (file as any).directorySegments = parts.slice(0, parts.length - 1);
+      }
       collectedFiles.push(file);
     }
   } else if (entry.isDirectory) {
@@ -96,7 +124,7 @@ async function traverseEntry(
       const entries = await readAllEntriesFromReader(reader);
       for (const child of entries) {
         if (collectedFiles.length >= maxFiles) break;
-        await traverseEntry(child, collectedFiles, maxFiles);
+        await traverseEntry(child, collectedFiles, maxFiles, currentPath);
       }
     } catch (err) {
       console.warn(`Gagal memproses folder "${entry.name}":`, err);
@@ -109,7 +137,7 @@ async function traverseEntry(
  */
 export async function extractFilesFromDataTransfer(
   dataTransfer: DataTransfer,
-  maxFiles = 100,
+  maxFiles = 1000,
 ): Promise<File[]> {
   const collectedFiles: File[] = [];
 
@@ -145,6 +173,15 @@ export async function extractFilesFromDataTransfer(
     const rawFiles = Array.from(dataTransfer.files);
     for (const f of rawFiles) {
       if (collectedFiles.length >= maxFiles) break;
+      const lowerName = f.name.toLowerCase();
+      if (
+        lowerName === "desktop.ini" ||
+        lowerName === "thumbs.db" ||
+        lowerName === ".ds_store" ||
+        lowerName.startsWith("._")
+      ) {
+        continue;
+      }
       // Filter berkas semu folder 0-byte tanpa ekstensi jika ada
       if (f.size > 0 || f.type !== "") {
         collectedFiles.push(f);

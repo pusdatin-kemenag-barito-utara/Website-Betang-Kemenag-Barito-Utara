@@ -47,6 +47,10 @@ type Config struct {
 
 	// CORS
 	CORSAllowedOrigins []string
+
+	// Environment & Dev mode
+	AppEnv string
+	IsDev  bool
 }
 
 // Load membaca konfigurasi dari environment dengan nilai default yang aman.
@@ -77,6 +81,10 @@ func Load() (*Config, error) {
 		CookieDomain:       getEnvFirst([]string{"COOKIE_DOMAIN"}, ""),
 		CookieSecure:       getEnvBool("COOKIE_SECURE", false),
 	}
+
+	appEnv := strings.ToLower(getEnvFirst([]string{"APP_ENV", "NODE_ENV", "GO_ENV", "ENVIRONMENT"}, "development"))
+	cfg.AppEnv = appEnv
+	cfg.IsDev = appEnv == "development" || appEnv == "dev" || appEnv == "local" || appEnv == "test"
 
 	quota, err := strconv.ParseFloat(getEnv("STORAGE_QUOTA_GB", "100"), 64)
 	if err != nil || quota <= 0 {

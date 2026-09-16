@@ -127,7 +127,7 @@ export function ExtractProgressModal({
               </span>
             </div>
             <span
-              className={`font-mono text-xs font-bold shrink-0 ${
+              className={`text-xs font-bold shrink-0 ${
                 isComplete ? "text-emerald-600" : isFailed ? "text-rose-600" : "text-amber-600"
               }`}
             >

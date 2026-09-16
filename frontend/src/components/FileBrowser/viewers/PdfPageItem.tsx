@@ -130,7 +130,7 @@ export function PdfPageItem({
           <span>Memuat Halaman {pageNumber}...</span>
         </div>
       )}
-      <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/60 text-white text-[10px] font-mono pointer-events-none select-none backdrop-blur-xs">
+      <div className="absolute bottom-2 right-2 px-2 py-0.5 rounded bg-black/60 text-white text-[10px] font-medium pointer-events-none select-none backdrop-blur-xs">
         {pageNumber}
       </div>
     </div>

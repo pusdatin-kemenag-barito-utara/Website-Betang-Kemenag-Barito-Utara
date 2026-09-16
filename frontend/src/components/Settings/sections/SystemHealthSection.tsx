@@ -42,7 +42,7 @@ export function SystemHealthSection({ currentUser }: SystemHealthSectionProps) {
               </span>
             </div>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 truncate">
-              Schema: <code className="bg-slate-200/70 dark:bg-slate-800 px-1 py-0.5 rounded font-mono text-[10px]">kemenag_arsip</code>
+              Schema: <code className="bg-slate-200/70 dark:bg-slate-800 px-1 py-0.5 rounded font-medium text-[10px]">kemenag_arsip</code>
             </p>
             <p className="text-[10px] text-slate-400 mt-0.5">PostgreSQL 15 • Port 6543</p>
           </div>
@@ -63,7 +63,7 @@ export function SystemHealthSection({ currentUser }: SystemHealthSectionProps) {
               </span>
             </div>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 truncate">
-              Bucket: <code className="bg-slate-200/70 dark:bg-slate-800 px-1 py-0.5 rounded font-mono text-[10px]">data-arsip</code>
+              Bucket: <code className="bg-slate-200/70 dark:bg-slate-800 px-1 py-0.5 rounded font-medium text-[10px]">data-arsip</code>
             </p>
             <p className="text-[10px] text-slate-400 mt-0.5">Singapore PoP • Multi-GB/s</p>
           </div>
@@ -84,7 +84,7 @@ export function SystemHealthSection({ currentUser }: SystemHealthSectionProps) {
               </span>
             </div>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 truncate">
-              Worker: <code className="bg-slate-200/70 dark:bg-slate-800 px-1 py-0.5 rounded font-mono text-[10px]">kemenag-files-router</code>
+              Worker: <code className="bg-slate-200/70 dark:bg-slate-800 px-1 py-0.5 rounded font-medium text-[10px]">kemenag-files-router</code>
             </p>
             <p className="text-[10px] text-slate-400 mt-0.5">Custom Domain • HTTP/3 QUIC</p>
           </div>
@@ -105,7 +105,7 @@ export function SystemHealthSection({ currentUser }: SystemHealthSectionProps) {
               </span>
             </div>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 truncate">
-              Host: <code className="bg-slate-200/70 dark:bg-slate-800 px-1 py-0.5 rounded font-mono text-[10px]">127.0.0.1:8080</code>
+              Host: <code className="bg-slate-200/70 dark:bg-slate-800 px-1 py-0.5 rounded font-medium text-[10px]">127.0.0.1:8080</code>
             </p>
             <p className="text-[10px] text-slate-400 mt-0.5">High Concurrency • pgx v5</p>
           </div>
@@ -126,7 +126,7 @@ export function SystemHealthSection({ currentUser }: SystemHealthSectionProps) {
               </span>
             </div>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 truncate">
-              Skema: <code className="bg-slate-200/70 dark:bg-slate-800 px-1 py-0.5 rounded font-mono text-[10px]">kemenag_arsip.users</code>
+              Skema: <code className="bg-slate-200/70 dark:bg-slate-800 px-1 py-0.5 rounded font-medium text-[10px]">kemenag_arsip.users</code>
             </p>
             <p className="text-[10px] text-slate-400 mt-0.5">Terisolasi Penuh Dari Pusdatin</p>
           </div>

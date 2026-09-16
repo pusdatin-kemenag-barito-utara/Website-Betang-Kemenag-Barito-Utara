@@ -1,11 +1,9 @@
 import {
   getCoreRowModel,
   useReactTable,
-  getPaginationRowModel,
 } from "@tanstack/react-table";
 import type { SortingState } from "@tanstack/react-table";
 import { useState, useMemo, useEffect } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { FileTableProps, ContextMenuState } from "./FileTable/types";
 import { useFileDragDrop } from "./FileTable/useFileDragDrop";
 import { useFileTableModals } from "./FileTable/useFileTableModals";
@@ -207,7 +205,6 @@ export function FileTable({
     },
     onRowSelectionChange: setRowSelection,
     getCoreRowModel: getCoreRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
   });
 
   const selectedRows = table.getSelectedRowModel().rows;
@@ -261,15 +258,7 @@ export function FileTable({
           onDrop={handleDrop}
           onContextMenu={handleContextMenuTrigger}
           onRowClick={(item) => {
-            setRowSelection((prev) => {
-              const next = { ...prev };
-              if (next[item.id]) {
-                delete next[item.id];
-              } else {
-                next[item.id] = true;
-              }
-              return next;
-            });
+            setDetailsItem(item);
           }}
           onRowDoubleClick={(item) => {
             if (item.type === "folder" && onNavigate) onNavigate(item.id);
@@ -278,31 +267,14 @@ export function FileTable({
         />
       )}
 
-      {/* Pagination Footer */}
+      {/* Status Bar Footer (Tanpa Pagination - Memanjang ke bawah seperti Google Drive) */}
       {filteredData.length > 0 && (
-        <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 bg-slate-50/50 text-xs text-slate-500">
+        <div className="flex items-center justify-between px-4 py-3 border-t border-slate-100 bg-slate-50/50 text-xs text-slate-500 select-none">
           <span>
-            Menampilkan {table.getRowModel().rows.length} dari {filteredData.length} item
+            {selectedItems.length > 0
+              ? `${selectedItems.length} dari ${filteredData.length} item dipilih`
+              : `${filteredData.length} item`}
           </span>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => table.previousPage()}
-              disabled={!table.getCanPreviousPage()}
-              className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 transition-colors"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </button>
-            <span className="font-semibold text-slate-700">
-              {table.getState().pagination.pageIndex + 1} / {table.getPageCount() || 1}
-            </span>
-            <button
-              onClick={() => table.nextPage()}
-              disabled={!table.getCanNextPage()}
-              className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 transition-colors"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </button>
-          </div>
         </div>
       )}
 

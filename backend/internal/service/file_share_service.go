@@ -7,9 +7,9 @@ import (
 	"github.com/kemenag-baritoutara/betang-kemenag/internal/domain"
 )
 
-// Stats menghitung ringkasan statistik dashboard.
-func (s *FileService) Stats(ctx context.Context) (*domain.DashboardStats, error) {
-	totalFiles, totalStorage, recent24h, thisMonth, recent, err := s.files.Stats(ctx)
+// Stats menghitung ringkasan statistik dashboard (dengan filter bidang opsional).
+func (s *FileService) Stats(ctx context.Context, bidangID *string) (*domain.DashboardStats, error) {
+	totalFiles, totalStorage, recent24h, thisMonth, recent, err := s.files.Stats(ctx, bidangID)
 	if err != nil {
 		return nil, err
 	}

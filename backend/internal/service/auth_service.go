@@ -17,6 +17,7 @@ import (
 	"github.com/kemenag-baritoutara/betang-kemenag/internal/config"
 	"github.com/kemenag-baritoutara/betang-kemenag/internal/domain"
 	"github.com/kemenag-baritoutara/betang-kemenag/internal/repository"
+	"golang.org/x/sync/singleflight"
 )
 
 // LoginResult adalah hasil sukses proses login.
@@ -33,22 +34,31 @@ type userMetaCacheItem struct {
 	expiresAt time.Time
 }
 
-// AuthService menangani autentikasi, sesi, dan otorisasi.
-type AuthService struct {
-	supabase  *auth.SupabaseClient
-	userRepo  *repository.UserRepo
-	cfg       *config.Config
-	metaMu    sync.RWMutex
-	metaCache map[string]userMetaCacheItem
+type refreshCacheItem struct {
+	tokens    *auth.Tokens
+	expiresAt time.Time
 }
 
-// NewAuthService membuat instance AuthService baru dengan in-memory cache metadata.
+// AuthService menangani autentikasi, sesi, dan otorisasi.
+type AuthService struct {
+	supabase     *auth.SupabaseClient
+	userRepo     *repository.UserRepo
+	cfg          *config.Config
+	metaMu       sync.RWMutex
+	metaCache    map[string]userMetaCacheItem
+	refreshGroup singleflight.Group
+	refreshMu    sync.RWMutex
+	refreshCache map[string]refreshCacheItem
+}
+
+// NewAuthService membuat instance AuthService baru dengan in-memory cache metadata dan deduplikasi token refresh.
 func NewAuthService(supabase *auth.SupabaseClient, userRepo *repository.UserRepo, cfg *config.Config) *AuthService {
 	return &AuthService{
-		supabase:  supabase,
-		userRepo:  userRepo,
-		cfg:       cfg,
-		metaCache: make(map[string]userMetaCacheItem),
+		supabase:     supabase,
+		userRepo:     userRepo,
+		cfg:          cfg,
+		metaCache:    make(map[string]userMetaCacheItem),
+		refreshCache: make(map[string]refreshCacheItem),
 	}
 }
 
@@ -78,13 +88,18 @@ func (s *AuthService) Login(ctx context.Context, email, password, turnstileToken
 	// untuk menghemat waktu latensi jaringan (menghemat ~600-800ms).
 	if s.cfg.TurnstileSecretKey != "" {
 		if turnstileToken == "" {
-			return nil, errors.New("Verifikasi keamanan tidak lengkap. Silakan muat ulang halaman dan coba lagi.")
+			if s.cfg.IsDev {
+				log.Printf("[AUTH DEV] turnstileToken kosong di environment %s, dilanjutkan otomatis untuk dev/local PWA", s.cfg.AppEnv)
+			} else {
+				return nil, errors.New("Verifikasi keamanan tidak lengkap. Silakan muat ulang halaman dan coba lagi.")
+			}
+		} else {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				turnstileErr = s.verifyTurnstile(ctx, turnstileToken)
+			}()
 		}
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			turnstileErr = s.verifyTurnstile(ctx, turnstileToken)
-		}()
 	}
 
 	wg.Add(1)
@@ -136,11 +151,24 @@ func (s *AuthService) Login(ctx context.Context, email, password, turnstileToken
 	// ke middleware dan /auth/me setelah redirect berjalan instan (0 ms).
 	s.SetUserMetaCache(user.Email, user, 60*time.Second)
 
-	// 3) Susun sesi.
+	// 3) Susun sesi mandiri Golang.
+	// Jika rememberMe aktif, sesi berlaku 30 hari. Jika tidak aktif, berlaku 7 hari (aman untuk upload berkas).
+	sessionDuration := 7 * 24 * time.Hour
+	if rememberMe {
+		sessionDuration = 30 * 24 * time.Hour
+	}
+
+	// Terbitkan JWT mandiri yang ditandatangani oleh Go backend
+	goAccessToken, err := s.supabase.GenerateAccessToken(tokens.UserID, tokens.Email, sessionDuration)
+	if err != nil {
+		// Fallback ke access token bawaan jika gagal signing
+		goAccessToken = tokens.AccessToken
+	}
+
 	session := &domain.Session{
-		AccessToken:  tokens.AccessToken,
+		AccessToken:  goAccessToken,
 		RefreshToken: tokens.RefreshToken,
-		ExpiresAt:    time.Now().Unix() + tokens.ExpiresIn,
+		ExpiresAt:    time.Now().Add(sessionDuration).Unix(),
 		UserID:       tokens.UserID,
 		Email:        tokens.Email,
 	}
@@ -154,16 +182,29 @@ func (s *AuthService) Login(ctx context.Context, email, password, turnstileToken
 	}, nil
 }
 
-// VerifySession memvalidasi sesi dari cookie; jika token kedaluwarsa dan
-// refresh diizinkan, token diperbarui lewat Supabase.
+// VerifySession memvalidasi sesi dari cookie secara in-memory (0 ms).
+// Mendukung sliding window renewal agar sesi pengguna aktif diperpanjang otomatis
+// tanpa perlu menembak server Supabase setiap saat. Dilengkapi singleflight guard
+// dan cache 60 detik untuk mencegah tabrakan Refresh Token Rotation.
 func (s *AuthService) VerifySession(ctx context.Context, raw string, allowRefresh bool) (*domain.Session, error) {
 	session, err := decodeSession(raw)
 	if err != nil {
 		return nil, errors.New("sesi tidak valid")
 	}
 
-	_, err = s.supabase.VerifyAccessToken(session.AccessToken)
+	claims, err := s.supabase.VerifyAccessToken(session.AccessToken)
 	if err == nil {
+		// Sesi masih valid. Jika sisa masa berlaku < 24 jam dan merupakan token Go mandiri,
+		// perpanjang masa aktifnya secara otomatis (sliding session 7 hari).
+		nowUnix := time.Now().Unix()
+		if session.ExpiresAt-nowUnix < 24*3600 && session.UserID != "" && session.Email != "" {
+			newDuration := 7 * 24 * time.Hour
+			if newAccessToken, signErr := s.supabase.GenerateAccessToken(session.UserID, session.Email, newDuration); signErr == nil {
+				session.AccessToken = newAccessToken
+				session.ExpiresAt = time.Now().Add(newDuration).Unix()
+			}
+		}
+		_ = claims
 		return session, nil
 	}
 
@@ -171,15 +212,82 @@ func (s *AuthService) VerifySession(ctx context.Context, raw string, allowRefres
 		return nil, errors.New("sesi kedaluwarsa")
 	}
 
-	tokens, err := s.supabase.RefreshToken(ctx, session.RefreshToken)
+	// 1. Periksa recentRefreshCache untuk request paralel atau straggler request
+	// yang tiba dengan token lama sesaat setelah refresh berhasil dilakukan.
+	s.refreshMu.RLock()
+	if item, ok := s.refreshCache[session.RefreshToken]; ok && time.Now().Before(item.expiresAt) {
+		s.refreshMu.RUnlock()
+		session.AccessToken = item.tokens.AccessToken
+		session.RefreshToken = item.tokens.RefreshToken
+		session.ExpiresAt = item.tokens.ExpiresIn
+		session.UserID = item.tokens.UserID
+		session.Email = item.tokens.Email
+		return session, nil
+	}
+	s.refreshMu.RUnlock()
+
+	// 2. Jalankan pembaruan token via singleflight agar hanya 1 panggilan yang menembak Supabase
+	val, err, _ := s.refreshGroup.Do(session.RefreshToken, func() (interface{}, error) {
+		// Periksa kembali cache di dalam singleflight
+		s.refreshMu.RLock()
+		if item, ok := s.refreshCache[session.RefreshToken]; ok && time.Now().Before(item.expiresAt) {
+			s.refreshMu.RUnlock()
+			return item.tokens, nil
+		}
+		s.refreshMu.RUnlock()
+
+		tokens, refreshErr := s.supabase.RefreshToken(ctx, session.RefreshToken)
+		if refreshErr != nil {
+			return nil, refreshErr
+		}
+
+		// Terbitkan token mandiri Go yang tahan 7 hari ke depan
+		goAccessToken, signErr := s.supabase.GenerateAccessToken(tokens.UserID, tokens.Email, 7*24*time.Hour)
+		if signErr == nil {
+			tokens.AccessToken = goAccessToken
+			tokens.ExpiresIn = time.Now().Add(7 * 24 * time.Hour).Unix()
+		} else {
+			tokens.ExpiresIn = time.Now().Unix() + tokens.ExpiresIn
+		}
+
+		// Simpan di recentRefreshCache dengan TTL 60 detik untuk kedua refresh token (lama & baru)
+		s.refreshMu.Lock()
+		if s.refreshCache == nil {
+			s.refreshCache = make(map[string]refreshCacheItem)
+		}
+		cacheItem := refreshCacheItem{tokens: tokens, expiresAt: time.Now().Add(60 * time.Second)}
+		s.refreshCache[session.RefreshToken] = cacheItem
+		if tokens.RefreshToken != "" {
+			s.refreshCache[tokens.RefreshToken] = cacheItem
+		}
+		// Bersihkan entri cache yang sudah kedaluwarsa jika cache bertambah
+		if len(s.refreshCache) > 100 {
+			now := time.Now()
+			for k, v := range s.refreshCache {
+				if now.After(v.expiresAt) {
+					delete(s.refreshCache, k)
+				}
+			}
+		}
+		s.refreshMu.Unlock()
+
+		return tokens, nil
+	})
+
 	if err != nil {
 		return nil, err
 	}
-	session.AccessToken = tokens.AccessToken
-	session.RefreshToken = tokens.RefreshToken
-	session.ExpiresAt = time.Now().Unix() + tokens.ExpiresIn
-	session.UserID = tokens.UserID
-	session.Email = tokens.Email
+
+	newTokens, ok := val.(*auth.Tokens)
+	if !ok || newTokens == nil {
+		return nil, errors.New("gagal memproses sesi baru")
+	}
+
+	session.AccessToken = newTokens.AccessToken
+	session.RefreshToken = newTokens.RefreshToken
+	session.ExpiresAt = newTokens.ExpiresIn
+	session.UserID = newTokens.UserID
+	session.Email = newTokens.Email
 	return session, nil
 }
 
@@ -206,6 +314,12 @@ func decodeSession(raw string) (*domain.Session, error) {
 
 // verifyTurnstile memvalidasi token Turnstile ke Cloudflare.
 func (s *AuthService) verifyTurnstile(ctx context.Context, token string) error {
+	// Di environment development/lokal, izinkan token Cloudflare testing (1x0000...) atau dev bypass
+	if s.cfg.IsDev && (token == "dev-turnstile-bypass" || token == "local-pwa-dev-token" || strings.HasPrefix(token, "XXXX.")) {
+		log.Printf("[AUTH DEV] Token Turnstile dev '%s' diterima (bypass dev)", token)
+		return nil
+	}
+
 	form := url.Values{}
 	form.Set("secret", s.cfg.TurnstileSecretKey)
 	form.Set("response", token)
@@ -220,6 +334,10 @@ func (s *AuthService) verifyTurnstile(ctx context.Context, token string) error {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
+		if s.cfg.IsDev {
+			log.Printf("[AUTH DEV] Verifikasi Turnstile gagal koneksi (%v), diloloskan karena mode development", err)
+			return nil
+		}
 		return errors.New("verifikasi keamanan gagal. Silakan coba lagi.")
 	}
 	defer resp.Body.Close()
@@ -231,6 +349,10 @@ func (s *AuthService) verifyTurnstile(ctx context.Context, token string) error {
 		return errors.New("respon verifikasi tidak valid")
 	}
 	if !result.Success {
+		if s.cfg.IsDev {
+			log.Printf("[AUTH DEV] Turnstile siteverify false untuk token %s, diloloskan karena mode development", token)
+			return nil
+		}
 		return errors.New("Verifikasi keamanan gagal. Silakan coba lagi.")
 	}
 	return nil

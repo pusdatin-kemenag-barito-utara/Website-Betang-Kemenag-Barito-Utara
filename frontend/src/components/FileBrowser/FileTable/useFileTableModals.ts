@@ -262,7 +262,7 @@ export function useFileTableModals({
         progressPercent: 35,
       }));
 
-      const extractRes = await extractFilesFromZip(blob, 100, item.name.replace(/\.zip$/i, ""));
+      const extractRes = await extractFilesFromZip(blob, 1000, item.name.replace(/\.zip$/i, ""));
 
       if (extractRes.items.length === 0) {
         setExtractProgress((prev) => ({

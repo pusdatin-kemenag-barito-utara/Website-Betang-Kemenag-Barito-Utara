@@ -18,7 +18,7 @@ export function UploadDropzone({ isFolderMode, onFilesSelected, onScanningState 
 
     onScanningState("Memindai berkas / folder... Mohon tunggu.");
     try {
-      const extractedFiles = await extractFilesFromDataTransfer(e.dataTransfer, 100);
+      const extractedFiles = await extractFilesFromDataTransfer(e.dataTransfer, 1000);
       onScanningState("");
       if (extractedFiles.length > 0) {
         onFilesSelected(extractedFiles);

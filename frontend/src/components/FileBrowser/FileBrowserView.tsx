@@ -4,6 +4,7 @@ import { FileBrowserHeader, type FileSortOption } from "./FileBrowser/FileBrowse
 import { FileFilterChips } from "./FileBrowser/FileFilterChips";
 import { FileBrowserModals } from "./FileBrowser/FileBrowserModals";
 import { extractFilesFromDataTransfer } from "./UploadModal/dragDropUtils";
+import { openGlobalUpload } from "./globalUploadEvents";
 import type { FileItem } from "@/lib/types";
 import { getFolderContents, getBreadcrumbs, getActiveFileLocks } from "@/lib/api";
 import { formatFileSize } from "@/lib/utils";
@@ -100,8 +101,6 @@ export function FileBrowserView({
   }, [initialFolderId, initialItems, initialBreadcrumbs]);
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [isUploadOpen, setIsUploadOpen] = useState(false);
-  const [isFolderMode, setIsFolderMode] = useState(false);
   const [searchQuery, setSearchQuery] = useState(initialSearchQuery);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [filterType, setFilterType] = useState<string>("all");
@@ -111,7 +110,6 @@ export function FileBrowserView({
 
   // External file drag & drop states
   const [isDragOverWindow, setIsDragOverWindow] = useState(false);
-  const [droppedFiles, setDroppedFiles] = useState<File[] | undefined>(undefined);
   const dragCounter = useRef(0);
 
   const loadFolder = useCallback(async (targetId: string, pushState = true) => {
@@ -292,9 +290,12 @@ export function FileBrowserView({
     try {
       const filesArray = await extractFilesFromDataTransfer(e.dataTransfer, 100);
       if (filesArray.length > 0) {
-        setDroppedFiles(filesArray);
-        setIsFolderMode(false);
-        setIsUploadOpen(true);
+        openGlobalUpload({
+          folderId: currentFolderId,
+          userBidangId,
+          isFolderMode: false,
+          initialFiles: filesArray,
+        });
         toast.info(`${filesArray.length} berkas siap diunggah`);
       } else {
         toast.warning("Tidak ada berkas yang terbaca dari folder/file yang ditarik.");
@@ -334,7 +335,7 @@ export function FileBrowserView({
 
       switch (sortBy) {
         case "name-desc":
-          return b.name.localeCompare(a.name, "id-ID", { sensitivity: "base" });
+          return b.name.localeCompare(a.name, "id-ID", { numeric: true, sensitivity: "base" });
         case "date-desc": {
           const tA = a.rawDate ? new Date(a.rawDate).getTime() : 0;
           const tB = b.rawDate ? new Date(b.rawDate).getTime() : 0;
@@ -357,7 +358,7 @@ export function FileBrowserView({
         }
         case "name-asc":
         default:
-          return a.name.localeCompare(b.name, "id-ID", { sensitivity: "base" });
+          return a.name.localeCompare(b.name, "id-ID", { numeric: true, sensitivity: "base" });
       }
     });
   }, [items, searchQuery, filterType, sortBy]);
@@ -392,14 +393,18 @@ export function FileBrowserView({
         onSortChange={setSortBy}
         onOpenCreateFolder={() => setIsCreateOpen(true)}
         onOpenUploadFile={() => {
-          setIsFolderMode(false);
-          setDroppedFiles(undefined);
-          setIsUploadOpen(true);
+          openGlobalUpload({
+            folderId: currentFolderId,
+            userBidangId,
+            isFolderMode: false,
+          });
         }}
         onOpenUploadFolder={() => {
-          setIsFolderMode(true);
-          setDroppedFiles(undefined);
-          setIsUploadOpen(true);
+          openGlobalUpload({
+            folderId: currentFolderId,
+            userBidangId,
+            isFolderMode: true,
+          });
         }}
         onNavigateBreadcrumb={handleNavigate}
       />
@@ -427,17 +432,9 @@ export function FileBrowserView({
 
       <FileBrowserModals
         isCreateOpen={isCreateOpen}
-        isUploadOpen={isUploadOpen}
-        isFolderMode={isFolderMode}
         currentFolderId={currentFolderId}
-        userBidangId={userBidangId}
         selectedItemForInfo={selectedItemForInfo}
-        initialFiles={droppedFiles}
         onCloseCreate={() => setIsCreateOpen(false)}
-        onCloseUpload={() => {
-          setIsUploadOpen(false);
-          setDroppedFiles(undefined);
-        }}
         onCloseInfo={() => setSelectedItemForInfo(null)}
         onSuccessMutation={() => loadFolder(currentFolderId, false)}
       />

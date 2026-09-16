@@ -110,9 +110,11 @@ func (m *AuthMiddleware) RequireAuth(c fiber.Ctx) error {
 }
 
 // SetSessionCookie menulis cookie sesi httpOnly.
-// Bila sessionOnly (remember me tidak dicentang), cookie menjadi session cookie (dihapus saat browser ditutup).
-// Bila rememberMe aktif (!sessionOnly), cookie diberi masa berlaku 30 hari (2.592.000 detik).
+// Bila rememberMe aktif (!sessionOnly), cookie diberi masa berlaku 30 hari.
+// Bila sessionOnly, tetap berikan masa berlaku 7 hari agar tab yang idle atau
+// browser yang ditidurkan oleh fitur hemat memori OS tidak kehilangan cookie di tengah kerja.
 const rememberMeMaxAge = 30 * 24 * 60 * 60 // 30 hari
+const defaultSessionMaxAge = 7 * 24 * 60 * 60 // 7 hari
 
 func (m *AuthMiddleware) SetSessionCookie(c fiber.Ctx, session *domain.Session, sessionOnly bool) {
 	cookie := &fiber.Cookie{
@@ -126,6 +128,8 @@ func (m *AuthMiddleware) SetSessionCookie(c fiber.Ctx, session *domain.Session, 
 	}
 	if !sessionOnly {
 		cookie.MaxAge = rememberMeMaxAge
+	} else {
+		cookie.MaxAge = defaultSessionMaxAge
 	}
 	c.Cookie(cookie)
 }

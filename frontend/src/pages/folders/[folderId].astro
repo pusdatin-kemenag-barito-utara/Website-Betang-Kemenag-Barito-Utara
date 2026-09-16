@@ -91,9 +91,9 @@ const items = [
 ].sort((a, b) => {
   if (a.type !== b.type) return a.type === "folder" ? -1 : 1;
   if (folderId === "root") {
-    return b.name.localeCompare(a.name, "id-ID", { sensitivity: "base" });
+    return b.name.localeCompare(a.name, "id-ID", { numeric: true, sensitivity: "base" });
   }
-  return a.name.localeCompare(b.name, "id-ID", { sensitivity: "base" });
+  return a.name.localeCompare(b.name, "id-ID", { numeric: true, sensitivity: "base" });
 });
 
 // Breadcrumbs backend berurutan daun -> akar; balik agar akar -> daun.

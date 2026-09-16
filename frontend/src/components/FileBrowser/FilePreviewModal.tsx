@@ -136,10 +136,11 @@ export function FilePreviewModal({
     Boolean((effectiveFileUrl || fileUrl) && /\.(xlsx|xls|xlsm|ods|csv|tsv)(\?|$)/i.test(effectiveFileUrl || fileUrl || ""));
 
   const isDocx =
-    /\.(docx|doc|dotx)$/i.test(fileName) ||
+    /\.(docx|doc|dotx|dot|rtf)$/i.test(fileName) ||
     mimeType?.toLowerCase().includes("wordprocessingml") ||
     mimeType?.toLowerCase().includes("msword") ||
-    Boolean((effectiveFileUrl || fileUrl) && /\.(docx|doc|dotx)(\?|$)/i.test(effectiveFileUrl || fileUrl || ""));
+    mimeType?.toLowerCase().includes("rtf") ||
+    Boolean((effectiveFileUrl || fileUrl) && /\.(docx|doc|dotx|dot|rtf)(\?|$)/i.test(effectiveFileUrl || fileUrl || ""));
 
   const isPptx =
     /\.(pptx|ppt|ppsx|potx)$/i.test(fileName) ||
@@ -567,6 +568,7 @@ export function FilePreviewModal({
                   fileUrl={effectiveFileUrl || fileUrl!}
                   fileName={fileName}
                   fileId={fileId}
+                  onDownload={handleDownload}
                 />
               ) : isPptx ? (
                 <PptxViewer

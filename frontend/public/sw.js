@@ -1,8 +1,8 @@
 // ==============================================================================
-// SI BETANG Enterprise PWA Service Worker (v1.1.0)
+// SI BETANG Enterprise PWA Service Worker (v1.1.1)
 // ==============================================================================
 
-const CACHE_NAME = "si-betang-pwa-v1.1.0";
+const CACHE_NAME = "si-betang-pwa-v1.1.1";
 const OFFLINE_URL = "/offline";
 
 const PRECACHE_ASSETS = [

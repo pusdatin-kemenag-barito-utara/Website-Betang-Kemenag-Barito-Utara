@@ -133,7 +133,7 @@ export function OfficeLaunchModal() {
               Mendukung Auto-Save (Ctrl + S Online)
             </p>
             <p className="text-[10px] text-slate-500">
-              Bebas tekan <kbd className="px-1 py-0.5 rounded bg-white border border-slate-300 font-mono text-[9px] text-slate-700">Ctrl + S</kbd> kapan saja saat mengetik. Sistem pintar menyerap simpanan berkala dan menyinkronkan ke server secara aman tanpa membebani memori.
+              Bebas tekan <kbd className="px-1 py-0.5 rounded bg-white border border-slate-300 font-semibold text-[9px] text-slate-700">Ctrl + S</kbd> kapan saja saat mengetik. Sistem pintar menyerap simpanan berkala dan menyinkronkan ke server secara aman tanpa membebani memori.
             </p>
           </div>
         </div>

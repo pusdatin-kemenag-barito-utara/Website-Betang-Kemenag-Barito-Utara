@@ -3,6 +3,7 @@ import BaseLayout from "./BaseLayout.astro";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { DashboardNavigation } from "@/components/layout/DashboardNavigation";
 import { TopNavbar } from "@/components/layout/TopNavbar";
+import { GlobalUploadIsland } from "@/components/FileBrowser/GlobalUploadIsland";
 import { apiGet, requireUser } from "@/lib/server";
 
 interface Props {
@@ -85,6 +86,9 @@ const disableRightClick = settings?.ok ? (settings.body?.data?.disable_right_cli
     </div>
   </div>
 
+  <!-- Persistent Global Upload Island (Proses upload tetap berjalan di background saat pindah halaman) -->
+  <GlobalUploadIsland client:load transition:persist="global-upload-island" />
+
   <script is:inline>
     function setupContextMenuGuard() {
       document.addEventListener("contextmenu", function (e) {
@@ -126,8 +130,11 @@ const disableRightClick = settings?.ok ? (settings.body?.data?.disable_right_cli
         } catch (e) {}
 
         var now = Date.now();
-        if (now - lastCheck < 15000) return;
+        if (now - lastCheck < 30000) return;
         lastCheck = now;
+
+        // Jangan periksa/alihkan jika sedang ada proses unggah berkas yang aktif
+        if (window.__BETANG_IS_UPLOADING__ === true) return;
 
         // 2. Verifikasi ke backend API jika sesi aktif
         fetch("/api/v1/auth/me", {
@@ -136,12 +143,20 @@ const disableRightClick = settings?.ok ? (settings.body?.data?.disable_right_cli
           credentials: "include",
         })
           .then(function (res) {
-            if (!res.ok || res.status === 401) {
-              try {
-                localStorage.removeItem("is_logged_in");
-                sessionStorage.clear();
-              } catch (e) {}
-              window.location.replace("/login");
+            // HANYA alihkan ke login jika berstatus 401 terkonfirmasi (bukan 500/502/network glitch)
+            if (res.status === 401) {
+              res
+                .json()
+                .then(function (data) {
+                  if (data && data.success === false) {
+                    try {
+                      localStorage.removeItem("is_logged_in");
+                      sessionStorage.clear();
+                    } catch (e) {}
+                    window.location.replace("/login");
+                  }
+                })
+                .catch(function () {});
             }
           })
           .catch(function () {});

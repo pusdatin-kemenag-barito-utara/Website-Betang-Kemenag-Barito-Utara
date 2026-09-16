@@ -143,7 +143,7 @@ export function RecentUploadsTable({
                           </span>
                         </div>
                       </td>
-                      <td className="px-4 py-3.5 whitespace-nowrap text-xs text-slate-500 font-mono">
+                      <td className="px-4 py-3.5 whitespace-nowrap text-xs text-slate-500 font-medium">
                         {formatBytes(file.size_bytes)}
                       </td>
                       <td className="px-4 py-3.5 whitespace-nowrap text-xs text-slate-400">

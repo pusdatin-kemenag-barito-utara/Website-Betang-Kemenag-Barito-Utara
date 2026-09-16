@@ -13,8 +13,8 @@ import (
 func TestDataSync(t *testing.T) {
 
 	cfg, err := config.Load()
-	if err != nil {
-		t.Fatalf("config error: %v", err)
+	if err != nil || cfg.DatabaseURL == "" {
+		t.Skipf("skipping live database integration test: %v", err)
 	}
 
 	pool, err := repository.Connect(context.Background(), cfg.DatabaseURL, "kemenag_arsip, kemenag_pusdatin, public")
@@ -123,7 +123,7 @@ func TestDataSync(t *testing.T) {
 	}
 
 	// 7. Test Stats
-	stats, err := svc.File.Stats(context.Background())
+	stats, err := svc.File.Stats(context.Background(), nil)
 	if err != nil {
 		t.Fatalf("File.Stats error: %v", err)
 	}

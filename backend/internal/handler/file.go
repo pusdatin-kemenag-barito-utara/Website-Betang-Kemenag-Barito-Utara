@@ -282,8 +282,21 @@ func sanitizeFilename(name string) string {
 }
 
 // Stats mengembalikan ringkasan statistik untuk halaman dashboard.
+// Untuk Admin Bidang, statistik dan 5 unggahan terbaru secara otomatis dibatasi pada seksi/bidang miliknya.
 func (h *FileHandler) Stats(c fiber.Ctx) error {
-	stats, err := h.svc.Stats(c.Context())
+	user := currentUser(c)
+	var bidangFilter *string
+	if user != nil && !user.IsSuperAdmin {
+		if user.BidangID != nil && *user.BidangID != "" {
+			bidangFilter = user.BidangID
+		}
+	} else if user != nil && user.IsSuperAdmin {
+		if q := strings.TrimSpace(c.Query("bidang_id")); q != "" && len(q) == 36 {
+			bidangFilter = &q
+		}
+	}
+
+	stats, err := h.svc.Stats(c.Context(), bidangFilter)
 	if err != nil {
 		return writeFail(c, fiber.StatusInternalServerError, "Gagal memuat statistik dashboard.")
 	}

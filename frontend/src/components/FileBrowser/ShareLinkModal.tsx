@@ -116,7 +116,7 @@ export function ShareLinkModal({ isOpen, onClose, file }: ShareLinkModalProps) {
                   type="text"
                   readOnly
                   value={directCdnUrl}
-                  className="bg-white dark:bg-slate-900 text-xs text-slate-700 dark:text-slate-200 outline-none flex-1 truncate font-mono px-2 py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800/60"
+                  className="bg-white dark:bg-slate-900 text-xs text-slate-700 dark:text-slate-200 outline-none flex-1 truncate font-medium px-2 py-1.5 rounded-lg border border-emerald-200 dark:border-emerald-800/60"
                 />
                 <button
                   type="button"
@@ -205,7 +205,7 @@ export function ShareLinkModal({ isOpen, onClose, file }: ShareLinkModalProps) {
                   type="text"
                   readOnly
                   value={shareUrl}
-                  className="bg-transparent text-xs text-slate-700 dark:text-slate-200 outline-none flex-1 truncate font-mono px-1"
+                  className="bg-transparent text-xs text-slate-700 dark:text-slate-200 outline-none flex-1 truncate font-medium px-1"
                 />
                 <button
                   onClick={handleCopy}

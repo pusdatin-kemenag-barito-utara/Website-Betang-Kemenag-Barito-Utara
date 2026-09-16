@@ -262,7 +262,7 @@ export function FileDetailsPanel({
                   <FileText className="w-3.5 h-3.5 text-slate-400" />
                   Tipe MIME
                 </span>
-                <span className="font-mono text-[11px] text-slate-800 text-right truncate max-w-[140px]">
+                <span className="font-medium text-[11px] text-slate-800 text-right truncate max-w-[140px]">
                   {item.mimeType || (isFolder ? "inode/directory" : "application/octet-stream")}
                 </span>
               </div>

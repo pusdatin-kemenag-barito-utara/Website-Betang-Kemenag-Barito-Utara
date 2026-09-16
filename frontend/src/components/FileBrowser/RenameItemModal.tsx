@@ -99,7 +99,7 @@ export function RenameItemModal({ isOpen, onClose, onConfirm, initialName, itemT
                 </label>
                 {fileExtension && (
                   <span className="text-[11px] font-semibold text-slate-400">
-                    Format: <span className="font-mono text-slate-600 font-bold">{fileExtension}</span>
+                    Format: <span className="text-slate-600 font-bold">{fileExtension}</span>
                   </span>
                 )}
               </div>
@@ -117,7 +117,7 @@ export function RenameItemModal({ isOpen, onClose, onConfirm, initialName, itemT
                   autoFocus
                 />
                 {itemType === "file" && fileExtension && (
-                  <div className="shrink-0 flex items-center px-3.5 py-3 bg-slate-100 border-l border-slate-200 text-xs sm:text-sm font-bold text-slate-600 select-none font-mono tracking-wide">
+                  <div className="shrink-0 flex items-center px-3.5 py-3 bg-slate-100 border-l border-slate-200 text-xs sm:text-sm font-bold text-slate-600 select-none tracking-wide">
                     {fileExtension}
                   </div>
                 )}
@@ -130,7 +130,7 @@ export function RenameItemModal({ isOpen, onClose, onConfirm, initialName, itemT
                     Hasil:
                   </span>
                   <span
-                    className="font-mono text-xs text-slate-800 font-semibold truncate select-all"
+                    className="text-xs text-slate-800 font-semibold truncate select-all"
                     title={`${name.trim()}${fileExtension}`}
                   >
                     {name.trim() ? `${name.trim()}${fileExtension}` : `(nama kosong)${fileExtension}`}

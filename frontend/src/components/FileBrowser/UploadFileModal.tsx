@@ -74,8 +74,14 @@ export function UploadFileModal({
               <Upload className="h-5 w-5" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-slate-900">Upload Dokumen (Batch)</h2>
-              <p className="text-xs text-slate-500">Maksimal 100 file sekaligus</p>
+              <h2 className="text-lg font-bold text-slate-900">
+                {isFolderMode ? "Upload Folder" : "Upload Dokumen (Batch)"}
+              </h2>
+              <p className="text-xs text-slate-500">
+                {isFolderMode
+                  ? "Folder beserta struktur subfolder dan seluruh berkas akan diunggah otomatis"
+                  : "Maksimal 1000 file sekaligus"}
+              </p>
             </div>
           </div>
           <button

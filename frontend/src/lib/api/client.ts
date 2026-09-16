@@ -71,11 +71,24 @@ export async function request<T = any>(
         window.location.pathname !== "/login" &&
         path !== "/auth/login"
       ) {
-        try {
-          localStorage.removeItem("is_logged_in");
-          sessionStorage.clear();
-        } catch {}
-        window.location.replace("/login");
+        // Jangan langsung redirect paksa jika:
+        // 1. Sedang ada proses upload berkas aktif
+        // 2. Request merupakan polling background (seperti syncLocks atau storage stats)
+        const isBackgroundPoll =
+          path.includes("/locks") ||
+          path.includes("/stats") ||
+          path.includes("/check");
+        const isUploading = (window as any).__BETANG_IS_UPLOADING__ === true;
+
+        if (!isBackgroundPoll && !isUploading) {
+          try {
+            localStorage.removeItem("is_logged_in");
+            sessionStorage.clear();
+          } catch {}
+          window.location.replace("/login");
+        } else if (isUploading) {
+          console.warn("[BETANG AUTH]: 401 diabaikan dari auto-redirect karena proses upload sedang aktif.");
+        }
       }
     }
     return result as T;

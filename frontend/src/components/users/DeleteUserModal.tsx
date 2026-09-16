@@ -33,7 +33,7 @@ export function DeleteUserModal({
         <p className="mt-2 text-xs text-slate-500 leading-relaxed">
           Tindakan ini akan menghapus akun{" "}
           <strong className="text-slate-800">{user.full_name}</strong> (
-          <span className="text-slate-700 font-mono">{user.email}</span>)
+          <span className="text-slate-700 font-medium">{user.email}</span>)
           secara permanen dari sistem SI BETANG dan mencabut seluruh hak aksesnya.
         </p>
 

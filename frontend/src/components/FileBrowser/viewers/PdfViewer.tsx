@@ -89,7 +89,7 @@ export function PdfViewer({
             >
               <ZoomOut className="w-4 h-4" />
             </button>
-            <span className="text-[11px] font-mono text-zinc-400 min-w-[36px] text-center">
+            <span className="text-[11px] font-medium text-zinc-400 min-w-[36px] text-center">
               {Math.round(scale * 100)}%
             </span>
             <button
