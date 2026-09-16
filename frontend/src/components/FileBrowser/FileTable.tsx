@@ -16,6 +16,7 @@ import { FileContextMenu } from "./FileTable/FileContextMenu";
 import { FileTableEmptyState } from "./FileTable/FileTableEmptyState";
 import { FileTableBatchBar } from "./FileTable/FileTableBatchBar";
 import { FileTableModals } from "./FileTable/FileTableModals";
+import { ExtractProgressModal } from "./FileTable/ExtractProgressModal";
 import type { FileItem } from "@/lib/types";
 import { copyItem } from "@/lib/api";
 import { toast } from "sonner";
@@ -104,6 +105,10 @@ export function FileTable({
     handlePreview,
     handleDownload,
     handleDeleteConfirm,
+    handleExtractArchive,
+    extractProgress,
+    handleCloseExtractProgress,
+    handleToggleCollapseExtractProgress,
   } = useFileTableModals({ folderId, onNavigate, onRefresh });
 
   const filteredData = useMemo(() => {
@@ -117,13 +122,13 @@ export function FileTable({
     const viewportWidth = typeof window !== "undefined" ? window.innerWidth : 1200;
     const viewportHeight = typeof window !== "undefined" ? window.innerHeight : 800;
 
-    let targetX = rect.right - 220;
+    let targetX = rect.right - 260;
     if (targetX < 12) targetX = 12;
-    if (targetX + 220 > viewportWidth - 12) targetX = viewportWidth - 232;
+    if (targetX + 260 > viewportWidth - 12) targetX = viewportWidth - 272;
 
     let targetY = rect.bottom + 4;
-    if (targetY + 380 > viewportHeight - 12) {
-      targetY = Math.max(12, rect.top - 384);
+    if (targetY + 340 > viewportHeight - 12) {
+      targetY = Math.max(12, rect.top - 344);
     }
 
     setContextMenu({ visible: true, x: targetX, y: targetY, item });
@@ -135,8 +140,8 @@ export function FileTable({
     const viewportWidth = typeof window !== "undefined" ? window.innerWidth : 1200;
     const viewportHeight = typeof window !== "undefined" ? window.innerHeight : 800;
 
-    const targetX = Math.min(e.clientX, viewportWidth - 232);
-    const targetY = Math.min(e.clientY, viewportHeight - 380);
+    const targetX = Math.min(e.clientX, viewportWidth - 272);
+    const targetY = Math.min(e.clientY, viewportHeight - 340);
 
     setContextMenu({ visible: true, x: targetX, y: targetY, item });
   };
@@ -171,9 +176,10 @@ export function FileTable({
         onDelete: (item) => setItemsToDelete([item]),
         onShowInfo: handleShowDetails,
         onOpenMenu: handleOpenItemMenu,
+        onExtract: handleExtractArchive,
         starredMap: localStarredMap,
       }),
-    [onNavigate, onShowInfo, localStarredMap, handlePreview, handleDownload, handleToggleStar, setItemsToDelete],
+    [onNavigate, onShowInfo, localStarredMap, handlePreview, handleDownload, handleToggleStar, setItemsToDelete, handleExtractArchive],
   );
 
   const table = useReactTable({
@@ -326,6 +332,7 @@ export function FileTable({
         onVersion={(item) => setVersionHistoryFile(item)}
         onDelete={(item) => setItemsToDelete([item])}
         onShowInfo={handleShowDetails}
+        onExtract={handleExtractArchive}
       />
 
       {/* Dialog Modals */}
@@ -363,6 +370,13 @@ export function FileTable({
         onTriggerShare={(item) => setShareLinkFile(item)}
         onTriggerDelete={(item) => setItemsToDelete([item])}
         onRefresh={onRefresh}
+      />
+
+      {/* Modal / Widget Progres Ekstraksi Arsip */}
+      <ExtractProgressModal
+        state={extractProgress}
+        onToggleCollapse={handleToggleCollapseExtractProgress}
+        onClose={handleCloseExtractProgress}
       />
     </div>
   );

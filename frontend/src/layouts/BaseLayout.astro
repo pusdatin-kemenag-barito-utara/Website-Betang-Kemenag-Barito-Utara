@@ -91,6 +91,16 @@ const publicEnv = {
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
 
+    <!-- 📱 PWA & Mobile Web App Meta -->
+    <meta name="theme-color" content="#059669" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="SI BETANG" />
+    <meta name="application-name" content="SI BETANG" />
+    <meta name="msapplication-TileColor" content="#059669" />
+    <meta name="msapplication-TileImage" content="/pwa-192x192.png" />
+
     <!-- 🏷️ SEO Meta Tags & JSON-LD Graph -->
     <MetaTags
       fullTitle={fullTitle}
@@ -119,5 +129,30 @@ const publicEnv = {
     <!-- React Island Global Components -->
     <ToasterIsland client:load />
     <MaintenanceListener client:load />
+
+    <!-- ⚡ PWA Service Worker Registration -->
+    <script is:inline>
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker
+            .register("/sw.js", { scope: "/" })
+            .then((registration) => {
+              registration.addEventListener("updatefound", () => {
+                const newWorker = registration.installing;
+                if (newWorker) {
+                  newWorker.addEventListener("statechange", () => {
+                    if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
+                      console.log("[PWA] Versi baru aplikasi SI BETANG siap dimuat.");
+                    }
+                  });
+                }
+              });
+            })
+            .catch((err) => {
+              console.warn("[PWA] Registrasi Service Worker gagal:", err);
+            });
+        });
+      }
+    </script>
   </body>
 </html>

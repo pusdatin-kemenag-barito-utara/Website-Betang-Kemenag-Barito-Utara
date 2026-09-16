@@ -1,5 +1,12 @@
 import { Search, Filter, UserPlus, X } from "lucide-react";
 import type { Bidang } from "./types";
+import { ModernSelect } from "@/components/ui/ModernSelect";
+
+const ROLE_OPTIONS = [
+  { value: "ALL", label: "Semua Peran" },
+  { value: "Super Admin", label: "Super Admin" },
+  { value: "Admin Bidang", label: "Admin Bidang" },
+];
 
 interface UserToolbarProps {
   search: string;
@@ -22,6 +29,11 @@ export function UserToolbar({
   bidangList,
   onOpenAddModal,
 }: UserToolbarProps) {
+  const bidangOptions = [
+    { value: "ALL", label: "Semua Bidang" },
+    ...bidangList.map((b) => ({ value: b.id, label: b.name })),
+  ];
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
@@ -32,8 +44,8 @@ export function UserToolbar({
             type="text"
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
-            placeholder="Cari nama, email, username, atau bidang..."
-            className="w-full rounded-2xl border border-slate-200 bg-slate-50/60 pl-10 pr-4 py-2.5 text-sm text-slate-800 placeholder-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-4 focus:ring-emerald-500/10 transition-all"
+            placeholder="Cari nama, email, NIP, atau bidang..."
+            className="w-full rounded-2xl border border-slate-200/80 bg-white pl-10 pr-10 py-2.5 text-xs sm:text-sm font-medium text-slate-900 shadow-2xs transition-all placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-3 focus:ring-emerald-500/15"
           />
           {search && (
             <button
@@ -51,28 +63,23 @@ export function UserToolbar({
         <div className="flex flex-wrap items-center gap-2.5">
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4 text-slate-400 shrink-0" />
-            <select
+            <ModernSelect
               value={roleFilter}
-              onChange={(e) => onRoleFilterChange(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2 text-xs font-bold text-slate-700 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer"
-            >
-              <option value="ALL">Semua Peran</option>
-              <option value="Super Admin">Super Admin</option>
-              <option value="Admin Bidang">Admin Bidang</option>
-            </select>
+              onChange={onRoleFilterChange}
+              options={ROLE_OPTIONS}
+              triggerClassName="px-3 py-2 rounded-xl bg-slate-50/70 border border-slate-200 text-xs font-bold text-slate-700 hover:bg-white hover:border-slate-300"
+              dropdownClassName="w-44"
+              title="Filter peran pengguna"
+            />
 
-            <select
+            <ModernSelect
               value={bidangFilter}
-              onChange={(e) => onBidangFilterChange(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2 text-xs font-bold text-slate-700 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer max-w-[180px] truncate"
-            >
-              <option value="ALL">Semua Bidang</option>
-              {bidangList.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
+              onChange={onBidangFilterChange}
+              options={bidangOptions}
+              triggerClassName="px-3 py-2 rounded-xl bg-slate-50/70 border border-slate-200 text-xs font-bold text-slate-700 hover:bg-white hover:border-slate-300 max-w-[200px]"
+              dropdownClassName="w-56"
+              title="Filter seksi / bidang"
+            />
           </div>
 
           <button

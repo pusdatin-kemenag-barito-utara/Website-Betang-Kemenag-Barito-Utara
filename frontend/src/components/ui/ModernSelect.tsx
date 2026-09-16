@@ -1,24 +1,31 @@
-"use client"
+"use client";
 
-import { useState, useRef, useEffect } from "react"
-import { ChevronDown, Check } from "lucide-react"
+import { useState, useRef, useEffect, type ReactNode } from "react";
+import { ChevronDown, Check } from "lucide-react";
 
 export interface SelectOption {
-  value: string
-  label: string
+  value: string | number;
+  label: string;
+  icon?: ReactNode;
+  description?: string;
 }
 
-interface ModernSelectProps {
-  value: string
-  onChange: (value: string) => void
-  options: SelectOption[]
-  className?: string
-  triggerClassName?: string
-  id?: string
-  name?: string
-  required?: boolean
-  disabled?: boolean
-  placeholder?: string
+export interface ModernSelectProps {
+  value: string | number;
+  onChange: (value: string) => void;
+  options: SelectOption[];
+  className?: string;
+  triggerClassName?: string;
+  dropdownClassName?: string;
+  id?: string;
+  name?: string;
+  required?: boolean;
+  disabled?: boolean;
+  placeholder?: string;
+  icon?: ReactNode;
+  align?: "left" | "right";
+  direction?: "auto" | "up" | "down";
+  title?: string;
 }
 
 export function ModernSelect({
@@ -26,66 +33,158 @@ export function ModernSelect({
   onChange,
   options,
   className = "",
-  triggerClassName = "w-full rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-900 ring-1 ring-inset ring-slate-200 hover:bg-slate-100",
+  triggerClassName,
+  dropdownClassName = "",
   id,
   name,
   required,
   disabled,
-  placeholder = "-- Pilih --"
+  placeholder = "-- Pilih --",
+  icon,
+  align = "left",
+  direction = "auto",
+  title,
 }: ModernSelectProps) {
-  const [isOpen, setIsOpen] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
+  const [isOpen, setIsOpen] = useState(false);
+  const [openUpwards, setOpenUpwards] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const instanceId = useRef(`modern-select-${Math.random().toString(36).slice(2, 9)}`);
+
+  // Menutup dropdown ini jika dropdown ModernSelect lain dibuka (mencegah tabrakan / bentrok)
+  useEffect(() => {
+    const handleOtherOpened = (e: Event) => {
+      const customEvent = e as CustomEvent<string>;
+      if (customEvent.detail !== instanceId.current) {
+        setIsOpen(false);
+      }
+    };
+    window.addEventListener("modern-select-opened", handleOtherOpened);
+    return () => window.removeEventListener("modern-select-opened", handleOtherOpened);
+  }, []);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setIsOpen(false)
+        setIsOpen(false);
       }
     }
-    document.addEventListener("mousedown", handleClickOutside)
-    return () => document.removeEventListener("mousedown", handleClickOutside)
-  }, [])
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
 
-  const selectedOption = options.find(opt => String(opt.value) === String(value))
+  const toggleOpen = () => {
+    if (disabled) return;
+    const nextState = !isOpen;
+    if (nextState && containerRef.current) {
+      // Siarkan event ke ModernSelect lain agar menutup
+      window.dispatchEvent(
+        new CustomEvent("modern-select-opened", { detail: instanceId.current })
+      );
+
+      // Hitung ketersediaan ruang di atas vs di bawah
+      const rect = containerRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+
+      if (direction === "up") {
+        setOpenUpwards(true);
+      } else if (direction === "down") {
+        setOpenUpwards(false);
+      } else {
+        // Otomatis: jika ruang bawah sempit (< 240px) dan ruang atas lebih lega, buka ke atas
+        setOpenUpwards(spaceBelow < 240 && spaceAbove > spaceBelow);
+      }
+    }
+    setIsOpen(nextState);
+  };
+
+  const selectedOption = options.find((opt) => String(opt.value) === String(value));
+
+  const defaultTriggerClass =
+    "w-full rounded-xl bg-white px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-slate-800 border border-slate-200 shadow-2xs hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20";
 
   return (
-    <div className={`relative ${className}`} ref={containerRef}>
+    <div
+      className={`relative inline-block ${isOpen ? "z-50" : "z-10"} ${className}`}
+      ref={containerRef}
+    >
       <input type="hidden" name={name} id={id} value={value} required={required} />
 
       <button
         type="button"
         disabled={disabled}
-        onClick={() => setIsOpen(!isOpen)}
-        className={`flex items-center justify-between border-0 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all ${triggerClassName} ${isOpen ? '!bg-white !ring-2 !ring-emerald-500' : ''} ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+        onClick={toggleOpen}
+        title={title}
+        className={`flex items-center justify-between gap-2 transition-all cursor-pointer select-none ${
+          triggerClassName || defaultTriggerClass
+        } ${isOpen ? "!border-emerald-500 !ring-2 !ring-emerald-500/20 shadow-xs" : ""} ${
+          disabled ? "opacity-50 !cursor-not-allowed" : ""
+        }`}
       >
-        <span className={`${selectedOption ? 'text-current' : 'text-slate-500'} truncate mr-2`}>
-          {selectedOption ? selectedOption.label : placeholder}
-        </span>
-        <ChevronDown className={`h-4 w-4 shrink-0 transition-transform ${isOpen ? 'rotate-180 text-emerald-500' : 'text-slate-400'}`} />
+        <div className="flex items-center gap-2 min-w-0 truncate">
+          {icon && <span className="shrink-0 text-slate-400">{icon}</span>}
+          {selectedOption?.icon && <span className="shrink-0">{selectedOption.icon}</span>}
+          <span className={`${selectedOption ? "text-slate-800 dark:text-slate-100" : "text-slate-400"} truncate`}>
+            {selectedOption ? selectedOption.label : placeholder}
+          </span>
+        </div>
+        <ChevronDown
+          className={`h-3.5 w-3.5 shrink-0 transition-transform duration-200 ${
+            isOpen ? "rotate-180 text-emerald-600" : "text-slate-400"
+          }`}
+        />
       </button>
 
       {isOpen && !disabled && (
-        <div className="absolute z-[100] mt-2 w-full min-w-max rounded-xl bg-white p-1 shadow-xl ring-1 ring-slate-200 animate-in fade-in zoom-in-95 max-h-60 overflow-y-auto">
-          {options.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              onClick={() => {
-                onChange(option.value)
-                setIsOpen(false)
-              }}
-              className={`w-full flex items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium transition-colors text-left ${
-                String(value) === String(option.value)
-                  ? 'bg-emerald-50 text-emerald-700'
-                  : 'text-slate-700 hover:bg-slate-50'
-              }`}
-            >
-              <span className="truncate pr-4">{option.label}</span>
-              {String(value) === String(option.value) && <Check className="h-4 w-4 shrink-0 text-emerald-600" />}
-            </button>
-          ))}
+        <div
+          className={`absolute z-[9999] min-w-full rounded-xl bg-white p-1 shadow-2xl ring-1 border border-slate-200/90 duration-150 max-h-60 overflow-y-auto ${
+            openUpwards
+              ? "bottom-full mb-1.5 animate-in fade-in zoom-in-95 slide-in-from-bottom-2"
+              : "top-full mt-1.5 animate-in fade-in zoom-in-95 slide-in-from-top-2"
+          } ${align === "right" ? "right-0" : "left-0"} ${dropdownClassName}`}
+        >
+          {options.map((option) => {
+            const isSelected = String(value) === String(option.value);
+            return (
+              <button
+                key={String(option.value)}
+                type="button"
+                onClick={() => {
+                  onChange(String(option.value));
+                  setIsOpen(false);
+                }}
+                className={`w-full flex items-center justify-between rounded-lg px-2.5 py-2 text-xs font-semibold transition-colors text-left cursor-pointer ${
+                  isSelected
+                    ? "bg-emerald-50 text-emerald-700 font-bold"
+                    : "text-slate-700 hover:bg-slate-50 hover:text-slate-900"
+                }`}
+              >
+                <div className="flex items-center gap-2 min-w-0 pr-2">
+                  {option.icon && <span className="shrink-0">{option.icon}</span>}
+                  <div className="truncate">
+                    <span className="block truncate">{option.label}</span>
+                    {option.description && (
+                      <span className="block text-[10px] text-slate-400 font-normal truncate">
+                        {option.description}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {isSelected && <Check className="h-3.5 w-3.5 shrink-0 text-emerald-600 ml-auto" />}
+              </button>
+            );
+          })}
         </div>
       )}
     </div>
-  )
+  );
 }

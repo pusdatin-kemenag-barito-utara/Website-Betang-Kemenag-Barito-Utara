@@ -1,12 +1,11 @@
 // ==============================================================================
-// SI BETANG Enterprise PWA Service Worker
+// SI BETANG Enterprise PWA Service Worker (v1.1.0)
 // ==============================================================================
 
-const CACHE_NAME = "si-betang-pwa-v1.0.0";
+const CACHE_NAME = "si-betang-pwa-v1.1.0";
 const OFFLINE_URL = "/offline";
 
 const PRECACHE_ASSETS = [
-  "/",
   "/offline",
   "/login",
   "/kemenag.svg",
@@ -15,23 +14,34 @@ const PRECACHE_ASSETS = [
   "/pwa-512x512.png",
   "/pwa-maskable-512x512.png",
   "/apple-touch-icon.png",
-  "/og-image.png",
   "/manifest.webmanifest",
 ];
 
-// 1. Install & Precache
+// 1. Install & Resilient Precache
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches
       .open(CACHE_NAME)
-      .then((cache) => {
-        return cache.addAll(PRECACHE_ASSETS);
+      .then(async (cache) => {
+        await Promise.all(
+          PRECACHE_ASSETS.map((url) =>
+            fetch(url, { cache: "no-cache" })
+              .then((response) => {
+                if (response.ok) {
+                  return cache.put(url, response);
+                }
+              })
+              .catch((err) => {
+                console.warn("[SW] Gagal precache aset:", url, err);
+              }),
+          ),
+        );
       })
       .then(() => self.skipWaiting()),
   );
 });
 
-// 2. Activate & Clean Old Caches
+// 2. Activate & Clean Outdated Caches
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
@@ -47,17 +57,30 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-// 3. Fetch Strategy: Network First with Offline Fallback & Cache Fallback
+// 3. Message listener (for SKIP_WAITING / instant reload)
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+});
+
+// 4. Fetch Strategy
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Jangan cache API atau permintaan non-GET
-  if (request.method !== "GET" || url.pathname.startsWith("/api/")) {
+  // Jangan cache permintaan selain GET atau permintaan API/auth/eksternal
+  if (
+    request.method !== "GET" ||
+    url.pathname.startsWith("/api/") ||
+    url.pathname.startsWith("/auth/") ||
+    url.hostname.includes("supabase") ||
+    url.hostname.includes("challenges.cloudflare.com")
+  ) {
     return;
   }
 
-  // Permintaan navigasi halaman HTML
+  // Strategi Navigasi Halaman: Network-First dengan Fallback Halaman Offline
   if (request.mode === "navigate") {
     event.respondWith(
       fetch(request).catch(async () => {
@@ -65,31 +88,44 @@ self.addEventListener("fetch", (event) => {
         const cachedResponse = await cache.match(request);
         if (cachedResponse) return cachedResponse;
         const offlineResponse = await cache.match(OFFLINE_URL);
-        return offlineResponse || new Response("Anda sedang offline", { status: 503 });
+        return (
+          offlineResponse ||
+          new Response(
+            "<!DOCTYPE html><html><body><h1>Koneksi Terputus</h1><p>Anda sedang berada dalam mode offline.</p></body></html>",
+            {
+              status: 503,
+              headers: { "Content-Type": "text/html; charset=utf-8" },
+            },
+          )
+        );
       }),
     );
     return;
   }
 
-  // Aset statis & Gambar (Cache First / Stale-While-Revalidate)
+  // Aset Statis (Gambar, Font, Skrip Bundle Astro): Cache-First dengan Revalidasi di Latar
   if (
     url.pathname.endsWith(".svg") ||
     url.pathname.endsWith(".png") ||
     url.pathname.endsWith(".jpg") ||
+    url.pathname.endsWith(".jpeg") ||
     url.pathname.endsWith(".webp") ||
     url.pathname.endsWith(".woff2") ||
+    url.pathname.endsWith(".webmanifest") ||
     url.pathname.startsWith("/_astro/")
   ) {
     event.respondWith(
       caches.match(request).then((cached) => {
         if (cached) return cached;
-        return fetch(request).then((networkResponse) => {
-          if (networkResponse && networkResponse.status === 200) {
-            const responseClone = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone));
-          }
-          return networkResponse;
-        }).catch(() => cached);
+        return fetch(request)
+          .then((networkResponse) => {
+            if (networkResponse && networkResponse.status === 200) {
+              const responseClone = networkResponse.clone();
+              caches.open(CACHE_NAME).then((cache) => cache.put(request, responseClone));
+            }
+            return networkResponse;
+          })
+          .catch(() => cached);
       }),
     );
   }

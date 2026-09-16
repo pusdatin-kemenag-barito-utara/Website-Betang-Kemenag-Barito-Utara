@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { FolderIcon, LayoutDashboard, Trash2, Settings, X, Star, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StorageQuotaWidget } from "./StorageQuotaWidget";
+import { PwaInstallButton } from "@/components/pwa/PwaInstallButton";
 import { getCurrentUser } from "@/lib/api";
 import { trackEvent } from "@/lib/analytics";
 
@@ -168,11 +169,12 @@ export function Sidebar({ onClose, currentPath, isSuperAdmin: propIsSuperAdmin }
       </nav>
 
       {/* Footer Sidebar */}
-      <div className="p-6 pb-4">
+      <div className="px-5 pb-3 pt-2 space-y-2.5">
+        <PwaInstallButton />
         <StorageQuotaWidget />
       </div>
-      <div className="border-t border-slate-800 p-6 pt-4">
-        <div className="rounded-xl bg-slate-800/50 p-4 border border-slate-700/50">
+      <div className="border-t border-slate-800 p-5 pt-3">
+        <div className="rounded-xl bg-slate-800/50 p-3.5 border border-slate-700/50">
           <p className="text-xs font-semibold text-white">Butuh Bantuan?</p>
           <p className="mt-1 text-[10px] text-slate-400 leading-relaxed">
             Hubungi administrator sistem jika Anda mengalami kendala teknis.

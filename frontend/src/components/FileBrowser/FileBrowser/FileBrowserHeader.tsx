@@ -12,6 +12,7 @@ import {
   ArrowUpDown,
 } from "lucide-react";
 import { Breadcrumbs } from "../Breadcrumbs";
+import { ModernSelect } from "@/components/ui/ModernSelect";
 
 export type FileSortOption =
   | "name-asc"
@@ -20,6 +21,15 @@ export type FileSortOption =
   | "date-asc"
   | "size-desc"
   | "size-asc";
+
+const SORT_OPTIONS = [
+  { value: "name-asc", label: "Nama (A - Z)" },
+  { value: "name-desc", label: "Nama (Z - A)" },
+  { value: "date-desc", label: "Diubah (Terbaru)" },
+  { value: "date-asc", label: "Diubah (Terlama)" },
+  { value: "size-desc", label: "Ukuran (Terbesar)" },
+  { value: "size-asc", label: "Ukuran (Terkecil)" },
+];
 
 interface FileBrowserHeaderProps {
   breadcrumbsList: { id: string; name: string }[];
@@ -157,23 +167,16 @@ export function FileBrowserHeader({
 
         <div className="flex items-center gap-2 shrink-0">
           {/* Sort By Dropdown */}
-          <div className="relative">
-            <select
-              value={sortBy}
-              onChange={(e) => onSortChange?.(e.target.value as FileSortOption)}
-              className="appearance-none pl-8 pr-7 py-1.5 rounded-xl bg-white border border-slate-200/80 text-xs font-semibold text-slate-700 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 cursor-pointer shadow-2xs transition-all"
-              title="Urutkan berkas & folder"
-            >
-              <option value="name-asc">Nama (A - Z)</option>
-              <option value="name-desc">Nama (Z - A)</option>
-              <option value="date-desc">Diubah (Terbaru)</option>
-              <option value="date-asc">Diubah (Terlama)</option>
-              <option value="size-desc">Ukuran (Terbesar)</option>
-              <option value="size-asc">Ukuran (Terkecil)</option>
-            </select>
-            <ArrowUpDown className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
-            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 h-3 w-3 text-slate-400 pointer-events-none" />
-          </div>
+          <ModernSelect
+            value={sortBy}
+            onChange={(val) => onSortChange?.(val as FileSortOption)}
+            options={SORT_OPTIONS}
+            icon={<ArrowUpDown className="h-3.5 w-3.5 text-slate-400" />}
+            align="right"
+            triggerClassName="px-2.5 py-1.5 rounded-xl bg-white border border-slate-200/80 text-xs font-semibold text-slate-700 hover:border-slate-300 shadow-2xs"
+            dropdownClassName="w-48"
+            title="Urutkan berkas & folder"
+          />
 
           {/* View Mode Toggle (List vs Grid) */}
           <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200/60 shrink-0">

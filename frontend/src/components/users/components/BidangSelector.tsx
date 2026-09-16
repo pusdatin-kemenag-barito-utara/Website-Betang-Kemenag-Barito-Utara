@@ -2,6 +2,7 @@ import { useState } from "react"
 import { ShieldCheck, Plus, FolderKey, Folder } from "lucide-react"
 import type { Bidang, RootFolderOption } from "../types"
 import { AddBidangModal } from "@/components/Bidang/AddBidangModal"
+import { ModernSelect } from "@/components/ui/ModernSelect"
 
 interface BidangSelectorProps {
   role: string
@@ -73,19 +74,19 @@ export function BidangSelector({
           </button>
         </div>
 
-        <select
+        <ModernSelect
           value={bidangId || ""}
-          required
-          onChange={(e) => onChangeBidang(e.target.value || null)}
-          className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 font-medium focus:border-emerald-500 focus:outline-none focus:ring-3 focus:ring-emerald-500/15 cursor-pointer shadow-2xs"
-        >
-          <option value="">-- Pilih Seksi / Bidang Penempatan --</option>
-          {bidangList.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.name}
-            </option>
-          ))}
-        </select>
+          onChange={(val) => onChangeBidang(val || null)}
+          options={[
+            { value: "", label: "-- Pilih Seksi / Bidang Penempatan --" },
+            ...bidangList.map((b) => ({ value: b.id, label: b.name })),
+          ]}
+          placeholder="-- Pilih Seksi / Bidang Penempatan --"
+          className="w-full"
+          triggerClassName="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs sm:text-sm text-slate-800 font-semibold shadow-2xs hover:border-slate-300"
+          dropdownClassName="w-full"
+          title="Pilih Seksi / Bidang Penempatan"
+        />
 
         {/* RBAC Folder Access Ringkas */}
         {selectedBidang ? (

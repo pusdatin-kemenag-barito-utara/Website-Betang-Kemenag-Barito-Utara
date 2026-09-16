@@ -10,11 +10,14 @@ import {
   MoreVertical,
   Info,
   Lock,
+  FolderArchive,
+  Send,
 } from "lucide-react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { formatFileSize } from "@/lib/utils";
 import type { FileItem } from "@/lib/types";
 import { getFolderContents } from "@/lib/api";
+import { exportFileForExternalApp } from "@/lib/exportUtils";
 
 export const getFileIcon = (item: FileItem) => {
   if (item.type === "folder") {
@@ -75,6 +78,7 @@ export function createFileTableColumns({
   onOpenMenu,
   starredMap,
   onShowInfo,
+  onExtract,
 }: {
   onNavigate?: (id: string) => void;
   onPreview: (item: FileItem) => void;
@@ -83,6 +87,7 @@ export function createFileTableColumns({
   onDelete: (item: FileItem) => void;
   onShowInfo?: (item: FileItem) => void;
   onOpenMenu: (e: React.MouseEvent, item: FileItem) => void;
+  onExtract?: (item: FileItem) => void;
   starredMap: Record<string, boolean>;
 }): ColumnDef<FileItem>[] {
   return [
@@ -293,6 +298,16 @@ export function createFileTableColumns({
       cell: ({ row }) => {
         const item = row.original;
         const isStarred = starredMap[item.id] ?? item.isStarred ?? false;
+        const fileNameLower = item.name.toLowerCase();
+        const isArchive =
+          item.type !== "folder" &&
+          (fileNameLower.endsWith(".zip") ||
+            fileNameLower.endsWith(".rar") ||
+            fileNameLower.endsWith(".7z") ||
+            fileNameLower.endsWith(".tar") ||
+            fileNameLower.endsWith(".gz") ||
+            Boolean(item.mimeType?.includes("zip")) ||
+            Boolean(item.mimeType?.includes("rar")));
 
         return (
           <div className="flex items-center justify-end gap-0.5 sm:gap-1" onClick={(e) => e.stopPropagation()}>
@@ -310,6 +325,18 @@ export function createFileTableColumns({
               />
             </button>
 
+            {/* Tombol Ekstrak Cepat untuk berkas arsip (ZIP/RAR) */}
+            {isArchive && onExtract && (
+              <button
+                type="button"
+                onClick={() => onExtract(item)}
+                className="hidden sm:inline-flex p-1.5 rounded-lg text-amber-600 hover:text-amber-700 hover:bg-amber-50 transition-colors cursor-pointer"
+                title="Ekstrak Berkas di Sini"
+              >
+                <FolderArchive className="h-4 w-4" />
+              </button>
+            )}
+
             {onShowInfo && (
               <button
                 type="button"
@@ -318,6 +345,18 @@ export function createFileTableColumns({
                 title="Detail Informasi"
               >
                 <Info className="h-4 w-4" />
+              </button>
+            )}
+
+            {/* Tombol Kirim / Drag ke SRIKANDI / TTE */}
+            {item.type !== "folder" && (
+              <button
+                type="button"
+                onClick={() => exportFileForExternalApp(item)}
+                className="hidden sm:inline-flex p-1.5 rounded-lg text-purple-600 hover:text-purple-700 hover:bg-purple-50 transition-colors cursor-pointer"
+                title="Kirim / Drag ke Aplikasi Lain (SRIKANDI, TTE Kemenag)"
+              >
+                <Send className="h-4 w-4" />
               </button>
             )}
 
@@ -333,7 +372,7 @@ export function createFileTableColumns({
         );
       },
       enableSorting: false,
-      size: 85,
+      size: 105,
     },
   ];
 }

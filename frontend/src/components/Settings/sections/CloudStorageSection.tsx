@@ -1,5 +1,20 @@
-import { Cloud, Zap, HardDrive, Clock, ChevronDown } from "lucide-react"
+import { Cloud, Zap, HardDrive, Clock } from "lucide-react"
 import type { AppSettings } from "@/lib/api"
+import { ModernSelect } from "@/components/ui/ModernSelect"
+
+const MAX_UPLOAD_OPTIONS = [
+  { value: 50, label: "50 MB (Rekomendasi Dokumen)" },
+  { value: 100, label: "100 MB (Standar Kantor)" },
+  { value: 250, label: "250 MB (Arsip Sedang)" },
+  { value: 500, label: "500 MB (Maksimal Kapasitas)" },
+];
+
+const SHARE_EXPIRY_OPTIONS = [
+  { value: 1, label: "1 Jam (Sangat Rahasia)" },
+  { value: 24, label: "24 Jam (Rekomendasi)" },
+  { value: 72, label: "3 Hari (Akses Rapat)" },
+  { value: 168, label: "7 Hari (Maksimal)" },
+];
 
 interface CloudStorageSectionProps {
   settings: AppSettings
@@ -13,8 +28,8 @@ export function CloudStorageSection({
   onUpdate,
 }: CloudStorageSectionProps) {
   return (
-    <div className="w-full rounded-3xl bg-white dark:bg-slate-900 shadow-sm ring-1 ring-slate-100 dark:ring-slate-800 overflow-hidden">
-      <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 px-6 py-4 flex items-center justify-between">
+    <div className="w-full rounded-3xl bg-white dark:bg-slate-900 shadow-sm ring-1 ring-slate-100 dark:ring-slate-800 relative z-20">
+      <div className="border-b border-slate-100 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-800/40 px-6 py-4 flex items-center justify-between rounded-t-3xl">
         <div>
           <h2 className="font-bold text-slate-800 dark:text-slate-100 text-base">
             Penyimpanan & Jaringan Cloudflare R2
@@ -59,7 +74,7 @@ export function CloudStorageSection({
         </div>
 
         {/* Setting: Max Upload Size */}
-        <div className="p-5 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-850 flex flex-col justify-between">
+        <div className="p-5 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-850 flex flex-col justify-between relative">
           <div>
             <div className="flex items-center justify-between mb-3">
               <div className="h-11 w-11 rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 flex items-center justify-center">
@@ -80,25 +95,21 @@ export function CloudStorageSection({
               <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1.5">
                 Batas per File:
               </label>
-              <div className="relative">
-                <select
-                  value={settings.max_upload_size_mb}
-                  disabled={updatingKey === "max_upload_size_mb"}
-                  onChange={(e) =>
-                    onUpdate(
-                      { max_upload_size_mb: Number(e.target.value) },
-                      "Batas Ukuran Upload",
-                    )
-                  }
-                  className="w-full appearance-none rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-xs font-semibold text-slate-800 dark:text-slate-100 outline-hidden focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 cursor-pointer"
-                >
-                  <option value={50}>50 MB (Rekomendasi Dokumen)</option>
-                  <option value={100}>100 MB (Standar Kantor)</option>
-                  <option value={250}>250 MB (Arsip Sedang)</option>
-                  <option value={500}>500 MB (Maksimal Kapasitas)</option>
-                </select>
-                <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-2.5 pointer-events-none" />
-              </div>
+              <ModernSelect
+                value={settings.max_upload_size_mb}
+                disabled={updatingKey === "max_upload_size_mb"}
+                onChange={(val) =>
+                  onUpdate(
+                    { max_upload_size_mb: Number(val) },
+                    "Batas Ukuran Upload",
+                  )
+                }
+                options={MAX_UPLOAD_OPTIONS}
+                className="w-full"
+                triggerClassName="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-xs font-semibold text-slate-800 dark:text-slate-100 shadow-2xs"
+                dropdownClassName="w-full"
+                title="Pilih batas ukuran upload per file"
+              />
             </div>
           </div>
 
@@ -111,7 +122,7 @@ export function CloudStorageSection({
         </div>
 
         {/* Setting: Default Share Link Expiry */}
-        <div className="p-5 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-850 flex flex-col justify-between">
+        <div className="p-5 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/40 dark:bg-slate-850 flex flex-col justify-between relative">
           <div>
             <div className="flex items-center justify-between mb-3">
               <div className="h-11 w-11 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center">
@@ -132,25 +143,21 @@ export function CloudStorageSection({
               <label className="block text-[11px] font-medium text-slate-600 dark:text-slate-400 mb-1.5">
                 Durasi Standar:
               </label>
-              <div className="relative">
-                <select
-                  value={settings.default_share_expiry_hours}
-                  disabled={updatingKey === "default_share_expiry_hours"}
-                  onChange={(e) =>
-                    onUpdate(
-                      { default_share_expiry_hours: Number(e.target.value) },
-                      "Masa Berlaku Tautan Berbagi",
-                    )
-                  }
-                  className="w-full appearance-none rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-xs font-semibold text-slate-800 dark:text-slate-100 outline-hidden focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 cursor-pointer"
-                >
-                  <option value={1}>1 Jam (Sangat Rahasia)</option>
-                  <option value={24}>24 Jam (Rekomendasi)</option>
-                  <option value={72}>3 Hari (Akses Rapat)</option>
-                  <option value={168}>7 Hari (Maksimal)</option>
-                </select>
-                <ChevronDown className="w-4 h-4 text-slate-400 absolute right-3 top-2.5 pointer-events-none" />
-              </div>
+              <ModernSelect
+                value={settings.default_share_expiry_hours}
+                disabled={updatingKey === "default_share_expiry_hours"}
+                onChange={(val) =>
+                  onUpdate(
+                    { default_share_expiry_hours: Number(val) },
+                    "Masa Berlaku Tautan Berbagi",
+                  )
+                }
+                options={SHARE_EXPIRY_OPTIONS}
+                className="w-full"
+                triggerClassName="w-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-2 text-xs font-semibold text-slate-800 dark:text-slate-100 shadow-2xs"
+                dropdownClassName="w-full"
+                title="Pilih masa berlaku tautan berbagi"
+              />
             </div>
           </div>
 

@@ -1,4 +1,5 @@
 {
+  "id": "/?source=pwa",
   "name": "SI BETANG - E-Arsip Kemenag Barito Utara",
   "short_name": "SI BETANG",
   "description": "Sistem Informasi Manajemen dan Pengarsipan Digital Terpadu Kantor Kementerian Agama Kabupaten Barito Utara",
@@ -6,7 +7,7 @@
   "scope": "/",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#0f172a",
+  "background_color": "#059669",
   "theme_color": "#059669",
   "categories": ["productivity", "utilities", "business", "government"],
   "lang": "id-ID",
@@ -30,12 +31,6 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
-    },
-    {
-      "src": "/kemenag.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
     }
   ],
   "shortcuts": [
