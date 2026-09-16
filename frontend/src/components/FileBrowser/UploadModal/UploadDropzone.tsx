@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { Upload, FolderUp } from "lucide-react";
+import { extractFilesFromDataTransfer } from "./dragDropUtils";
 
 interface UploadDropzoneProps {
   isFolderMode: boolean;
@@ -7,69 +8,23 @@ interface UploadDropzoneProps {
   onScanningState: (msg: string) => void;
 }
 
-interface WebkitEntry {
-  isFile: boolean;
-  isDirectory: boolean;
-  file: (cb: (file: File) => void) => void;
-  createReader: () => { readEntries: (cb: (entries: WebkitEntry[]) => void) => void };
-}
-
 export function UploadDropzone({ isFolderMode, onFilesSelected, onScanningState }: UploadDropzoneProps) {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const getFilesFromDataTransfer = async (items: DataTransferItemList): Promise<File[]> => {
-    const files: File[] = [];
-    const entries: WebkitEntry[] = [];
-
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      if (item.kind === "file") {
-        const entry = item.webkitGetAsEntry() as unknown as WebkitEntry;
-        if (entry) entries.push(entry);
-      }
-    }
-
-    const readEntry = async (entry: WebkitEntry) => {
-      if (entry.isFile) {
-        return new Promise<void>((resolve) => {
-          entry.file((file: File) => {
-            files.push(file);
-            resolve();
-          });
-        });
-      } else if (entry.isDirectory) {
-        const dirReader = entry.createReader();
-        return new Promise<void>((resolve) => {
-          dirReader.readEntries(async (dirEntries: WebkitEntry[]) => {
-            for (const childEntry of dirEntries) {
-              await readEntry(childEntry);
-            }
-            resolve();
-          });
-        });
-      }
-    };
-
-    for (const entry of entries) {
-      await readEntry(entry);
-    }
-    return files;
-  };
 
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
 
-    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
-      onScanningState("Memindai folder... Mohon tunggu.");
-      const extractedFiles = await getFilesFromDataTransfer(e.dataTransfer.items);
+    onScanningState("Memindai berkas / folder... Mohon tunggu.");
+    try {
+      const extractedFiles = await extractFilesFromDataTransfer(e.dataTransfer, 100);
       onScanningState("");
       if (extractedFiles.length > 0) {
         onFilesSelected(extractedFiles);
       }
-    } else if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      onFilesSelected(Array.from(e.dataTransfer.files));
+    } catch {
+      onScanningState("");
     }
   };
 

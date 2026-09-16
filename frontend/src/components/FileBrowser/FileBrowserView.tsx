@@ -3,6 +3,7 @@ import { FileTable } from "./FileTable";
 import { FileBrowserHeader, type FileSortOption } from "./FileBrowser/FileBrowserHeader";
 import { FileFilterChips } from "./FileBrowser/FileFilterChips";
 import { FileBrowserModals } from "./FileBrowser/FileBrowserModals";
+import { extractFilesFromDataTransfer } from "./UploadModal/dragDropUtils";
 import type { FileItem } from "@/lib/types";
 import { getFolderContents, getBreadcrumbs, getActiveFileLocks } from "@/lib/api";
 import { formatFileSize } from "@/lib/utils";
@@ -282,18 +283,24 @@ export function FileBrowserView({
     e.stopPropagation();
   };
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     dragCounter.current = 0;
     setIsDragOverWindow(false);
 
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const filesArray = Array.from(e.dataTransfer.files);
-      setDroppedFiles(filesArray);
-      setIsFolderMode(false);
-      setIsUploadOpen(true);
-      toast.info(`${filesArray.length} berkas siap diunggah`);
+    try {
+      const filesArray = await extractFilesFromDataTransfer(e.dataTransfer, 100);
+      if (filesArray.length > 0) {
+        setDroppedFiles(filesArray);
+        setIsFolderMode(false);
+        setIsUploadOpen(true);
+        toast.info(`${filesArray.length} berkas siap diunggah`);
+      } else {
+        toast.warning("Tidak ada berkas yang terbaca dari folder/file yang ditarik.");
+      }
+    } catch {
+      toast.error("Gagal membaca berkas dari drag & drop");
     }
   };
 

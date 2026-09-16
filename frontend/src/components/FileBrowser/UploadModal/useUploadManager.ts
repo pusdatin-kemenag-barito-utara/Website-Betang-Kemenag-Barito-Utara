@@ -50,9 +50,9 @@ export function useUploadManager({
   }, [isOpen]);
 
   const addFiles = (newFiles: File[]) => {
-    if (uploadItems.length + newFiles.length > 50) {
-      setGlobalError("Maksimal 50 file dapat diunggah sekaligus.");
-      newFiles = newFiles.slice(0, 50 - uploadItems.length);
+    if (uploadItems.length + newFiles.length > 100) {
+      setGlobalError("Maksimal 100 file dapat diunggah sekaligus.");
+      newFiles = newFiles.slice(0, 100 - uploadItems.length);
     } else {
       setGlobalError("");
     }

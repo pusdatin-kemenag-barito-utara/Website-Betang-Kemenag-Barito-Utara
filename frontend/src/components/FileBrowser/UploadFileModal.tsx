@@ -70,7 +70,7 @@ export function UploadFileModal({
             </div>
             <div>
               <h2 className="text-lg font-bold text-slate-900">Upload Dokumen (Batch)</h2>
-              <p className="text-xs text-slate-500">Maksimal 50 file sekaligus</p>
+              <p className="text-xs text-slate-500">Maksimal 100 file sekaligus</p>
             </div>
           </div>
           <button
