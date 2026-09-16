@@ -33,6 +33,36 @@ const fullTitle =
 const siteUrl = (Astro.site?.toString() || Astro.url.origin).replace(/\/+$/, "");
 const canonicalUrl = new URL(Astro.url.pathname, siteUrl).toString();
 const ogImageUrl = new URL(image, siteUrl).toString();
+
+// Variabel publik diinjeksi secara dinamis dari proses runtime server Node.js (Infisical) ke browser client
+const publicEnv = {
+  PUBLIC_TURNSTILE_SITE_KEY:
+    (typeof process !== "undefined" &&
+      (process.env.PUBLIC_TURNSTILE_SITE_KEY || process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY)) ||
+    import.meta.env.PUBLIC_TURNSTILE_SITE_KEY ||
+    import.meta.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ||
+    "",
+  PUBLIC_PUSDATIN_URL:
+    (typeof process !== "undefined" &&
+      (process.env.PUBLIC_PUSDATIN_URL || process.env.NEXT_PUBLIC_PUSDATIN_URL)) ||
+    import.meta.env.PUBLIC_PUSDATIN_URL ||
+    import.meta.env.NEXT_PUBLIC_PUSDATIN_URL ||
+    "",
+  PUBLIC_API_URL:
+    (typeof process !== "undefined" &&
+      (process.env.PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_URL)) ||
+    import.meta.env.PUBLIC_API_URL ||
+    import.meta.env.NEXT_PUBLIC_API_URL ||
+    "",
+  PUBLIC_GA_MEASUREMENT_ID:
+    (typeof process !== "undefined" && process.env.PUBLIC_GA_MEASUREMENT_ID) ||
+    import.meta.env.PUBLIC_GA_MEASUREMENT_ID ||
+    "",
+  PUBLIC_GTM_ID:
+    (typeof process !== "undefined" && process.env.PUBLIC_GTM_ID) ||
+    import.meta.env.PUBLIC_GTM_ID ||
+    "",
+};
 ---
 
 <!doctype html>
@@ -42,6 +72,11 @@ const ogImageUrl = new URL(image, siteUrl).toString();
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="generator" content={Astro.generator} />
+
+    <!-- 🔑 Injeksi SSR Dinamis Variabel Publik Infisical Runtime -->
+    <script is:inline define:vars={{ publicEnv }}>
+      window.__PUBLIC_ENV__ = Object.assign(window.__PUBLIC_ENV__ || {}, publicEnv);
+    </script>
 
     <!-- 🌐 DNS-Prefetch & Preconnect -->
     <link rel="dns-prefetch" href="https://challenges.cloudflare.com" />

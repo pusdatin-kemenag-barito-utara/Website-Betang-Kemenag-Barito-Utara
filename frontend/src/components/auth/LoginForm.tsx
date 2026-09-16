@@ -14,6 +14,8 @@ interface LoginFormProps {
 export function LoginForm({ siteKey }: LoginFormProps) {
   const activeSiteKey =
     siteKey ||
+    (typeof window !== "undefined" && window.__PUBLIC_ENV__?.PUBLIC_TURNSTILE_SITE_KEY) ||
+    (typeof window !== "undefined" && window.__PUBLIC_ENV__?.NEXT_PUBLIC_TURNSTILE_SITE_KEY) ||
     import.meta.env.PUBLIC_TURNSTILE_SITE_KEY ||
     import.meta.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ||
     "";

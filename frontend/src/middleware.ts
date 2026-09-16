@@ -4,7 +4,10 @@ import type { APIContext, MiddlewareNext } from "astro";
 import { fetchFromBackend, forwardSetCookies } from "@/lib/server";
 
 const PUSDATIN_URL =
-  import.meta.env.PUBLIC_PUSDATIN_URL || "https://pusdatin.kemenag-baritoutara.com";
+  (typeof process !== "undefined" &&
+    (process.env.PUBLIC_PUSDATIN_URL || process.env.PUSDATIN_URL || process.env.NEXT_PUBLIC_PUSDATIN_URL)) ||
+  import.meta.env.PUBLIC_PUSDATIN_URL ||
+  "https://pusdatin.kemenag-baritoutara.com";
 const APP_ID = "e-arsip-kemenag";
 
 // Aset statis tidak perlu diperiksa sesi.

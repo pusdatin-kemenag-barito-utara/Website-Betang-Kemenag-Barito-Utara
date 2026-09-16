@@ -4,13 +4,23 @@
  */
 
 // Bersihkan API_ORIGIN agar tidak menduplikasi /api/v1 jika env PUBLIC_API_URL bernilai "/api/v1" atau berakhiran "/api/v1"
-const rawOrigin = (import.meta.env.PUBLIC_API_URL || "").replace(/\/+$/, "");
-export const API_ORIGIN = rawOrigin.replace(/\/api\/v1\/?$/, "");
+export function getApiOrigin(): string {
+  const rawOrigin = (
+    (typeof window !== "undefined" && (window.__PUBLIC_ENV__?.PUBLIC_API_URL || window.__PUBLIC_ENV__?.NEXT_PUBLIC_API_URL)) ||
+    import.meta.env.PUBLIC_API_URL ||
+    import.meta.env.NEXT_PUBLIC_API_URL ||
+    ""
+  ).replace(/\/+$/, "");
+  return rawOrigin.replace(/\/api\/v1\/?$/, "");
+}
+
+export const API_ORIGIN = getApiOrigin();
 
 export function buildApiUrl(path: string): string {
+  const origin = getApiOrigin();
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
   const normalizedPath = cleanPath.startsWith("/api/v1") ? cleanPath : `/api/v1${cleanPath}`;
-  return `${API_ORIGIN}${normalizedPath}`;
+  return `${origin}${normalizedPath}`;
 }
 
 export async function request<T = any>(

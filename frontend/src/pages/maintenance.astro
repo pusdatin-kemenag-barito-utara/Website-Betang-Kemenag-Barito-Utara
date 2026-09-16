@@ -2,6 +2,8 @@
 import BaseLayout from "@/layouts/BaseLayout.astro";
 
 const pusdatinUrl =
+  (typeof process !== "undefined" &&
+    (process.env.PUBLIC_PUSDATIN_URL || process.env.PUSDATIN_URL || process.env.NEXT_PUBLIC_PUSDATIN_URL)) ||
   import.meta.env.PUBLIC_PUSDATIN_URL ||
   "https://pusdatin.kemenag-baritoutara.com";
 ---

@@ -47,6 +47,12 @@ export const LoginTurnstile = forwardRef<LoginTurnstileRef, LoginTurnstileProps>
     useEffect(() => {
       if (!mounted) return;
 
+      if (typeof window !== "undefined" && window.turnstile) {
+        setScriptLoaded(true);
+        setLoading(false);
+        return;
+      }
+
       const existingScript = document.querySelector<HTMLScriptElement>(
         'script[src*="challenges.cloudflare.com"]',
       );
@@ -58,7 +64,7 @@ export const LoginTurnstile = forwardRef<LoginTurnstileRef, LoginTurnstileProps>
             setScriptLoaded(true);
             setLoading(false);
           }
-        }, 100);
+        }, 50);
         return () => clearInterval(checkTurnstile);
       }
 
@@ -67,8 +73,13 @@ export const LoginTurnstile = forwardRef<LoginTurnstileRef, LoginTurnstileProps>
       script.async = true;
       script.defer = true;
       script.onload = () => {
-        setScriptLoaded(true);
-        setLoading(false);
+        const checkTurnstile = setInterval(() => {
+          if (window.turnstile) {
+            clearInterval(checkTurnstile);
+            setScriptLoaded(true);
+            setLoading(false);
+          }
+        }, 50);
       };
       script.onerror = () => {
         console.error("Turnstile script failed to load");
@@ -84,6 +95,8 @@ export const LoginTurnstile = forwardRef<LoginTurnstileRef, LoginTurnstileProps>
 
       const siteKey =
         propSiteKey ||
+        (typeof window !== "undefined" && window.__PUBLIC_ENV__?.PUBLIC_TURNSTILE_SITE_KEY) ||
+        (typeof window !== "undefined" && window.__PUBLIC_ENV__?.NEXT_PUBLIC_TURNSTILE_SITE_KEY) ||
         import.meta.env.PUBLIC_TURNSTILE_SITE_KEY ||
         import.meta.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY;
       if (!siteKey) {
@@ -91,8 +104,12 @@ export const LoginTurnstile = forwardRef<LoginTurnstileRef, LoginTurnstileProps>
         return;
       }
 
+      if (typeof window === "undefined" || !window.turnstile) {
+        return;
+      }
+
       try {
-        widgetIdRef.current = window.turnstile!.render(containerRef.current, {
+        widgetIdRef.current = window.turnstile.render(containerRef.current, {
           sitekey: siteKey,
           theme: "light",
           size: "flexible",
