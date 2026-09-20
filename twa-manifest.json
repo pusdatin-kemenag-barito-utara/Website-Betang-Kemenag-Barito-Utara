@@ -1,0 +1,52 @@
+{
+  "packageId": "com.kemenag_baritoutara.arsip.twa",
+  "host": "arsip.kemenag-baritoutara.com",
+  "name": "SI BETANG - E-Arsip Kemenag Barito Utara",
+  "launcherName": "SI BETANG",
+  "display": "standalone",
+  "themeColor": "#059669",
+  "navigationColor": "#0f172a",
+  "navigationColorDark": "#0f172a",
+  "navigationDividerColor": "#00000000",
+  "navigationDividerColorDark": "#00000000",
+  "backgroundColor": "#ffffff",
+  "enableNotifications": true,
+  "startUrl": "/?source=android_twa",
+  "iconUrl": "https://arsip.kemenag-baritoutara.com/pwa-512x512.png",
+  "maskableIconUrl": "https://arsip.kemenag-baritoutara.com/pwa-maskable-512x512.png",
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "signingKey": {
+    "path": "./sibetang.keystore",
+    "alias": "sibetang"
+  },
+  "splashScreenFadeOutDuration": 300,
+  "enableSiteSettingsShortcut": true,
+  "orientation": "any",
+  "fingerprints": [],
+  "shortcuts": [
+    {
+      "name": "File Browser",
+      "shortName": "Arsip",
+      "url": "/folders/root",
+      "icon": "https://arsip.kemenag-baritoutara.com/pwa-192x192.png"
+    },
+    {
+      "name": "Recycle Bin",
+      "shortName": "Sampah",
+      "url": "/trash",
+      "icon": "https://arsip.kemenag-baritoutara.com/pwa-192x192.png"
+    }
+  ],
+  "features": {
+    "locationDelegation": {
+      "enabled": false
+    },
+    "playBilling": {
+      "enabled": false
+    }
+  },
+  "alphaDependencies": {
+    "enabled": false
+  }
+}

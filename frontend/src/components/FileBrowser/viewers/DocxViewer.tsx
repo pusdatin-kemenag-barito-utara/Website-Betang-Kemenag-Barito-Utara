@@ -370,10 +370,10 @@ export function DocxViewer({ fileUrl, fileName, fileId, onDownload }: DocxViewer
 
       {/* MODE 1: LEMBAR KERJA ASLI IN-BROWSER DENGAN KOP SURAT LENGKAP */}
       {viewMode === "native" && (
-        <div className="p-4 sm:p-8 flex justify-center w-full min-h-full">
+        <div className="p-2 sm:p-8 flex justify-center w-full min-h-full">
           <div
             ref={docxContainerRef}
-            className={`docx-preview-root transition-transform origin-top ${
+            className={`docx-preview-root w-full max-w-full transition-transform origin-top ${
               loading ? "opacity-0" : "opacity-100"
             }`}
           />
@@ -382,8 +382,8 @@ export function DocxViewer({ fileUrl, fileName, fileId, onDownload }: DocxViewer
 
       {/* MODE 2: PRATINJAU TEKS DOKUMEN DALAM LEMBAR KERJA A4 (UNTUK .DOC BINER) */}
       {viewMode === "text" && extractedDoc && (
-        <div className="p-4 sm:p-8 flex flex-col items-center w-full min-h-full">
-          <div className="w-full max-w-[800px] min-h-[1050px] bg-white text-slate-800 shadow-2xl p-8 sm:p-14 rounded-xs border border-slate-300 flex flex-col justify-between">
+        <div className="p-2 sm:p-8 flex flex-col items-center w-full min-h-full">
+          <div className="w-full max-w-[800px] min-h-auto sm:min-h-[1050px] bg-white text-slate-800 shadow-2xl p-4 sm:p-14 rounded-lg sm:rounded-xs border border-slate-300 flex flex-col justify-between">
             <div>
               <div className="border-b-2 border-slate-900 pb-3 mb-6 flex items-center justify-between">
                 <div>
@@ -517,6 +517,66 @@ export function DocxViewer({ fileUrl, fileName, fileId, onDownload }: DocxViewer
 
         .docx-render span {
           display: inline;
+        }
+
+        /* Optimasi Tampilan Khusus Mobile Phone & Tablet Kecil */
+        @media (max-width: 768px) {
+          .docx-preview-root {
+            width: 100% !important;
+            max-width: 100% !important;
+          }
+
+          .docx-wrapper {
+            width: 100% !important;
+            max-width: 100% !important;
+            padding: 0 !important;
+            gap: 12px !important;
+          }
+
+          .docx-wrapper > section.docx-render,
+          .docx-wrapper > section {
+            width: 100% !important;
+            max-width: 100% !important;
+            min-width: 0 !important;
+            min-height: auto !important;
+            padding: 16px 14px !important;
+            margin: 0 0 16px 0 !important;
+            border-radius: 8px !important;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+            box-sizing: border-box !important;
+            overflow-x: auto !important;
+          }
+
+          .docx-render p {
+            margin-bottom: 0.35em !important;
+            line-height: 1.45 !important;
+            font-size: 13px !important;
+            word-break: normal !important;
+            overflow-wrap: break-word !important;
+          }
+
+          .docx-render table {
+            width: 100% !important;
+            max-width: 100% !important;
+            table-layout: auto !important;
+            font-size: 11px !important;
+            margin: 8px 0 !important;
+          }
+
+          .docx-render td, .docx-render th {
+            padding: 4px 6px !important;
+            word-break: break-word !important;
+          }
+
+          .docx-render img, .docx-wrapper img {
+            max-height: 65px !important;
+            max-width: 65px !important;
+          }
+
+          .docx-injected-logo img {
+            max-height: 60px !important;
+            max-width: 60px !important;
+          }
         }
 
         @media print {

@@ -17,6 +17,8 @@
     "build:frontend": "npm run build --workspace=frontend",
     "build:backend": "cd backend && go build -o bin/betang-api ./cmd/api",
     "build": "npm run build:backend && npm run build:frontend",
+    "build:apk": "node scripts/build-apk.js",
+    "build:twa": "npx @bubblewrap/cli build",
     "install:frontend": "npm install --workspace=frontend",
     "install:backend": "cd backend && go mod download && go mod tidy",
     "install:all": "npm install && cd backend && go mod download && go mod tidy",

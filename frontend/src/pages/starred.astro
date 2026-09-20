@@ -1,7 +1,5 @@
 ---
 import DashboardLayout from "@/layouts/DashboardLayout.astro";
-import PageBanner from "@/components/ui/PageBanner.astro";
-import { Star } from "lucide-react";
 import { FileBrowserView } from "@/components/FileBrowser/FileBrowserView";
 import { apiGet, requireUser } from "@/lib/server";
 import { formatFileSize } from "@/lib/utils";
@@ -85,12 +83,6 @@ const breadcrumbs = [{ id: "starred", name: "Berbintang" }];
 
 <DashboardLayout title="Dokumen Berbintang" description="Akses cepat ke seluruh berkas dan folder penting yang telah Anda tandai sebagai favorit">
   <div class="flex flex-col gap-6 pb-10">
-    <PageBanner
-      title="Dokumen Berbintang"
-      description="Akses instan ke berkas dan folder favorit Anda tanpa mencari di hirarki folder"
-    >
-      <Star className="h-8 w-8 text-amber-300 fill-amber-300" slot="icon" />
-    </PageBanner>
 
     <FileBrowserView
       client:load

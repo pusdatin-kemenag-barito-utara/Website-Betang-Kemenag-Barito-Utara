@@ -1,7 +1,5 @@
 ---
 import DashboardLayout from "@/layouts/DashboardLayout.astro";
-import PageBanner from "@/components/ui/PageBanner.astro";
-import { Users } from "lucide-react";
 import { UsersManagementView } from "@/components/users/UsersManagementView";
 import { apiGet, requireUser } from "@/lib/server";
 import type { UserItem } from "@/lib/api";
@@ -66,12 +64,6 @@ const currentUserId = auth?.user?.id || "";
 
 <DashboardLayout title="Manajemen Pengguna & Hak Akses">
   <div class="flex flex-col gap-6 pb-10">
-    <PageBanner
-      title="Manajemen Pengguna & Hak Akses"
-      description="Kelola akun pengguna, penempatan seksi/bidang, serta kontrol hak akses folder root (RBAC)"
-    >
-      <Users className="h-7 w-7 md:h-8 md:w-8 text-white" slot="icon" />
-    </PageBanner>
 
     <UsersManagementView
       client:load

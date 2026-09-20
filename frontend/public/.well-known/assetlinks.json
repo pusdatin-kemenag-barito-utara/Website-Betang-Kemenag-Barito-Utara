@@ -1,0 +1,8 @@
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "com.kemenag_baritoutara.arsip.twa",
+        "sha256_cert_fingerprints": ["B7:C9:F4:61:FF:E7:1A:B2:F4:92:8C:15:52:E6:3A:C0:3D:F9:3A:CE:B3:FB:4C:BD:64:45:90:93:4C:81:CE:1A"]
+      }
+    }]

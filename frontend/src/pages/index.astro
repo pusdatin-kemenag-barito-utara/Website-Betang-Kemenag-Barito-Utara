@@ -1,7 +1,5 @@
 ---
 import DashboardLayout from "@/layouts/DashboardLayout.astro";
-import PageBanner from "@/components/ui/PageBanner.astro";
-import { LayoutDashboard } from "lucide-react";
 import { apiGet, requireUser } from "@/lib/server";
 import DashboardMetrics from "@/components/Dashboard/DashboardMetrics.astro";
 import { RecentUploadsTable } from "@/components/Dashboard/RecentUploadsTable";
@@ -85,16 +83,6 @@ const myAccessibleFolders = myBidang?.accessible_folder_names ?? [];
 
 <DashboardLayout title={isSuperAdmin ? "Dashboard Statistik" : `Dashboard ${userBidang || "Admin Bidang"}`}>
   <div class="flex flex-col gap-6 pb-12">
-    <!-- Header Banner Resmi Tunggal -->
-    <PageBanner
-      title={isSuperAdmin ? "Dashboard Statistik" : `Dashboard ${userBidang || "Seksi Bidang"}`}
-      description={isSuperAdmin 
-        ? "Ringkasan penggunaan dan aktivitas sistem E-Arsip Kementerian Agama Kabupaten Barito Utara"
-        : `Pusat pengelolaan dan pemantauan arsip digital resmi ${userBidang || "Seksi Bidang"}`
-      }
-    >
-      <LayoutDashboard className="h-8 w-8 text-white" slot="icon" />
-    </PageBanner>
 
     <!-- KISI 4 METRIK STATISTIK -->
     <DashboardMetrics

@@ -357,17 +357,17 @@ export function FilePreviewModal({
         className="bg-white dark:bg-slate-900 border-0 md:border md:border-slate-200 dark:md:border-slate-800 rounded-none md:rounded-2xl w-full h-full md:w-[95vw] md:max-w-[1400px] md:h-[93vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150"
       >
         {/* Top Header */}
-        <div className="flex items-center justify-between px-4 md:px-6 py-3 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 select-none shrink-0 gap-2">
-          <div className="min-w-0 flex-1 pr-2">
-            <h2 className="text-xs md:text-base font-bold text-slate-800 dark:text-slate-100 tracking-tight truncate max-w-[200px] sm:max-w-md md:max-w-xl">
+        <div className="flex items-center justify-between px-3 sm:px-6 py-2.5 sm:py-3 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 select-none shrink-0 gap-1.5 sm:gap-2">
+          <div className="min-w-0 flex-1 pr-1 sm:pr-2">
+            <h2 className="text-xs sm:text-base font-bold text-slate-800 dark:text-slate-100 tracking-tight truncate">
               {fileName || "Pratinjau Dokumen"}
             </h2>
-            <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium truncate uppercase tracking-wider">
+            <p className="text-[9px] sm:text-[10px] text-slate-500 dark:text-slate-400 font-medium truncate uppercase tracking-wider">
               {mimeType}
             </p>
           </div>
 
-          <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+          <div className="flex items-center gap-1 sm:gap-2 shrink-0">
             {/* Mode Switcher (PDF) */}
             {isPdf && (effectiveFileUrl || fileUrl) && !error && (
               <button
@@ -375,7 +375,7 @@ export function FilePreviewModal({
                 onClick={() =>
                   setViewMode(viewMode === "iframe" ? "canvas" : "iframe")
                 }
-                className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-[11px] sm:text-xs font-semibold text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-[11px] sm:text-xs font-semibold text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
                 title={
                   viewMode === "iframe"
                     ? "Ganti ke mode lembar dokumen (Canvas)"
@@ -394,7 +394,7 @@ export function FilePreviewModal({
               <button
                 type="button"
                 onClick={handleCopyText}
-                className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-[11px] sm:text-xs font-semibold text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-[11px] sm:text-xs font-semibold text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
                 title="Salin seluruh isi berkas"
               >
                 {isCopied ? (
@@ -419,7 +419,7 @@ export function FilePreviewModal({
                 type="button"
                 onClick={handleManualRefresh}
                 disabled={isManualRefreshing}
-                className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-[11px] sm:text-xs font-semibold text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
+                className="inline-flex items-center gap-1 sm:gap-1.5 p-1.5 sm:px-3 sm:py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 text-[11px] sm:text-xs font-semibold text-slate-700 dark:text-slate-200 transition-colors cursor-pointer"
                 title="Muat ulang untuk menampilkan perubahan versi terbaru tanpa refresh halaman"
               >
                 <RotateCcw
@@ -438,7 +438,7 @@ export function FilePreviewModal({
                 onClick={() =>
                   openInDesktopOffice(effectiveFileUrl || fileUrl!, fileName, mimeType, fileId)
                 }
-                className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border text-[11px] sm:text-xs font-bold transition-all shadow-xs cursor-pointer ${
+                className={`inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-1.5 rounded-xl border text-[11px] sm:text-xs font-bold transition-all shadow-xs cursor-pointer ${
                   officeApp === "word"
                     ? "bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 dark:hover:bg-blue-900 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300"
                     : officeApp === "excel"
@@ -455,7 +455,7 @@ export function FilePreviewModal({
               >
                 <ExternalLink className="w-3.5 h-3.5" />
                 <span>
-                  Buka di{" "}
+                  <span className="hidden sm:inline">Buka di </span>
                   {officeApp === "word"
                     ? "Word"
                     : officeApp === "excel"
@@ -591,15 +591,15 @@ export function FilePreviewModal({
         </div>
 
         {/* Modal Footer */}
-        <div className="px-4 md:px-6 py-2.5 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0 select-none">
-          <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-xs sm:max-w-md">
+        <div className="px-3 sm:px-6 py-2 sm:py-2.5 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between shrink-0 select-none gap-2">
+          <p className="text-[10px] sm:text-[11px] text-slate-500 dark:text-slate-400 truncate flex-1 min-w-0 pr-2">
             Dokumen resmi E-Arsip SI BETANG Kemenag Barito Utara
           </p>
 
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 active:bg-red-800 text-white text-xs font-bold transition-colors cursor-pointer shadow-xs"
+            className="px-4 sm:px-5 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 active:bg-red-800 text-white text-xs font-bold transition-colors cursor-pointer shadow-xs shrink-0"
           >
             Tutup
           </button>

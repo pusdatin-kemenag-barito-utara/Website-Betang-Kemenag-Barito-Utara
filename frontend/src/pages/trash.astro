@@ -1,7 +1,5 @@
 ---
 import DashboardLayout from "@/layouts/DashboardLayout.astro";
-import PageBanner from "@/components/ui/PageBanner.astro";
-import { Trash2 } from "lucide-react";
 import { TrashView } from "@/components/Trash/TrashView";
 import { apiGet, requireUser } from "@/lib/server";
 
@@ -80,12 +78,6 @@ const trashItems = trashRaw.map((t) => {
 
 <DashboardLayout title="Recycle Bin (Trash)">
   <div class="flex flex-col gap-6 pb-10">
-    <PageBanner
-      title="Recycle Bin (Trash)"
-      description="Dokumen yang dihapus akan tersimpan di sini sebelum dihapus permanen"
-    >
-      <Trash2 className="h-8 w-8 text-white" slot="icon" />
-    </PageBanner>
 
     <TrashView client:load initialData={trashItems} />
   </div>

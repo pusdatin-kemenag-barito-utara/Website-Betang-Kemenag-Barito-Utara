@@ -11,7 +11,7 @@ const PUSDATIN_URL =
 const APP_ID = "e-arsip-kemenag";
 
 // Aset statis tidak perlu diperiksa sesi.
-const STATIC_PATTERN = /\.(svg|png|jpg|jpeg|gif|webp|ico|webmanifest|css|js|xml|txt|json)$/;
+const STATIC_PATTERN = /\.(svg|png|jpg|jpeg|gif|webp|ico|webmanifest|css|js|xml|txt|json|apk)$/;
 
 function buildCSP() {
   try {
@@ -71,8 +71,8 @@ export async function onRequest(context: APIContext, next: MiddlewareNext) {
       return next();
     }
 
-    // Lewati pemeriksaan untuk aset statis.
-    if (STATIC_PATTERN.test(pathname)) {
+    // Lewati pemeriksaan untuk aset statis dan download.
+    if (STATIC_PATTERN.test(pathname) || pathname.startsWith("/download/")) {
       return next();
     }
 
@@ -96,7 +96,8 @@ export async function onRequest(context: APIContext, next: MiddlewareNext) {
       pathname === "/sitemap-index.xml" ||
       pathname === "/manifest.webmanifest" ||
       pathname === "/site.webmanifest" ||
-      pathname === "/humans.txt";
+      pathname === "/humans.txt" ||
+      pathname.startsWith("/download/");
 
     const cookie = context.request.headers.get("cookie") || "";
     const hasAuthCookie = cookie.includes("earsip-auth=");

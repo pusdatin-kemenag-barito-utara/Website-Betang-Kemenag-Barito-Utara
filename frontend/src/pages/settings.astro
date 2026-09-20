@@ -1,7 +1,5 @@
 ---
 import DashboardLayout from "@/layouts/DashboardLayout.astro";
-import PageBanner from "@/components/ui/PageBanner.astro";
-import { Settings } from "lucide-react";
 import { SettingsClient } from "@/components/Settings/SettingsClient";
 import { apiGet, requireUser } from "@/lib/server";
 
@@ -42,12 +40,6 @@ const initialSettings = settingsRes?.ok && settingsRes.body?.data
 
 <DashboardLayout title="Pengaturan Sistem">
   <div class="flex flex-col gap-6 w-full pb-12">
-    <PageBanner
-      title="Pengaturan Sistem"
-      description="Konfigurasi sistem keamanan berkas, integrasi Cloudflare R2, dan preferensi antarmuka aplikasi secara menyeluruh."
-    >
-      <Settings className="h-8 w-8 text-white" slot="icon" />
-    </PageBanner>
 
     <SettingsClient client:load initialSettings={initialSettings} currentUser={auth.user} />
   </div>

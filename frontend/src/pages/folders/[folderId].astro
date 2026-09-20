@@ -1,7 +1,5 @@
 ---
 import DashboardLayout from "@/layouts/DashboardLayout.astro";
-import PageBanner from "@/components/ui/PageBanner.astro";
-import { FolderOpen } from "lucide-react";
 import { FileBrowserView } from "@/components/FileBrowser/FileBrowserView";
 import { apiGet, requireUser } from "@/lib/server";
 import { formatFileSize } from "@/lib/utils";
@@ -110,12 +108,6 @@ const pageTitle =
 
 <DashboardLayout title={pageTitle} description={`Telusuri dan kelola berkas arsip pada folder ${currentFolderName}`}>
   <div class="flex flex-col gap-6 pb-10">
-    <PageBanner
-      title="File Browser"
-      description="Jelajahi dan kelola dokumen pada seksi/bidang Anda"
-    >
-      <FolderOpen className="h-8 w-8 text-white" slot="icon" />
-    </PageBanner>
 
     <FileBrowserView
       client:load
