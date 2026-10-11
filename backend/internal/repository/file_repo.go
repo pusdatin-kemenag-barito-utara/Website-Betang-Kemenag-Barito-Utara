@@ -3,215 +3,304 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
+	"time"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
-
+	"github.com/google/uuid"
 	"github.com/kemenag-baritoutara/betang-kemenag/internal/domain"
+	"github.com/kemenag-baritoutara/betang-kemenag/internal/pocketbase"
 )
 
-// FileRepo mengakses tabel kemenag_arsip.files dan file_versions.
+// FileRepo mengakses koleksi files di PocketBase.
 type FileRepo struct {
-	pool *pgxpool.Pool
+	pb *pocketbase.Client
 }
 
-const fileColumns = `id, name, folder_id, bidang_id, r2_object_key, mime_type, size_bytes, COALESCE(is_restricted, false), COALESCE(is_starred, false), uploaded_by, COALESCE(created_at, now()), COALESCE(updated_at, created_at, now()), deleted_at`
+// NewFileRepo membuat instance FileRepo baru.
+func NewFileRepo(pb *pocketbase.Client) *FileRepo {
+	return &FileRepo{pb: pb}
+}
 
-func scanFile(row pgx.Row) (*domain.File, error) {
-	var f domain.File
-	err := row.Scan(&f.ID, &f.Name, &f.FolderID, &f.BidangID, &f.R2ObjectKey,
-		&f.MimeType, &f.SizeBytes, &f.IsRestricted, &f.IsStarred, &f.UploadedBy,
-		&f.CreatedAt, &f.UpdatedAt, &f.DeletedAt)
-	if err != nil {
-		return nil, err
+type pbFile struct {
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	FolderID     string `json:"folder_id"`
+	BidangID     string `json:"bidang_id"`
+	R2ObjectKey  string `json:"r2_object_key"`
+	MimeType     string `json:"mime_type"`
+	SizeBytes    int64  `json:"size_bytes"`
+	IsRestricted bool   `json:"is_restricted"`
+	IsStarred    bool   `json:"is_starred"`
+	UploadedBy   string `json:"uploaded_by"`
+	CreatedAt    string `json:"created_at"`
+	UpdatedAt    string `json:"updated_at"`
+	DeletedAt    string `json:"deleted_at"`
+	Created      string `json:"created"`
+	Updated      string `json:"updated"`
+}
+
+func (f *pbFile) toDomain() domain.File {
+	var folder *string
+	if f.FolderID != "" && f.FolderID != "root" {
+		folder = &f.FolderID
 	}
-	return &f, nil
+	var bidang *string
+	if f.BidangID != "" {
+		bidang = &f.BidangID
+	}
+	var uploadedBy *string
+	if f.UploadedBy != "" {
+		uploadedBy = &f.UploadedBy
+	}
+
+	createdAt, _ := time.Parse(time.RFC3339Nano, f.CreatedAt)
+	if createdAt.IsZero() {
+		createdAt, _ = time.Parse(time.RFC3339Nano, f.Created)
+	}
+	updatedAt, _ := time.Parse(time.RFC3339Nano, f.UpdatedAt)
+	if updatedAt.IsZero() {
+		updatedAt, _ = time.Parse(time.RFC3339Nano, f.Updated)
+	}
+
+	var deletedAt *time.Time
+	if f.DeletedAt != "" && f.DeletedAt != "null" {
+		t, err := time.Parse(time.RFC3339Nano, f.DeletedAt)
+		if err == nil {
+			deletedAt = &t
+		}
+	}
+
+	return domain.File{
+		ID:           f.ID,
+		Name:         f.Name,
+		FolderID:     folder,
+		BidangID:     bidang,
+		R2ObjectKey:  f.R2ObjectKey,
+		MimeType:     f.MimeType,
+		SizeBytes:    f.SizeBytes,
+		IsRestricted: f.IsRestricted,
+		IsStarred:    f.IsStarred,
+		UploadedBy:   uploadedBy,
+		CreatedAt:    createdAt,
+		UpdatedAt:    updatedAt,
+		DeletedAt:    deletedAt,
+	}
 }
 
 // ListByFolder mengambil file aktif milik satu folder (nil = root), dengan filter opsional bidangID.
 func (r *FileRepo) ListByFolder(ctx context.Context, folderID *string, bidangID *string) ([]domain.File, error) {
-	var query string
-	var args []any
+	filter := `deleted_at = ""`
 	if folderID == nil || *folderID == "" || *folderID == "root" {
-		if bidangID != nil && *bidangID != "" {
-			query = `SELECT ` + fileColumns + ` FROM kemenag_arsip.files WHERE deleted_at IS NULL AND folder_id IS NULL AND bidang_id = $1::uuid ORDER BY created_at DESC`
-			args = append(args, *bidangID)
-		} else {
-			query = `SELECT ` + fileColumns + ` FROM kemenag_arsip.files WHERE deleted_at IS NULL AND folder_id IS NULL ORDER BY created_at DESC`
-		}
+		filter += ` && folder_id = ""`
 	} else {
-		if len(*folderID) != 36 {
-			return []domain.File{}, nil
-		}
-		if bidangID != nil && *bidangID != "" {
-			query = `SELECT ` + fileColumns + ` FROM kemenag_arsip.files WHERE deleted_at IS NULL AND folder_id = $1::uuid AND bidang_id = $2::uuid ORDER BY created_at DESC`
-			args = append(args, *folderID, *bidangID)
-		} else {
-			query = `SELECT ` + fileColumns + ` FROM kemenag_arsip.files WHERE deleted_at IS NULL AND folder_id = $1::uuid ORDER BY created_at DESC`
-			args = append(args, *folderID)
-		}
+		filter += fmt.Sprintf(` && folder_id = "%s"`, *folderID)
 	}
 
-	rows, err := r.pool.Query(ctx, query, args...)
+	if bidangID != nil && *bidangID != "" {
+		filter += fmt.Sprintf(` && bidang_id = "%s"`, *bidangID)
+	}
+
+	var records []pbFile
+	_, err := r.pb.List(ctx, "files", pocketbase.ListParams{
+		Filter:  filter,
+		Sort:    "-created_at",
+		PerPage: 1000,
+	}, &records)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	items := []domain.File{}
-	for rows.Next() {
-		f, err := scanFile(rows)
-		if err != nil {
-			return nil, err
-		}
-		items = append(items, *f)
+	items := make([]domain.File, len(records))
+	for i, rec := range records {
+		items[i] = rec.toDomain()
 	}
-	return items, rows.Err()
+	return items, nil
 }
 
 // GetByID mengambil satu file aktif.
 func (r *FileRepo) GetByID(ctx context.Context, id string) (*domain.File, error) {
-	f, err := scanFile(r.pool.QueryRow(ctx, `
-		SELECT `+fileColumns+` FROM kemenag_arsip.files WHERE id = $1`, id))
-	if errors.Is(err, pgx.ErrNoRows) {
+	var rec pbFile
+	err := r.pb.Get(ctx, "files", id, &rec)
+	if err != nil {
+		if errors.Is(err, pocketbase.ErrNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if rec.DeletedAt != "" && rec.DeletedAt != "null" {
 		return nil, nil
 	}
-	return f, err
+	d := rec.toDomain()
+	return &d, nil
 }
 
 // FindByNameInFolder mencari file aktif dengan nama sama di folder yang sama.
 func (r *FileRepo) FindByNameInFolder(ctx context.Context, name string, folderID *string) (*domain.File, error) {
-	var query string
-	var args []any
+	filter := fmt.Sprintf(`deleted_at = "" && name = "%s"`, strings.ReplaceAll(name, `"`, `\"`))
 	if folderID == nil || *folderID == "" || *folderID == "root" {
-		query = `SELECT ` + fileColumns + ` FROM kemenag_arsip.files WHERE deleted_at IS NULL AND LOWER(name) = LOWER($1) AND folder_id IS NULL`
-		args = []any{name}
+		filter += ` && folder_id = ""`
 	} else {
-		query = `SELECT ` + fileColumns + ` FROM kemenag_arsip.files WHERE deleted_at IS NULL AND LOWER(name) = LOWER($1) AND folder_id = $2::uuid`
-		args = []any{name, *folderID}
+		filter += fmt.Sprintf(` && folder_id = "%s"`, *folderID)
 	}
 
-	f, err := scanFile(r.pool.QueryRow(ctx, query, args...))
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil
+	var list []pbFile
+	_, err := r.pb.List(ctx, "files", pocketbase.ListParams{
+		Filter:  filter,
+		PerPage: 1,
+	}, &list)
+	if err != nil || len(list) == 0 {
+		return nil, err
 	}
-	return f, err
+	d := list[0].toDomain()
+	return &d, nil
 }
 
 // Create menyimpan metadata file baru dan mengembalikan hasilnya.
 func (r *FileRepo) Create(ctx context.Context, f *domain.File) (*domain.File, error) {
-	created, err := scanFile(r.pool.QueryRow(ctx, `
-		INSERT INTO kemenag_arsip.files (name, folder_id, bidang_id, r2_object_key, mime_type, size_bytes, is_restricted, uploaded_by)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-		RETURNING `+fileColumns,
-		f.Name, f.FolderID, f.BidangID, f.R2ObjectKey, f.MimeType, f.SizeBytes,
-		f.IsRestricted, f.UploadedBy))
+	newID := f.ID
+	if newID == "" {
+		newID = uuid.New().String()
+	}
+	now := time.Now().Format(time.RFC3339Nano)
+
+	data := map[string]interface{}{
+		"id":            newID,
+		"name":          f.Name,
+		"r2_object_key": f.R2ObjectKey,
+		"mime_type":     f.MimeType,
+		"size_bytes":    f.SizeBytes,
+		"is_restricted": f.IsRestricted,
+		"created_at":    now,
+		"updated_at":    now,
+	}
+	if f.FolderID != nil && *f.FolderID != "root" {
+		data["folder_id"] = *f.FolderID
+	}
+	if f.BidangID != nil {
+		data["bidang_id"] = *f.BidangID
+	}
+	if f.UploadedBy != nil {
+		data["uploaded_by"] = *f.UploadedBy
+	}
+
+	var created pbFile
+	err := r.pb.Create(ctx, "files", data, &created)
 	if err != nil {
 		return nil, err
 	}
-	return created, nil
+	d := created.toDomain()
+	return &d, nil
 }
 
-// UpdateObjectKey memperbarui object key versi terbaru sebuah file
-// (dipakai saat upload versi baru).
+// UpdateObjectKey memperbarui object key versi terbaru sebuah file.
 func (r *FileRepo) UpdateObjectKey(ctx context.Context, id, objectKey, mimeType string, sizeBytes int64, uploadedBy *string) error {
-	_, err := r.pool.Exec(ctx, `
-		UPDATE kemenag_arsip.files SET r2_object_key = $1, mime_type = $2, size_bytes = $3,
-		                uploaded_by = $4, updated_at = now()
-		WHERE id = $5`, objectKey, mimeType, sizeBytes, uploadedBy, id)
-	return err
+	data := map[string]interface{}{
+		"r2_object_key": objectKey,
+		"mime_type":     mimeType,
+		"size_bytes":    sizeBytes,
+		"updated_at":    time.Now().Format(time.RFC3339Nano),
+	}
+	if uploadedBy != nil {
+		data["uploaded_by"] = *uploadedBy
+	}
+	return r.pb.Update(ctx, "files", id, data, nil)
 }
 
 // Rename mengganti nama file.
 func (r *FileRepo) Rename(ctx context.Context, id, name string) error {
-	_, err := r.pool.Exec(ctx, `
-		UPDATE kemenag_arsip.files SET name = $1, updated_at = now() WHERE id = $2`, name, id)
-	return err
+	return r.pb.Update(ctx, "files", id, map[string]interface{}{
+		"name":       name,
+		"updated_at": time.Now().Format(time.RFC3339Nano),
+	}, nil)
 }
 
 // UpdateFolder memindahkan file ke folder lain.
 func (r *FileRepo) UpdateFolder(ctx context.Context, id string, folderID *string) error {
-	_, err := r.pool.Exec(ctx, `
-		UPDATE kemenag_arsip.files SET folder_id = $1, updated_at = now() WHERE id = $2`, folderID, id)
-	return err
+	fID := ""
+	if folderID != nil && *folderID != "root" {
+		fID = *folderID
+	}
+	return r.pb.Update(ctx, "files", id, map[string]interface{}{
+		"folder_id":  fID,
+		"updated_at": time.Now().Format(time.RFC3339Nano),
+	}, nil)
 }
 
 // GetBidangID mengambil bidang_id sebuah file.
 func (r *FileRepo) GetBidangID(ctx context.Context, id string) (*string, error) {
-	id = strings.TrimSpace(id)
-	if id == "" || id == "root" || id == "undefined" || id == "null" || len(id) != 36 {
-		return nil, nil
+	f, err := r.GetByID(ctx, id)
+	if err != nil || f == nil {
+		return nil, err
 	}
-	var bidangID *string
-	err := r.pool.QueryRow(ctx, `SELECT bidang_id FROM kemenag_arsip.files WHERE id = $1`, id).Scan(&bidangID)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil
-	}
-	return bidangID, err
+	return f.BidangID, nil
 }
 
 // SoftDelete menandai file sebagai terhapus.
 func (r *FileRepo) SoftDelete(ctx context.Context, id string) error {
-	_, err := r.pool.Exec(ctx, `
-		UPDATE kemenag_arsip.files SET deleted_at = now(), updated_at = now() WHERE id = $1`, id)
-	return err
+	now := time.Now().Format(time.RFC3339Nano)
+	return r.pb.Update(ctx, "files", id, map[string]interface{}{
+		"deleted_at": now,
+		"updated_at": now,
+	}, nil)
 }
 
 // SoftDeleteBatch menandai banyak file terhapus sekaligus.
 func (r *FileRepo) SoftDeleteBatch(ctx context.Context, ids []string) error {
-	_, err := r.pool.Exec(ctx, `
-		UPDATE kemenag_arsip.files SET deleted_at = now(), updated_at = now() WHERE id = ANY($1)`, ids)
-	return err
+	now := time.Now().Format(time.RFC3339Nano)
+	for _, id := range ids {
+		_ = r.pb.Update(ctx, "files", id, map[string]interface{}{
+			"deleted_at": now,
+			"updated_at": now,
+		}, nil)
+	}
+	return nil
 }
 
 // Restore membatalkan penandaan terhapus.
 func (r *FileRepo) Restore(ctx context.Context, id string) error {
-	_, err := r.pool.Exec(ctx, `
-		UPDATE kemenag_arsip.files SET deleted_at = NULL, updated_at = now() WHERE id = $1`, id)
-	return err
+	return r.pb.Update(ctx, "files", id, map[string]interface{}{
+		"deleted_at": "",
+		"updated_at": time.Now().Format(time.RFC3339Nano),
+	}, nil)
 }
 
 // RestoreBatch memulihkan banyak file sekaligus.
 func (r *FileRepo) RestoreBatch(ctx context.Context, ids []string) error {
-	if len(ids) == 0 {
-		return nil
+	for _, id := range ids {
+		_ = r.Restore(ctx, id)
 	}
-	_, err := r.pool.Exec(ctx, `
-		UPDATE kemenag_arsip.files SET deleted_at = NULL, updated_at = now() WHERE id = ANY($1)`, ids)
-	return err
+	return nil
 }
 
-// HardDelete menghapus baris file permanen (cascade ke versi file).
+// HardDelete menghapus baris file permanen.
 func (r *FileRepo) HardDelete(ctx context.Context, id string) error {
-	_, err := r.pool.Exec(ctx, `DELETE FROM kemenag_arsip.files WHERE id = $1`, id)
-	return err
+	return r.pb.Delete(ctx, "files", id)
 }
 
 // HardDeleteBatch menghapus banyak file permanen sekaligus.
 func (r *FileRepo) HardDeleteBatch(ctx context.Context, ids []string) error {
-	_, err := r.pool.Exec(ctx, `DELETE FROM kemenag_arsip.files WHERE id = ANY($1)`, ids)
-	return err
+	for _, id := range ids {
+		_ = r.pb.Delete(ctx, "files", id)
+	}
+	return nil
 }
 
 // ListDeleted mengambil file yang berada di recycle bin.
 func (r *FileRepo) ListDeleted(ctx context.Context) ([]domain.File, error) {
-	rows, err := r.pool.Query(ctx, `
-		SELECT `+fileColumns+` FROM kemenag_arsip.files
-		WHERE deleted_at IS NOT NULL
-		ORDER BY deleted_at DESC`)
+	var records []pbFile
+	_, err := r.pb.List(ctx, "files", pocketbase.ListParams{
+		Filter:  `deleted_at != ""`,
+		Sort:    "-deleted_at",
+		PerPage: 2000,
+	}, &records)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	items := []domain.File{}
-	for rows.Next() {
-		f, err := scanFile(rows)
-		if err != nil {
-			return nil, err
-		}
-		items = append(items, *f)
+	items := make([]domain.File, len(records))
+	for i, rec := range records {
+		items[i] = rec.toDomain()
 	}
-	return items, rows.Err()
+	return items, nil
 }

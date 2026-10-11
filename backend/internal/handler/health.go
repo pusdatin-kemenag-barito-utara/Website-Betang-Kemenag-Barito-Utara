@@ -6,35 +6,35 @@ import (
 	"time"
 
 	"github.com/gofiber/fiber/v3"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/kemenag-baritoutara/betang-kemenag/internal/pocketbase"
 )
 
 // HealthHandler menyediakan endpoint health check komprehensif untuk Docker, Coolify, dan Uptime Kuma.
 type HealthHandler struct {
 	startedAt time.Time
-	pool      *pgxpool.Pool
+	pb        *pocketbase.Client
 }
 
-// NewHealthHandler membuat handler health check dengan koneksi pool database.
-func NewHealthHandler(pool *pgxpool.Pool) *HealthHandler {
+// NewHealthHandler membuat handler health check dengan koneksi PocketBase.
+func NewHealthHandler(pb *pocketbase.Client) *HealthHandler {
 	return &HealthHandler{
 		startedAt: time.Now(),
-		pool:      pool,
+		pb:        pb,
 	}
 }
 
-// Check mengembalikan status kesehatan mendalam (Database, Memori, Uptime).
+// Check mengembalikan status kesehatan mendalam (Database PocketBase, Memori, Uptime).
 func (h *HealthHandler) Check(c fiber.Ctx) error {
-	ctx, cancel := context.WithTimeout(c.Context(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(c.Context(), 3*time.Second)
 	defer cancel()
 
 	dbStatus := "up"
 	dbError := ""
 	dbLatencyMs := float64(0)
 
-	if h.pool != nil {
+	if h.pb != nil {
 		start := time.Now()
-		if err := h.pool.Ping(ctx); err != nil {
+		if err := h.pb.Ping(ctx); err != nil {
 			dbStatus = "down"
 			dbError = err.Error()
 		} else {
@@ -58,29 +58,26 @@ func (h *HealthHandler) Check(c fiber.Ctx) error {
 
 	data := fiber.Map{
 		"status":      statusText,
-		"uptime":      time.Since(h.startedAt).String(),
-		"uptime_sec":  int64(time.Since(h.startedAt).Seconds()),
+		"service":     "SI BETANG (E-Arsip) API",
+		"version":     "1.0.0",
 		"timestamp":   time.Now().UTC().Format(time.RFC3339),
-		"environment": "production",
-		"version":     "2.0.0-enterprise",
+		"uptime_sec":  int64(time.Since(h.startedAt).Seconds()),
 		"database": fiber.Map{
+			"engine":     "PocketBase",
 			"status":     dbStatus,
 			"latency_ms": dbLatencyMs,
-			"error":      dbError,
-			"pool_stats": fiber.Map{
-				"total_conns": h.pool.Stat().TotalConns(),
-				"idle_conns":  h.pool.Stat().IdleConns(),
-			},
 		},
 		"system": fiber.Map{
-			"go_version": runtime.Version(),
-			"goroutines": runtime.NumGoroutine(),
-			"memory_mb":  float64(m.Alloc) / 1024 / 1024,
+			"goroutines":   runtime.NumGoroutine(),
+			"alloc_mb":     float64(m.Alloc) / 1024 / 1024,
+			"total_sys_mb": float64(m.Sys) / 1024 / 1024,
+			"num_gc":       m.NumGC,
 		},
 	}
 
-	return c.Status(httpStatus).JSON(fiber.Map{
-		"success": isHealthy,
-		"data":    data,
-	})
+	if dbError != "" {
+		data["database"].(fiber.Map)["error"] = dbError
+	}
+
+	return c.Status(httpStatus).JSON(data)
 }

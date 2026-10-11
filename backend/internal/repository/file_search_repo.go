@@ -2,170 +2,125 @@ package repository
 
 import (
 	"context"
+	"fmt"
+	"strings"
+	"time"
 
 	"github.com/kemenag-baritoutara/betang-kemenag/internal/domain"
+	"github.com/kemenag-baritoutara/betang-kemenag/internal/pocketbase"
 )
 
-// Search mencari file berdasarkan trigram fuzzy similarity, substring ILIKE, dan FTS, dengan filter opsional bidangID.
+// Search mencari file berdasarkan substring nama, dengan filter opsional bidangID.
 func (r *FileRepo) Search(ctx context.Context, query string, bidangID *string) ([]domain.File, error) {
-	var sqlQuery string
-	var args []any
-	if bidangID != nil && *bidangID != "" {
-		sqlQuery = `
-			SELECT ` + fileColumns + ` FROM kemenag_arsip.files
-			WHERE deleted_at IS NULL
-			  AND bidang_id = $2::uuid
-			  AND (
-			    name ILIKE '%' || $1 || '%'
-			    OR similarity(name, $1) > 0.2
-			    OR (fts_doc IS NOT NULL AND fts_doc @@ plainto_tsquery('simple', $1))
-			    OR (fts_doc IS NOT NULL AND fts_doc @@ websearch_to_tsquery('simple', $1))
-			  )
-			ORDER BY similarity(name, $1) DESC, created_at DESC`
-		args = append(args, query, *bidangID)
-	} else {
-		sqlQuery = `
-			SELECT ` + fileColumns + ` FROM kemenag_arsip.files
-			WHERE deleted_at IS NULL
-			  AND (
-			    name ILIKE '%' || $1 || '%'
-			    OR similarity(name, $1) > 0.2
-			    OR (fts_doc IS NOT NULL AND fts_doc @@ plainto_tsquery('simple', $1))
-			    OR (fts_doc IS NOT NULL AND fts_doc @@ websearch_to_tsquery('simple', $1))
-			  )
-			ORDER BY similarity(name, $1) DESC, created_at DESC`
-		args = append(args, query)
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return []domain.File{}, nil
 	}
 
-	rows, err := r.pool.Query(ctx, sqlQuery, args...)
+	filter := fmt.Sprintf(`deleted_at = "" && name ~ "%s"`, strings.ReplaceAll(query, `"`, `\"`))
+	if bidangID != nil && *bidangID != "" {
+		filter += fmt.Sprintf(` && bidang_id = "%s"`, *bidangID)
+	}
+
+	var records []pbFile
+	_, err := r.pb.List(ctx, "files", pocketbase.ListParams{
+		Filter:  filter,
+		Sort:    "-created_at",
+		PerPage: 200,
+	}, &records)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	items := []domain.File{}
-	for rows.Next() {
-		f, err := scanFile(rows)
-		if err != nil {
-			return nil, err
-		}
-		items = append(items, *f)
+	items := make([]domain.File, len(records))
+	for i, rec := range records {
+		items[i] = rec.toDomain()
 	}
-	return items, rows.Err()
+	return items, nil
 }
 
 // Stats menghitung ringkasan statistik dashboard: total file aktif, total
 // ukuran, unggahan 24 jam terakhir, unggahan bulan ini, dan 5 unggahan terbaru.
-// Bila bidangID disediakan (Admin Bidang), hanya data arsip yang relevan dengan bidang tersebut yang dihitung.
 func (r *FileRepo) Stats(ctx context.Context, bidangID *string) (totalFiles, totalStorage, recent24h, thisMonth int64, recent []domain.RecentUpload, err error) {
-	var (
-		countQuery  string
-		recentQuery string
-		args        []any
-	)
-
+	filter := `deleted_at = ""`
 	if bidangID != nil && *bidangID != "" {
-		countQuery = `
-			SELECT
-				COUNT(*)::bigint,
-				COALESCE(SUM(size_bytes), 0)::bigint,
-				COUNT(*) FILTER (WHERE created_at > now() - interval '24 hours')::bigint,
-				COUNT(*) FILTER (WHERE created_at >= date_trunc('month', now()))::bigint
-			FROM kemenag_arsip.files
-			WHERE deleted_at IS NULL
-			  AND (
-			    bidang_id = $1::uuid
-			    OR (folder_id IS NOT NULL AND kemenag_arsip.can_bidang_access_folder($1::uuid, folder_id))
-			  )`
-		recentQuery = `
-			SELECT id, name, mime_type, size_bytes, created_at, COALESCE(r2_object_key, '')
-			FROM kemenag_arsip.files
-			WHERE deleted_at IS NULL
-			  AND (
-			    bidang_id = $1::uuid
-			    OR (folder_id IS NOT NULL AND kemenag_arsip.can_bidang_access_folder($1::uuid, folder_id))
-			  )
-			ORDER BY created_at DESC
-			LIMIT 5`
-		args = append(args, *bidangID)
-	} else {
-		countQuery = `
-			SELECT
-				COUNT(*)::bigint,
-				COALESCE(SUM(size_bytes), 0)::bigint,
-				COUNT(*) FILTER (WHERE created_at > now() - interval '24 hours')::bigint,
-				COUNT(*) FILTER (WHERE created_at >= date_trunc('month', now()))::bigint
-			FROM kemenag_arsip.files
-			WHERE deleted_at IS NULL`
-		recentQuery = `
-			SELECT id, name, mime_type, size_bytes, created_at, COALESCE(r2_object_key, '')
-			FROM kemenag_arsip.files
-			WHERE deleted_at IS NULL
-			ORDER BY created_at DESC
-			LIMIT 5`
+		filter += fmt.Sprintf(` && bidang_id = "%s"`, *bidangID)
 	}
 
-	err = r.pool.QueryRow(ctx, countQuery, args...).
-		Scan(&totalFiles, &totalStorage, &recent24h, &thisMonth)
+	var records []pbFile
+	_, err = r.pb.List(ctx, "files", pocketbase.ListParams{
+		Filter:  filter,
+		Sort:    "-created_at",
+		PerPage: 5000,
+	}, &records)
 	if err != nil {
 		return 0, 0, 0, 0, nil, err
 	}
 
-	rows, err := r.pool.Query(ctx, recentQuery, args...)
-	if err != nil {
-		return 0, 0, 0, 0, nil, err
-	}
-	defer rows.Close()
+	now := time.Now()
+	oneDayAgo := now.Add(-24 * time.Hour)
+	startOfMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
 
-	recent = []domain.RecentUpload{}
-	for rows.Next() {
-		var u domain.RecentUpload
-		if err := rows.Scan(&u.ID, &u.Name, &u.MimeType, &u.SizeBytes, &u.CreatedAt, &u.R2ObjectKey); err != nil {
-			return 0, 0, 0, 0, nil, err
+	recent = make([]domain.RecentUpload, 0, 5)
+
+	for i, rec := range records {
+		totalFiles++
+		totalStorage += rec.SizeBytes
+
+		t, _ := time.Parse(time.RFC3339Nano, rec.CreatedAt)
+		if t.IsZero() {
+			t, _ = time.Parse(time.RFC3339Nano, rec.Created)
 		}
-		recent = append(recent, u)
+
+		if t.After(oneDayAgo) {
+			recent24h++
+		}
+		if t.After(startOfMonth) {
+			thisMonth++
+		}
+
+		if i < 5 {
+			recent = append(recent, domain.RecentUpload{
+				ID:        rec.ID,
+				Name:      rec.Name,
+				MimeType:  rec.MimeType,
+				SizeBytes: rec.SizeBytes,
+				CreatedAt: t,
+			})
+		}
 	}
-	return totalFiles, totalStorage, recent24h, thisMonth, recent, rows.Err()
+
+	return totalFiles, totalStorage, recent24h, thisMonth, recent, nil
 }
 
 // ToggleStar mengubah status bintang sebuah file.
 func (r *FileRepo) ToggleStar(ctx context.Context, fileID string, isStarred bool) error {
-	_, err := r.pool.Exec(ctx, `
-		UPDATE kemenag_arsip.files
-		SET is_starred = $2, updated_at = now()
-		WHERE id = $1 AND deleted_at IS NULL`, fileID, isStarred)
-	return err
+	return r.pb.Update(ctx, "files", fileID, map[string]interface{}{
+		"is_starred": isStarred,
+		"updated_at": time.Now().Format(time.RFC3339Nano),
+	}, nil)
 }
+
 // ListStarred mengambil seluruh file aktif yang dibintangi, dengan filter opsional bidangID.
 func (r *FileRepo) ListStarred(ctx context.Context, bidangID *string) ([]domain.File, error) {
-	var query string
-	var args []any
+	filter := `deleted_at = "" && is_starred = true`
 	if bidangID != nil && *bidangID != "" {
-		query = `
-			SELECT ` + fileColumns + ` FROM kemenag_arsip.files
-			WHERE deleted_at IS NULL AND is_starred = true AND bidang_id = $1::uuid
-			ORDER BY updated_at DESC, created_at DESC`
-		args = append(args, *bidangID)
-	} else {
-		query = `
-			SELECT ` + fileColumns + ` FROM kemenag_arsip.files
-			WHERE deleted_at IS NULL AND is_starred = true
-			ORDER BY updated_at DESC, created_at DESC`
+		filter += fmt.Sprintf(` && bidang_id = "%s"`, *bidangID)
 	}
 
-	rows, err := r.pool.Query(ctx, query, args...)
+	var records []pbFile
+	_, err := r.pb.List(ctx, "files", pocketbase.ListParams{
+		Filter:  filter,
+		Sort:    "-updated_at,-created_at",
+		PerPage: 500,
+	}, &records)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	items := []domain.File{}
-	for rows.Next() {
-		f, err := scanFile(rows)
-		if err != nil {
-			return nil, err
-		}
-		items = append(items, *f)
+	items := make([]domain.File, len(records))
+	for i, rec := range records {
+		items[i] = rec.toDomain()
 	}
-	return items, rows.Err()
+	return items, nil
 }

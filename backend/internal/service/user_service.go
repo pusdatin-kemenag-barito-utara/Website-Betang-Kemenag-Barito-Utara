@@ -13,17 +13,17 @@ import (
 
 // UserService mengelola operasi bisnis akun pengguna internal SI BETANG.
 type UserService struct {
-	repo     *repository.UserRepo
-	supabase *auth.SupabaseClient
-	audits   *Services
+	repo   *repository.UserRepo
+	pbAuth *auth.PBAuthClient
+	audits *Services
 }
 
 // NewUserService membuat instance UserService baru.
-func NewUserService(repo *repository.UserRepo, supabase *auth.SupabaseClient, audits *Services) *UserService {
+func NewUserService(repo *repository.UserRepo, pbAuth *auth.PBAuthClient, audits *Services) *UserService {
 	return &UserService{
-		repo:     repo,
-		supabase: supabase,
-		audits:   audits,
+		repo:   repo,
+		pbAuth: pbAuth,
+		audits: audits,
 	}
 }
 
@@ -48,7 +48,7 @@ type CreateUserRequest struct {
 	IsActive *bool   `json:"is_active"`
 }
 
-// Create membuat akun di Supabase Auth dan menyimpan metadata di kemenag_arsip.users.
+// Create membuat akun di PocketBase Auth dan menyimpan metadata di users.
 func (s *UserService) Create(ctx context.Context, req CreateUserRequest, actorEmail, ip string) (*domain.User, error) {
 	email := strings.ToLower(strings.TrimSpace(req.Email))
 	username := strings.ToLower(strings.TrimSpace(req.Username))
@@ -78,19 +78,19 @@ func (s *UserService) Create(ctx context.Context, req CreateUserRequest, actorEm
 		isActive = *req.IsActive
 	}
 
-	// 1. Cek apakah user sudah terdaftar di kemenag_arsip.users
+	// 1. Cek apakah user sudah terdaftar di koleksi users
 	existing, _ := s.repo.GetUserByEmail(ctx, email)
 	if existing != nil {
 		return nil, errors.New("email ini sudah digunakan oleh pengguna lain")
 	}
 
-	// 2. Buat akun di Supabase Auth
-	authUserID, err := s.supabase.AdminCreateUser(ctx, email, password, fullName, username)
+	// 2. Buat akun di PocketBase Auth
+	authUserID, err := s.pbAuth.AdminCreateUser(ctx, email, password, fullName, username)
 	if err != nil {
 		return nil, err
 	}
 
-	// 3. Simpan ke database lokal kemenag_arsip.users
+	// 3. Simpan ke database PocketBase users
 	user := &domain.User{
 		ID:       authUserID,
 		Email:    email,
@@ -102,8 +102,8 @@ func (s *UserService) Create(ctx context.Context, req CreateUserRequest, actorEm
 	}
 
 	if err := s.repo.CreateUser(ctx, user); err != nil {
-		// Rollback Supabase auth user jika gagal menyimpan di database
-		_ = s.supabase.AdminDeleteUser(ctx, authUserID)
+		// Rollback PocketBase auth user jika gagal menyimpan di database
+		_ = s.pbAuth.AdminDeleteUser(ctx, authUserID)
 		return nil, fmt.Errorf("gagal menyimpan profil pengguna: %w", err)
 	}
 
@@ -175,16 +175,16 @@ func (s *UserService) Update(ctx context.Context, id string, req UpdateUserReque
 		return nil, errors.New("kata sandi baru minimal 6 karakter")
 	}
 
-	// Sinkronisasi metadata profil ke Supabase Auth
+	// Sinkronisasi metadata profil ke PocketBase Auth
 	metadata := map[string]any{
 		"full_name": user.FullName,
 		"name":      user.FullName,
 		"role":      user.Role,
 	}
 
-	if err := s.supabase.AdminUpdateUser(ctx, id, "", password, metadata); err != nil {
+	if err := s.pbAuth.AdminUpdateUser(ctx, id, "", password, metadata); err != nil {
 		if password != "" {
-			return nil, fmt.Errorf("gagal memperbarui kata sandi pengguna di Supabase: %w", err)
+			return nil, fmt.Errorf("gagal memperbarui kata sandi pengguna di PocketBase: %w", err)
 		}
 	}
 
@@ -199,7 +199,7 @@ func (s *UserService) Update(ctx context.Context, id string, req UpdateUserReque
 	return s.repo.GetUserByID(ctx, id)
 }
 
-// Delete menghapus pengguna dari database lokal dan Supabase Auth.
+// Delete menghapus pengguna dari database dan PocketBase Auth.
 func (s *UserService) Delete(ctx context.Context, id, currentUserID, actorEmail, ip string) error {
 	if id == currentUserID {
 		return errors.New("Anda tidak dapat menghapus akun Anda sendiri")
@@ -213,13 +213,13 @@ func (s *UserService) Delete(ctx context.Context, id, currentUserID, actorEmail,
 		return errors.New("pengguna tidak ditemukan")
 	}
 
-	// Hapus dari tabel lokal kemenag_arsip.users
+	// Hapus dari koleksi users
 	if err := s.repo.DeleteUser(ctx, id); err != nil {
-		return fmt.Errorf("gagal menghapus dari basis data lokal: %w", err)
+		return fmt.Errorf("gagal menghapus dari basis data: %w", err)
 	}
 
-	// Hapus dari Supabase Auth
-	_ = s.supabase.AdminDeleteUser(ctx, id)
+	// Hapus dari PocketBase Auth
+	_ = s.pbAuth.AdminDeleteUser(ctx, id)
 
 	if s.audits != nil {
 		_ = s.audits.LogAudit(ctx, actorEmail, "DELETE", fmt.Sprintf("Pengguna %s (%s)", user.FullName, user.Email), user, nil, ip)

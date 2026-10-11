@@ -2,97 +2,64 @@ package repository
 
 import (
 	"context"
-	"encoding/json"
-	"errors"
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
-
+	"github.com/google/uuid"
 	"github.com/kemenag-baritoutara/betang-kemenag/internal/domain"
+	"github.com/kemenag-baritoutara/betang-kemenag/internal/pocketbase"
 )
 
-type cachedPusdatinUser struct {
-	user      *domain.PusdatinUser
-	expiresAt time.Time
-}
-
-// PusdatinRepo mengakses fungsi RPC pada schema kemenag_pusdatin dan public.
+// PusdatinRepo mengelola audit log dan data user pusdatin di PocketBase.
 type PusdatinRepo struct {
-	pool      *pgxpool.Pool
-	schema    string
-	userCache sync.Map
+	pb *pocketbase.Client
 }
 
 // NewPusdatinRepo membuat instance PusdatinRepo baru.
-func NewPusdatinRepo(pool *pgxpool.Pool, schema string) *PusdatinRepo {
-	return &PusdatinRepo{
-		pool:   pool,
-		schema: schema,
-	}
+func NewPusdatinRepo(pb *pocketbase.Client) *PusdatinRepo {
+	return &PusdatinRepo{pb: pb}
 }
 
-// GetUserByEmail mengambil data user dari sistem pusdatin via RPC dengan cache 30s.
+// GetUserByEmail mengambil data user dari sistem pusdatin / pocketbase.
 func (r *PusdatinRepo) GetUserByEmail(ctx context.Context, email string) (*domain.PusdatinUser, error) {
-	if val, ok := r.userCache.Load(email); ok {
-		item := val.(cachedPusdatinUser)
-		if time.Now().Before(item.expiresAt) {
-			return item.user, nil
-		}
-		r.userCache.Delete(email)
-	}
-
-	var raw string
-	err := r.pool.QueryRow(ctx, `SELECT COALESCE(public.get_pusdatin_user($1)::text, '')`, email).Scan(&raw)
-	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-		return nil, fmt.Errorf("gagal memanggil get_pusdatin_user: %w", err)
-	}
-
-	if raw == "" || raw == "{}" || raw == "null" {
+	email = strings.ToLower(strings.TrimSpace(email))
+	if email == "" {
 		return nil, nil
 	}
 
-	var user domain.PusdatinUser
-	if err := json.Unmarshal([]byte(raw), &user); err != nil {
-		return nil, fmt.Errorf("respon get_pusdatin_user tidak valid: %w", err)
-	}
-	if user.ID == "" {
-		return nil, nil
+	var list []pocketbase.AuthRecord
+	_, err := r.pb.List(ctx, "users", pocketbase.ListParams{
+		Filter:  fmt.Sprintf(`email = "%s"`, email),
+		PerPage: 1,
+	}, &list)
+	if err != nil || len(list) == 0 {
+		return nil, err
 	}
 
-	r.userCache.Store(email, cachedPusdatinUser{
-		user:      &user,
-		expiresAt: time.Now().Add(30 * time.Second),
-	})
-
-	return &user, nil
+	u := list[0]
+	return &domain.PusdatinUser{
+		ID:     u.ID,
+		Name:   u.Name,
+		Email:  u.Email,
+		Role:   u.Role,
+		Status: "active",
+	}, nil
 }
 
-// LogAudit mencatat aktivitas pengguna ke tabel audit pusdatin
-// (RPC public.log_pusdatin_audit).
+// LogAudit mencatat aktivitas pengguna ke tabel audit_logs PocketBase.
 func (r *PusdatinRepo) LogAudit(ctx context.Context, action, target, targetSchema, performedBy string, beforeState, afterState any, ip string) error {
-	ip = strings.TrimSpace(ip)
-	if strings.Contains(ip, ":") && !strings.Contains(ip, "::") {
-		parts := strings.Split(ip, ":")
-		if len(parts) == 2 {
-			ip = parts[0]
-		}
+	data := map[string]interface{}{
+		"id":            uuid.New().String(),
+		"action":        action,
+		"target":        target,
+		"target_schema": targetSchema,
+		"performed_by":  performedBy,
+		"before_state":  beforeState,
+		"after_state":   afterState,
+		"ip":            ip,
+		"created_at":    time.Now().Format(time.RFC3339Nano),
 	}
-
-	query := `
-		SELECT public.log_pusdatin_audit(
-			$1::text, $2::text, $3::text, $4::text,
-			$5::jsonb, $6::jsonb,
-			CASE WHEN $7::text IS NOT NULL AND $7::text != '' THEN $7::inet ELSE NULL END
-		)`
-	var ipArg any
-	if ip != "" {
-		ipArg = ip
-	}
-	_, err := r.pool.Exec(ctx, query,
-		action, target, targetSchema, performedBy, beforeState, afterState, ipArg)
-	return err
+	_ = r.pb.Create(ctx, "audit_logs", data, nil)
+	return nil
 }

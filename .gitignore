@@ -123,4 +123,5 @@ $RECYCLE.BIN/
 .gemini/
 **/.gemini/
 scratch/
-scripts/
+scripts/scratch/
+scripts/tmp/

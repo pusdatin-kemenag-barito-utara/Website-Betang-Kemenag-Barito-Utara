@@ -3,87 +3,90 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
+	"time"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/google/uuid"
 	"github.com/kemenag-baritoutara/betang-kemenag/internal/domain"
+	"github.com/kemenag-baritoutara/betang-kemenag/internal/pocketbase"
 )
+
+type pbFileVersion struct {
+	ID          string `json:"id"`
+	FileID      string `json:"file_id"`
+	R2ObjectKey string `json:"r2_object_key"`
+	SizeBytes   int64  `json:"size_bytes"`
+	UploadedBy  string `json:"uploaded_by"`
+	CreatedAt   string `json:"created_at"`
+	Created     string `json:"created"`
+}
+
+func (v *pbFileVersion) toDomain() domain.FileVersion {
+	var upBy *string
+	if v.UploadedBy != "" {
+		upBy = &v.UploadedBy
+	}
+
+	t, _ := time.Parse(time.RFC3339Nano, v.CreatedAt)
+	if t.IsZero() {
+		t, _ = time.Parse(time.RFC3339Nano, v.Created)
+	}
+
+	return domain.FileVersion{
+		ID:          v.ID,
+		FileID:      v.FileID,
+		R2ObjectKey: v.R2ObjectKey,
+		SizeBytes:   v.SizeBytes,
+		UploadedBy:  upBy,
+		CreatedAt:   t,
+	}
+}
 
 // ListVersions mengambil riwayat versi sebuah file beserta nama pengunggah.
 func (r *FileRepo) ListVersions(ctx context.Context, fileID string) ([]domain.FileVersion, error) {
-	if len(fileID) != 36 {
+	var records []pbFileVersion
+	_, err := r.pb.List(ctx, "file_versions", pocketbase.ListParams{
+		Filter:  fmt.Sprintf(`file_id = "%s"`, fileID),
+		Sort:    "-created_at",
+		PerPage: 100,
+	}, &records)
+	if err != nil {
 		return []domain.FileVersion{}, nil
 	}
-	rows, err := r.pool.Query(ctx, `
-		SELECT v.id, v.file_id, v.r2_object_key, v.size_bytes, v.uploaded_by, v.created_at,
-		       COALESCE(u.full_name, v.uploaded_by::text) AS full_name
-		FROM kemenag_arsip.file_versions v
-		LEFT JOIN kemenag_arsip.users u ON u.id = v.uploaded_by
-		WHERE v.file_id = $1::uuid
-		ORDER BY v.created_at DESC`, fileID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
 
-	items := []domain.FileVersion{}
-	for rows.Next() {
-		var v domain.FileVersion
-		var fullName *string
-		if err := rows.Scan(&v.ID, &v.FileID, &v.R2ObjectKey, &v.SizeBytes,
-			&v.UploadedBy, &v.CreatedAt, &fullName); err != nil {
-			return nil, err
-		}
-		if fullName != nil {
-			v.UploadedByUser = &domain.UserBrief{FullName: *fullName}
-		}
-		items = append(items, v)
+	items := make([]domain.FileVersion, len(records))
+	for i, rec := range records {
+		items[i] = rec.toDomain()
 	}
-	return items, rows.Err()
+	return items, nil
 }
 
 // InsertVersion mencatat versi baru dari sebuah file.
 func (r *FileRepo) InsertVersion(ctx context.Context, fileID, objectKey string, sizeBytes int64, uploadedBy *string) error {
-	_, err := r.pool.Exec(ctx, `
-		INSERT INTO kemenag_arsip.file_versions (file_id, r2_object_key, size_bytes, uploaded_by)
-		VALUES ($1::uuid, $2, $3, $4::uuid)`, fileID, objectKey, sizeBytes, uploadedBy)
-	return err
+	now := time.Now().Format(time.RFC3339Nano)
+	data := map[string]interface{}{
+		"id":            uuid.New().String(),
+		"file_id":       fileID,
+		"r2_object_key": objectKey,
+		"size_bytes":    sizeBytes,
+		"created_at":    now,
+	}
+	if uploadedBy != nil {
+		data["uploaded_by"] = *uploadedBy
+	}
+	return r.pb.Create(ctx, "file_versions", data, nil)
 }
 
 // GetVersionByID mengambil satu versi file.
 func (r *FileRepo) GetVersionByID(ctx context.Context, versionID string) (*domain.FileVersion, error) {
-	if len(versionID) != 36 {
-		return nil, nil
-	}
-	var v domain.FileVersion
-	err := r.pool.QueryRow(ctx, `
-		SELECT id, file_id, r2_object_key, size_bytes, uploaded_by, created_at
-		FROM kemenag_arsip.file_versions WHERE id = $1::uuid`, versionID).
-		Scan(&v.ID, &v.FileID, &v.R2ObjectKey, &v.SizeBytes, &v.UploadedBy, &v.CreatedAt)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil
-	}
+	var rec pbFileVersion
+	err := r.pb.Get(ctx, "file_versions", versionID, &rec)
 	if err != nil {
-		return nil, err
-	}
-	return &v, nil
-}
-
-// GetObjectKeysByIDs mengambil pasangan id -> object key untuk sekumpulan file.
-func (r *FileRepo) GetObjectKeysByIDs(ctx context.Context, ids []string) (map[string]string, error) {
-	rows, err := r.pool.Query(ctx, `
-		SELECT id, r2_object_key FROM kemenag_arsip.files WHERE id = ANY($1)`, ids)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	result := map[string]string{}
-	for rows.Next() {
-		var id, key string
-		if err := rows.Scan(&id, &key); err != nil {
-			return nil, err
+		if errors.Is(err, pocketbase.ErrNotFound) {
+			return nil, nil
 		}
-		result[id] = key
+		return nil, err
 	}
-	return result, rows.Err()
+	d := rec.toDomain()
+	return &d, nil
 }

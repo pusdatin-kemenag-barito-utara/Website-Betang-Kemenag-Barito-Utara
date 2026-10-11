@@ -2,190 +2,249 @@ package repository
 
 import (
 	"context"
-	"strconv"
+	"fmt"
 	"strings"
+	"time"
 
 	"github.com/kemenag-baritoutara/betang-kemenag/internal/domain"
+	"github.com/kemenag-baritoutara/betang-kemenag/internal/pocketbase"
 )
 
-// Search mencari folder berdasarkan trigram fuzzy similarity, substring ILIKE, dan FTS, dengan filter opsional bidangID.
+// Search mencari folder berdasarkan substring nama, dengan filter opsional bidangID.
 func (r *FolderRepo) Search(ctx context.Context, query string, bidangID *string) ([]domain.Folder, error) {
-	var sqlQuery string
-	var args []any
-	if bidangID != nil && *bidangID != "" {
-		sqlQuery = `
-			SELECT ` + folderColumns + ` FROM kemenag_arsip.folders
-			WHERE deleted_at IS NULL
-			  AND bidang_id = $2::uuid
-			  AND (
-			    name ILIKE '%' || $1 || '%'
-			    OR similarity(name, $1) > 0.2
-			    OR (fts_doc IS NOT NULL AND fts_doc @@ plainto_tsquery('simple', $1))
-			    OR (fts_doc IS NOT NULL AND fts_doc @@ websearch_to_tsquery('simple', $1))
-			  )
-			ORDER BY similarity(name, $1) DESC, name ASC`
-		args = append(args, query, *bidangID)
-	} else {
-		sqlQuery = `
-			SELECT ` + folderColumns + ` FROM kemenag_arsip.folders
-			WHERE deleted_at IS NULL
-			  AND (
-			    name ILIKE '%' || $1 || '%'
-			    OR similarity(name, $1) > 0.2
-			    OR (fts_doc IS NOT NULL AND fts_doc @@ plainto_tsquery('simple', $1))
-			    OR (fts_doc IS NOT NULL AND fts_doc @@ websearch_to_tsquery('simple', $1))
-			  )
-			ORDER BY similarity(name, $1) DESC, name ASC`
-		args = append(args, query)
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return []domain.Folder{}, nil
 	}
 
-	rows, err := r.pool.Query(ctx, sqlQuery, args...)
+	filter := fmt.Sprintf(`deleted_at = "" && name ~ "%s"`, strings.ReplaceAll(query, `"`, `\"`))
+	if bidangID != nil && *bidangID != "" {
+		filter += fmt.Sprintf(` && bidang_id = "%s"`, *bidangID)
+	}
+
+	var records []pbFolder
+	_, err := r.pb.List(ctx, "folders", pocketbase.ListParams{
+		Filter:  filter,
+		Sort:    "name",
+		PerPage: 100,
+	}, &records)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	items := []domain.Folder{}
-	for rows.Next() {
-		f, err := scanFolder(rows)
-		if err != nil {
-			return nil, err
-		}
-		items = append(items, *f)
-	}
-	return items, rows.Err()
-}
-
-// GetFolderSizes menghitung ukuran total (rekursif) sekumpulan folder via RPC.
-// total_size bertipe NUMERIC sehingga di-scan sebagai string.
-func (r *FolderRepo) GetFolderSizes(ctx context.Context, ids []string) (map[string]int64, error) {
-	validIDs := make([]string, 0, len(ids))
-	for _, id := range ids {
-		id = strings.TrimSpace(id)
-		if id != "" && id != "root" && id != "undefined" && id != "null" && len(id) == 36 {
-			validIDs = append(validIDs, id)
-		}
-	}
-	if len(validIDs) == 0 {
-		return map[string]int64{}, nil
-	}
-
-	rows, err := r.pool.Query(ctx, `
-		SELECT folder_id, total_size::text FROM kemenag_arsip.get_folders_size($1::uuid[])`, validIDs)
-	if err != nil {
-		return map[string]int64{}, nil
-	}
-	defer rows.Close()
-
-	result := map[string]int64{}
-	for rows.Next() {
-		var folderID string
-		var totalSize string
-		if err := rows.Scan(&folderID, &totalSize); err != nil {
-			continue
-		}
-		size, _ := strconv.ParseInt(totalSize, 10, 64)
-		result[folderID] = size
-	}
-	return result, nil
-}
-
-// GetFolderPath mengambil jalur folder [daun -> akar] via RPC.
-func (r *FolderRepo) GetFolderPath(ctx context.Context, id string) ([]domain.Breadcrumb, error) {
-	id = strings.TrimSpace(id)
-	if id == "" || id == "root" || id == "undefined" || id == "null" || len(id) != 36 {
-		return []domain.Breadcrumb{}, nil
-	}
-
-	rows, err := r.pool.Query(ctx, `
-		SELECT id, name FROM kemenag_arsip.get_folder_path($1::uuid)`, id)
-	if err != nil {
-		return []domain.Breadcrumb{}, nil
-	}
-	defer rows.Close()
-
-	items := []domain.Breadcrumb{}
-	for rows.Next() {
-		var b domain.Breadcrumb
-		if err := rows.Scan(&b.ID, &b.Name); err != nil {
-			continue
-		}
-		items = append(items, b)
+	items := make([]domain.Folder, len(records))
+	for i, rec := range records {
+		items[i] = rec.toDomain()
 	}
 	return items, nil
 }
 
-// GetAllFilesInFolder mengambil seluruh file aktif di dalam folder beserta
-// subfoldernya (via RPC), dengan path relatif untuk pembuatan ZIP.
-func (r *FolderRepo) GetAllFilesInFolder(ctx context.Context, folderID string) ([]domain.DownloadFile, error) {
-	rows, err := r.pool.Query(ctx, `
-		SELECT r2_object_key, relative_path, file_name
-		FROM kemenag_arsip.get_all_files_in_folder($1::uuid)`, folderID)
-	if err != nil {
-		return nil, err
+// GetFolderSizes menghitung ukuran total (rekursif) sekumpulan folder.
+func (r *FolderRepo) GetFolderSizes(ctx context.Context, ids []string) (map[string]int64, error) {
+	result := make(map[string]int64)
+	if len(ids) == 0 {
+		return result, nil
 	}
-	defer rows.Close()
 
-	items := []domain.DownloadFile{}
-	for rows.Next() {
-		var key, path, name string
-		if err := rows.Scan(&key, &path, &name); err != nil {
-			return nil, err
-		}
-		// relative_path adalah jalur folder; gabungkan dengan nama file.
-		items = append(items, domain.DownloadFile{R2ObjectKey: key, Path: path + "/" + name})
+	// Ambil seluruh file aktif
+	var allFiles []pbFile
+	_, err := r.pb.List(ctx, "files", pocketbase.ListParams{
+		Filter:  `deleted_at = ""`,
+		PerPage: 5000,
+	}, &allFiles)
+	if err != nil {
+		return result, nil
 	}
-	return items, rows.Err()
+
+	// Ambil seluruh folder aktif untuk pemetaan pohon
+	var allFolders []pbFolder
+	_, _ = r.pb.List(ctx, "folders", pocketbase.ListParams{
+		Filter:  `deleted_at = ""`,
+		PerPage: 2000,
+	}, &allFolders)
+
+	// Buat peta anak: parent_id -> []child_id
+	childrenMap := make(map[string][]string)
+	for _, fold := range allFolders {
+		if fold.ParentID != "" {
+			childrenMap[fold.ParentID] = append(childrenMap[fold.ParentID], fold.ID)
+		}
+	}
+
+	// Peta file size langsung: folder_id -> total size
+	directSize := make(map[string]int64)
+	for _, f := range allFiles {
+		if f.FolderID != "" {
+			directSize[f.FolderID] += f.SizeBytes
+		}
+	}
+
+	// Fungsi rekursif untuk menghitung total ukuran subfolder
+	var calcFolderSize func(fid string) int64
+	calcFolderSize = func(fid string) int64 {
+		size := directSize[fid]
+		for _, childID := range childrenMap[fid] {
+			size += calcFolderSize(childID)
+		}
+		return size
+	}
+
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id != "" && id != "root" {
+			result[id] = calcFolderSize(id)
+		}
+	}
+
+	return result, nil
+}
+
+// GetFolderPath mengambil jalur folder [daun -> akar].
+func (r *FolderRepo) GetFolderPath(ctx context.Context, id string) ([]domain.Breadcrumb, error) {
+	id = strings.TrimSpace(id)
+	if id == "" || id == "root" {
+		return []domain.Breadcrumb{}, nil
+	}
+
+	var path []domain.Breadcrumb
+	currID := id
+
+	for i := 0; i < 20; i++ {
+		var f pbFolder
+		err := r.pb.Get(ctx, "folders", currID, &f)
+		if err != nil {
+			break
+		}
+		path = append(path, domain.Breadcrumb{ID: f.ID, Name: f.Name})
+		if f.ParentID == "" || f.ParentID == "root" {
+			break
+		}
+		currID = f.ParentID
+	}
+
+	// Balik urutan agar dari akar -> daun
+	for i, j := 0, len(path)-1; i < j; i, j = i+1, j-1 {
+		path[i], path[j] = path[j], path[i]
+	}
+
+	return path, nil
+}
+
+// GetAllFilesInFolder mengambil seluruh file aktif di dalam folder beserta subfoldernya.
+func (r *FolderRepo) GetAllFilesInFolder(ctx context.Context, folderID string) ([]domain.DownloadFile, error) {
+	var allFolders []pbFolder
+	_, _ = r.pb.List(ctx, "folders", pocketbase.ListParams{
+		Filter:  `deleted_at = ""`,
+		PerPage: 2000,
+	}, &allFolders)
+
+	var allFiles []pbFile
+	_, _ = r.pb.List(ctx, "files", pocketbase.ListParams{
+		Filter:  `deleted_at = ""`,
+		PerPage: 5000,
+	}, &allFiles)
+
+	folderNameMap := make(map[string]string)
+	folderParentMap := make(map[string]string)
+	for _, f := range allFolders {
+		folderNameMap[f.ID] = f.Name
+		folderParentMap[f.ID] = f.ParentID
+	}
+
+	// Tentukan apakah suatu folder berada di bawah folderID
+	isDescendant := func(fid string) bool {
+		curr := fid
+		for i := 0; i < 20; i++ {
+			if curr == folderID {
+				return true
+			}
+			p, ok := folderParentMap[curr]
+			if !ok || p == "" || p == "root" {
+				break
+			}
+			curr = p
+		}
+		return false
+	}
+
+	// Bangun relative path dari folderID ke folder target
+	buildRelPath := func(fid string) string {
+		var segments []string
+		curr := fid
+		for i := 0; i < 20; i++ {
+			if curr == folderID {
+				break
+			}
+			name := folderNameMap[curr]
+			if name != "" {
+				segments = append([]string{name}, segments...)
+			}
+			curr = folderParentMap[curr]
+		}
+		return strings.Join(segments, "/")
+	}
+
+	var items []domain.DownloadFile
+	for _, f := range allFiles {
+		if f.FolderID == "" {
+			continue
+		}
+		if isDescendant(f.FolderID) {
+			rel := buildRelPath(f.FolderID)
+			filePath := f.Name
+			if rel != "" {
+				filePath = rel + "/" + f.Name
+			}
+			items = append(items, domain.DownloadFile{
+				R2ObjectKey: f.R2ObjectKey,
+				Path:        filePath,
+			})
+		}
+	}
+
+	return items, nil
 }
 
 // ToggleStar mengubah status bintang sebuah folder.
 func (r *FolderRepo) ToggleStar(ctx context.Context, folderID string, isStarred bool) error {
-	_, err := r.pool.Exec(ctx, `
-		UPDATE kemenag_arsip.folders
-		SET is_starred = $2, updated_at = now()
-		WHERE id = $1 AND deleted_at IS NULL`, folderID, isStarred)
-	return err
+	return r.pb.Update(ctx, "folders", folderID, map[string]interface{}{
+		"is_starred": isStarred,
+		"updated_at": time.Now().Format(time.RFC3339Nano),
+	}, nil)
 }
 
 // UpdateColor mengubah warna kustom folder.
 func (r *FolderRepo) UpdateColor(ctx context.Context, folderID string, color *string) error {
-	_, err := r.pool.Exec(ctx, `
-		UPDATE kemenag_arsip.folders
-		SET color = $2, updated_at = now()
-		WHERE id = $1 AND deleted_at IS NULL`, folderID, color)
-	return err
+	colVal := ""
+	if color != nil {
+		colVal = *color
+	}
+	return r.pb.Update(ctx, "folders", folderID, map[string]interface{}{
+		"color":      colVal,
+		"updated_at": time.Now().Format(time.RFC3339Nano),
+	}, nil)
 }
 
 // ListStarred mengambil seluruh folder aktif yang dibintangi, dengan filter opsional bidangID.
 func (r *FolderRepo) ListStarred(ctx context.Context, bidangID *string) ([]domain.Folder, error) {
-	var query string
-	var args []any
+	filter := `deleted_at = "" && is_starred = true`
 	if bidangID != nil && *bidangID != "" {
-		query = `
-			SELECT ` + folderColumns + ` FROM kemenag_arsip.folders
-			WHERE deleted_at IS NULL AND is_starred = true AND bidang_id = $1::uuid
-			ORDER BY updated_at DESC, created_at DESC`
-		args = append(args, *bidangID)
-	} else {
-		query = `
-			SELECT ` + folderColumns + ` FROM kemenag_arsip.folders
-			WHERE deleted_at IS NULL AND is_starred = true
-			ORDER BY updated_at DESC, created_at DESC`
+		filter += fmt.Sprintf(` && bidang_id = "%s"`, *bidangID)
 	}
 
-	rows, err := r.pool.Query(ctx, query, args...)
+	var records []pbFolder
+	_, err := r.pb.List(ctx, "folders", pocketbase.ListParams{
+		Filter:  filter,
+		Sort:    "-updated_at,-created_at",
+		PerPage: 500,
+	}, &records)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	items := []domain.Folder{}
-	for rows.Next() {
-		f, err := scanFolder(rows)
-		if err != nil {
-			return nil, err
-		}
-		items = append(items, *f)
+	items := make([]domain.Folder, len(records))
+	for i, rec := range records {
+		items[i] = rec.toDomain()
 	}
-	return items, rows.Err()
+	return items, nil
 }

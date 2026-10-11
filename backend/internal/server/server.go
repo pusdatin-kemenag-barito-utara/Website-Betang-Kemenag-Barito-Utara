@@ -15,6 +15,7 @@ import (
 	"github.com/kemenag-baritoutara/betang-kemenag/internal/config"
 	"github.com/kemenag-baritoutara/betang-kemenag/internal/handler"
 	"github.com/kemenag-baritoutara/betang-kemenag/internal/middleware"
+	"github.com/kemenag-baritoutara/betang-kemenag/internal/pocketbase"
 	"github.com/kemenag-baritoutara/betang-kemenag/internal/repository"
 	"github.com/kemenag-baritoutara/betang-kemenag/internal/service"
 	"github.com/kemenag-baritoutara/betang-kemenag/internal/storage"
@@ -25,32 +26,29 @@ import (
 func Build(ctx context.Context, cfg *config.Config) (*fiber.App, func(), error) {
 	cleanup := func() {}
 
-	// 1) Koneksi database dengan search_path yang benar.
-	searchPath := fmt.Sprintf("%s, %s, public", cfg.DBSChema, cfg.PusdatinSchema)
-	pool, err := repository.Connect(ctx, cfg.DatabaseURL, searchPath)
+	// 1) Inisialisasi Client PocketBase sebagai database utama SI BETANG.
+	pbClient, err := pocketbase.NewClient(cfg.PocketbaseURL, cfg.PocketbaseAdminEmail, cfg.PocketbaseAdminPassword)
 	if err != nil {
-		return nil, cleanup, err
+		return nil, cleanup, fmt.Errorf("koneksi database PocketBase gagal: %w", err)
 	}
-	cleanup = func() { pool.Close() }
 
 	// 2) Client penyimpanan R2.
 	r2, err := storage.NewR2Storage(cfg.R2AccountID, cfg.R2AccessKeyID, cfg.R2SecretAccessKey, cfg.R2BucketName)
 	if err != nil {
-		cleanup()
 		return nil, func() {}, err
 	}
 
-	// 3) Client Supabase Auth.
-	supabaseClient := auth.NewSupabaseClient(cfg.SupabaseURL, cfg.SupabaseAnonKey, cfg.SupabaseJWTSecret, cfg.SupabaseServiceRoleKey)
+	// 3) Client Auth PocketBase.
+	authClient := auth.NewPBAuthClient(pbClient, "betang-kemenag-secret-key-32b-length-ok")
 
-	// 4) Lapisan repository dan service.
-	repos := repository.New(pool, cfg.PusdatinSchema)
+	// 4) Lapisan repository dan service berbasis PocketBase.
+	repos := repository.New(pbClient)
 
-	services := service.New(repos, r2, supabaseClient, cfg)
+	services := service.New(repos, r2, authClient, cfg)
 	services.Maintenance = service.NewMaintenanceService(cfg.PusdatinURL, cfg.PusdatinAppID)
 
 	// 5) Handler dan middleware.
-	handlers := handler.New(services, pool, []byte(cfg.SupabaseJWTSecret))
+	handlers := handler.New(services, pbClient, []byte("betang-kemenag-secret-key-32b-length-ok"))
 	authMW := middleware.NewAuthMiddleware(services.Auth, cfg)
 	handlers.Auth.SetAuthMiddleware(authMW)
 	cors := middleware.NewCORSHandler(cfg)

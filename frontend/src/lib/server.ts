@@ -56,7 +56,7 @@ export async function fetchFromBackend(path: string, options: RequestInit = {}):
 
 /**
  * Meneruskan header Set-Cookie dari respon backend Go ke header respon Astro SSR.
- * Krusial agar saat backend memperbarui token Supabase (refresh token), browser pengguna
+ * Krusial agar saat backend memperbarui token sesi (refresh token), browser pengguna
  * langsung mendapatkan cookie sesi baru tanpa terputus/ter-logout tiba-tiba.
  */
 export function forwardSetCookies(upstreamRes: Response, targetHeaders?: Headers) {

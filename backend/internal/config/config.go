@@ -13,16 +13,10 @@ type Config struct {
 	// Server
 	Port string
 
-	// Supabase Auth (issuer token tetap dari Supabase)
-	SupabaseURL            string
-	SupabaseAnonKey        string
-	SupabaseJWTSecret      string
-	SupabaseServiceRoleKey string
-
-	// Postgres (satu database, dua schema)
-	DatabaseURL    string
-	DBSChema       string
-	PusdatinSchema string
+	// PocketBase
+	PocketbaseURL          string
+	PocketbaseAdminEmail   string
+	PocketbaseAdminPassword string
 
 	// Cloudflare R2
 	R2AccountID      string
@@ -62,24 +56,20 @@ func Load() (*Config, error) {
 	}
 
 	cfg := &Config{
-		Port:               backendPort,
-		SupabaseURL:        getEnvFirst([]string{"SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_URL", "PUBLIC_SUPABASE_URL"}, ""),
-		SupabaseAnonKey:        getEnvFirst([]string{"SUPABASE_ANON_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "PUBLIC_SUPABASE_ANON_KEY"}, ""),
-		SupabaseJWTSecret:      getEnvFirst([]string{"SUPABASE_JWT_SECRET", "SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SECRET_KEY"}, ""),
-		SupabaseServiceRoleKey: getEnvFirst([]string{"SUPABASE_SERVICE_ROLE_KEY", "SUPABASE_SERVICE_KEY", "SERVICE_ROLE_KEY"}, ""),
-		DatabaseURL:        getEnvFirst([]string{"DATABASE_URL", "DIRECT_URL", "POSTGRES_URL", "POSTGRESQL_URL"}, ""),
-		DBSChema:           getEnvFirst([]string{"DB_SCHEMA"}, "kemenag_arsip"),
-		PusdatinSchema:     getEnvFirst([]string{"PUSDATIN_SCHEMA"}, "kemenag_pusdatin"),
-		R2AccountID:        getEnvFirst([]string{"R2_ACCOUNT_ID", "CLOUDFLARE_ACCOUNT_ID", "CF_ACCOUNT_ID"}, ""),
-		R2AccessKeyID:      getEnvFirst([]string{"R2_ACCESS_KEY_ID", "CLOUDFLARE_ACCESS_KEY_ID", "CF_ACCESS_KEY_ID"}, ""),
-		R2SecretAccessKey:  getEnvFirst([]string{"R2_SECRET_ACCESS_KEY", "CLOUDFLARE_SECRET_ACCESS_KEY", "CF_SECRET_ACCESS_KEY"}, ""),
-		R2BucketName:       getEnvFirst([]string{"R2_BUCKET_NAME", "R2_BUCKET_ARSIP", "R2_BUCKET"}, "data-arsip"),
-		TurnstileSecretKey: getEnvFirst([]string{"TURNSTILE_SECRET_KEY", "CLOUDFLARE_TURNSTILE_SECRET_KEY"}, ""),
-		PusdatinURL:        getEnvFirst([]string{"PUSDATIN_URL", "NEXT_PUBLIC_PUSDATIN_URL", "PUBLIC_PUSDATIN_URL"}, ""),
-		PusdatinAppID:      getEnvFirst([]string{"PUSDATIN_APP_ID"}, "e-arsip-kemenag"),
-		CookieName:         getEnvFirst([]string{"COOKIE_NAME"}, "earsip-auth"),
-		CookieDomain:       getEnvFirst([]string{"COOKIE_DOMAIN"}, ""),
-		CookieSecure:       getEnvBool("COOKIE_SECURE", false),
+		Port:                    backendPort,
+		PocketbaseURL:          getEnvFirst([]string{"POCKETBASE_URL", "PB_URL", "POCKETBASE_API_URL"}, "https://db-arsip.kemenag-baritoutara.com"),
+		PocketbaseAdminEmail:   getEnvFirst([]string{"POCKETBASE_ADMIN_EMAIL", "PB_ADMIN_EMAIL", "POCKETBASE_EMAIL"}, "baritoutara@kemenag.go.id"),
+		PocketbaseAdminPassword: getEnvFirst([]string{"POCKETBASE_ADMIN_PASSWORD", "PB_ADMIN_PASSWORD", "POCKETBASE_PASSWORD"}, "@Kemenag_126"),
+		R2AccountID:            getEnvFirst([]string{"R2_ACCOUNT_ID", "CLOUDFLARE_ACCOUNT_ID", "CF_ACCOUNT_ID"}, ""),
+		R2AccessKeyID:          getEnvFirst([]string{"R2_ACCESS_KEY_ID", "CLOUDFLARE_ACCESS_KEY_ID", "CF_ACCESS_KEY_ID"}, ""),
+		R2SecretAccessKey:      getEnvFirst([]string{"R2_SECRET_ACCESS_KEY", "CLOUDFLARE_SECRET_ACCESS_KEY", "CF_SECRET_ACCESS_KEY"}, ""),
+		R2BucketName:           getEnvFirst([]string{"R2_BUCKET_NAME", "R2_BUCKET_ARSIP", "R2_BUCKET"}, "data-arsip"),
+		TurnstileSecretKey:     getEnvFirst([]string{"TURNSTILE_SECRET_KEY", "CLOUDFLARE_TURNSTILE_SECRET_KEY"}, ""),
+		PusdatinURL:            getEnvFirst([]string{"PUSDATIN_URL", "NEXT_PUBLIC_PUSDATIN_URL", "PUBLIC_PUSDATIN_URL"}, ""),
+		PusdatinAppID:          getEnvFirst([]string{"PUSDATIN_APP_ID"}, "e-arsip-kemenag"),
+		CookieName:             getEnvFirst([]string{"COOKIE_NAME"}, "earsip-auth"),
+		CookieDomain:           getEnvFirst([]string{"COOKIE_DOMAIN"}, ""),
+		CookieSecure:           getEnvBool("COOKIE_SECURE", false),
 	}
 
 	appEnv := strings.ToLower(getEnvFirst([]string{"APP_ENV", "NODE_ENV", "GO_ENV", "ENVIRONMENT"}, "development"))
@@ -106,11 +96,8 @@ func Load() (*Config, error) {
 
 // validate memastikan seluruh konfigurasi krusial terisi dari Infisical Cloud.
 func (c *Config) validate() error {
-	if c.DatabaseURL == "" {
-		return fmt.Errorf("environment variable DATABASE_URL (atau DIRECT_URL) wajib terisi dari Infisical Cloud")
-	}
-	if c.SupabaseURL == "" {
-		return fmt.Errorf("environment variable SUPABASE_URL wajib terisi dari Infisical Cloud")
+	if c.PocketbaseURL == "" {
+		return fmt.Errorf("environment variable POCKETBASE_URL wajib terisi")
 	}
 	return nil
 }

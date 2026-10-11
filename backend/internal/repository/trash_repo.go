@@ -2,53 +2,76 @@ package repository
 
 import (
 	"context"
-
-	"github.com/jackc/pgx/v5/pgxpool"
+	"sort"
+	"time"
 
 	"github.com/kemenag-baritoutara/betang-kemenag/internal/domain"
+	"github.com/kemenag-baritoutara/betang-kemenag/internal/pocketbase"
 )
 
-// TrashRepo menggabungkan akses recycle bin untuk folder dan file.
+// TrashRepo menggabungkan akses recycle bin untuk folder dan file di PocketBase.
 type TrashRepo struct {
-	pool *pgxpool.Pool
+	pb *pocketbase.Client
 }
 
-// List mengambil seluruh item yang berada di recycle bin (folder + file),
-// diurutkan dari yang paling baru dihapus. ExpiresAt adalah perkiraan
-// kapan baris akan dihapus permanen (30 hari).
-func (r *TrashRepo) List(ctx context.Context) ([]domain.TrashItem, error) {
-	rows, err := r.pool.Query(ctx, `
-		SELECT 'folder' AS type, id, name, deleted_at,
-		       (deleted_at + INTERVAL '30 days')::text AS expires_at,
-		       '' AS r2_object_key, 'folder' AS mime_type, 0::bigint AS size_bytes
-		FROM kemenag_arsip.folders WHERE deleted_at IS NOT NULL
-		UNION ALL
-		SELECT 'file' AS type, id, name, deleted_at,
-		       (deleted_at + INTERVAL '30 days')::text AS expires_at,
-		       COALESCE(r2_object_key, ''), COALESCE(mime_type, 'application/octet-stream'), COALESCE(size_bytes, 0)
-		FROM kemenag_arsip.files WHERE deleted_at IS NOT NULL
-		ORDER BY deleted_at DESC`)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
+// NewTrashRepo membuat instance TrashRepo baru.
+func NewTrashRepo(pb *pocketbase.Client) *TrashRepo {
+	return &TrashRepo{pb: pb}
+}
 
-	items := []domain.TrashItem{}
-	for rows.Next() {
-		var item domain.TrashItem
-		if err := rows.Scan(
-			&item.Type,
-			&item.ID,
-			&item.Name,
-			&item.DeletedAt,
-			&item.ExpiresAt,
-			&item.R2ObjectKey,
-			&item.MimeType,
-			&item.SizeBytes,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, item)
+// List mengambil seluruh item yang berada di recycle bin (folder + file).
+func (r *TrashRepo) List(ctx context.Context) ([]domain.TrashItem, error) {
+	var folders []pbFolder
+	_, _ = r.pb.List(ctx, "folders", pocketbase.ListParams{
+		Filter:  `deleted_at != ""`,
+		PerPage: 1000,
+	}, &folders)
+
+	var files []pbFile
+	_, _ = r.pb.List(ctx, "files", pocketbase.ListParams{
+		Filter:  `deleted_at != ""`,
+		PerPage: 2000,
+	}, &files)
+
+	items := make([]domain.TrashItem, 0, len(folders)+len(files))
+
+	for _, fold := range folders {
+		t, _ := time.Parse(time.RFC3339Nano, fold.DeletedAt)
+		exp := t.Add(30 * 24 * time.Hour).Format("2006-01-02 15:04:05")
+		items = append(items, domain.TrashItem{
+			Type:        "folder",
+			ID:          fold.ID,
+			Name:        fold.Name,
+			DeletedAt:   fold.DeletedAt,
+			ExpiresAt:   exp,
+			R2ObjectKey: "",
+			MimeType:    "folder",
+			SizeBytes:   0,
+		})
 	}
-	return items, rows.Err()
+
+	for _, f := range files {
+		t, _ := time.Parse(time.RFC3339Nano, f.DeletedAt)
+		exp := t.Add(30 * 24 * time.Hour).Format("2006-01-02 15:04:05")
+		mime := f.MimeType
+		if mime == "" {
+			mime = "application/octet-stream"
+		}
+		items = append(items, domain.TrashItem{
+			Type:        "file",
+			ID:          f.ID,
+			Name:        f.Name,
+			DeletedAt:   f.DeletedAt,
+			ExpiresAt:   exp,
+			R2ObjectKey: f.R2ObjectKey,
+			MimeType:    mime,
+			SizeBytes:   f.SizeBytes,
+		})
+	}
+
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].DeletedAt > items[j].DeletedAt
+	})
+
+	return items, nil
 }

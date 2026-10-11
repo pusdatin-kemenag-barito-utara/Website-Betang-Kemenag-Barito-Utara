@@ -7,10 +7,9 @@ import (
 	"strings"
 
 	"github.com/gofiber/fiber/v3"
-	"github.com/jackc/pgx/v5/pgxpool"
-
 	"github.com/kemenag-baritoutara/betang-kemenag/internal/domain"
 	"github.com/kemenag-baritoutara/betang-kemenag/internal/middleware"
+	"github.com/kemenag-baritoutara/betang-kemenag/internal/pocketbase"
 	"github.com/kemenag-baritoutara/betang-kemenag/internal/service"
 )
 
@@ -29,12 +28,12 @@ type Handlers struct {
 	WebDAV      *WebDAVHandler
 }
 
-// New membuat seluruh handler dari service dan pool database yang tersedia.
-func New(services *service.Services, pool *pgxpool.Pool, jwtSecret []byte) *Handlers {
+// New membuat seluruh handler dari service dan client PocketBase yang tersedia.
+func New(services *service.Services, pb *pocketbase.Client, jwtSecret []byte) *Handlers {
 	webdav := NewWebDAVHandler(services.File, jwtSecret)
 	return &Handlers{
 		Auth:        NewAuthHandler(services.Auth, services),
-		Health:      NewHealthHandler(pool),
+		Health:      NewHealthHandler(pb),
 		Bidang:      NewBidangHandler(services.Bidang),
 		Folder:      NewFolderHandler(services.Folder, services.File, webdav),
 		File:        NewFileHandler(services.File, webdav),

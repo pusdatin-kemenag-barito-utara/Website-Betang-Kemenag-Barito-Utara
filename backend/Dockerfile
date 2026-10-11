@@ -14,7 +14,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /app/bin/api ./cmd/api
 # Tahap runtime: image minimal.
 FROM alpine:3.20
 
-# ca-certificates untuk HTTPS (Supabase, R2, pusdatin), wget untuk healthcheck.
+# ca-certificates untuk HTTPS (PocketBase, R2, pusdatin), wget untuk healthcheck.
 RUN apk add --no-cache ca-certificates wget
 
 WORKDIR /app

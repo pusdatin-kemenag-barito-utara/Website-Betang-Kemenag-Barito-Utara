@@ -8,4 +8,4 @@
   Standards: HTML5, CSS3, ES2026, Schema.org
   Frameworks: Astro v7 (SSR), React 19, Tailwind CSS v4, Go Fiber v3
   Storage: Cloudflare R2 (S3-Compatible)
-  Security: Supabase Auth, Strict CSP, HTTP/3 QUIC
+  Security: PocketBase Auth, Strict CSP, HTTP/3 QUIC

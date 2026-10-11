@@ -73,8 +73,8 @@ self.addEventListener("fetch", (event) => {
   if (
     request.method !== "GET" ||
     url.pathname.startsWith("/api/") ||
-    url.pathname.startsWith("/auth/") ||
-    url.hostname.includes("supabase") ||
+    url.hostname.includes("pocketbase") ||
+    url.hostname.includes("db-arsip") ||
     url.hostname.includes("challenges.cloudflare.com")
   ) {
     return;

@@ -3,249 +3,385 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
+	"time"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
-
+	"github.com/google/uuid"
 	"github.com/kemenag-baritoutara/betang-kemenag/internal/domain"
+	"github.com/kemenag-baritoutara/betang-kemenag/internal/pocketbase"
 )
 
-// FolderRepo mengakses tabel kemenag_arsip.folders.
+// FolderRepo mengakses tabel kemenag_arsip.folders di PocketBase.
 type FolderRepo struct {
-	pool *pgxpool.Pool
+	pb *pocketbase.Client
 }
 
-const folderColumns = `id, name, parent_id, bidang_id, COALESCE(is_restricted, false), COALESCE(is_starred, false), color, created_by, COALESCE(created_at, now()), COALESCE(updated_at, created_at, now()), deleted_at`
+// NewFolderRepo membuat instance FolderRepo baru.
+func NewFolderRepo(pb *pocketbase.Client) *FolderRepo {
+	return &FolderRepo{pb: pb}
+}
 
-func scanFolder(row pgx.Row) (*domain.Folder, error) {
-	var f domain.Folder
-	err := row.Scan(&f.ID, &f.Name, &f.ParentID, &f.BidangID, &f.IsRestricted,
-		&f.IsStarred, &f.Color, &f.CreatedBy, &f.CreatedAt, &f.UpdatedAt, &f.DeletedAt)
-	if err != nil {
-		return nil, err
+type pbFolder struct {
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	ParentID     string `json:"parent_id"`
+	BidangID     string `json:"bidang_id"`
+	IsRestricted bool   `json:"is_restricted"`
+	IsStarred    bool   `json:"is_starred"`
+	Color        string `json:"color"`
+	CreatedBy    string `json:"created_by"`
+	CreatedAt    string `json:"created_at"`
+	UpdatedAt    string `json:"updated_at"`
+	DeletedAt    string `json:"deleted_at"`
+	Created      string `json:"created"`
+	Updated      string `json:"updated"`
+}
+
+func (f *pbFolder) toDomain() domain.Folder {
+	var parent *string
+	if f.ParentID != "" && f.ParentID != "root" {
+		parent = &f.ParentID
 	}
-	return &f, nil
+	var bidang *string
+	if f.BidangID != "" {
+		bidang = &f.BidangID
+	}
+	var color *string
+	if f.Color != "" && f.Color != "null" {
+		color = &f.Color
+	}
+	var createdBy *string
+	if f.CreatedBy != "" {
+		createdBy = &f.CreatedBy
+	}
+
+	createdAt, _ := time.Parse(time.RFC3339Nano, f.CreatedAt)
+	if createdAt.IsZero() {
+		createdAt, _ = time.Parse(time.RFC3339Nano, f.Created)
+	}
+	updatedAt, _ := time.Parse(time.RFC3339Nano, f.UpdatedAt)
+	if updatedAt.IsZero() {
+		updatedAt, _ = time.Parse(time.RFC3339Nano, f.Updated)
+	}
+
+	var deletedAt *time.Time
+	if f.DeletedAt != "" && f.DeletedAt != "null" {
+		t, err := time.Parse(time.RFC3339Nano, f.DeletedAt)
+		if err == nil {
+			deletedAt = &t
+		}
+	}
+
+	return domain.Folder{
+		ID:           f.ID,
+		Name:         f.Name,
+		ParentID:     parent,
+		BidangID:     bidang,
+		IsRestricted: f.IsRestricted,
+		IsStarred:    f.IsStarred,
+		Color:        color,
+		CreatedBy:    createdBy,
+		CreatedAt:    createdAt,
+		UpdatedAt:    updatedAt,
+		DeletedAt:    deletedAt,
+	}
 }
 
 // ListByParent mengambil folder aktif milik satu parent (nil = root), dengan filter opsional bidangID.
 func (r *FolderRepo) ListByParent(ctx context.Context, parentID *string, bidangID *string) ([]domain.Folder, error) {
-	var query string
-	var args []any
+	filter := `deleted_at = ""`
 	if parentID == nil || *parentID == "" || *parentID == "root" {
-		if bidangID != nil && *bidangID != "" {
-			query = `SELECT ` + folderColumns + ` FROM kemenag_arsip.folders WHERE deleted_at IS NULL AND parent_id IS NULL AND (id IN (SELECT folder_id FROM kemenag_arsip.bidang_folders WHERE bidang_id = $1::uuid) OR bidang_id = $1::uuid) ORDER BY name DESC`
-			args = append(args, *bidangID)
-		} else {
-			query = `SELECT ` + folderColumns + ` FROM kemenag_arsip.folders WHERE deleted_at IS NULL AND parent_id IS NULL ORDER BY name DESC`
-		}
+		filter += ` && parent_id = ""`
 	} else {
-		if len(*parentID) != 36 {
-			return []domain.Folder{}, nil
-		}
-		query = `SELECT ` + folderColumns + ` FROM kemenag_arsip.folders WHERE deleted_at IS NULL AND parent_id = $1::uuid ORDER BY name ASC`
-		args = append(args, *parentID)
+		filter += fmt.Sprintf(` && parent_id = "%s"`, *parentID)
 	}
 
-	rows, err := r.pool.Query(ctx, query, args...)
+	var records []pbFolder
+	_, err := r.pb.List(ctx, "folders", pocketbase.ListParams{
+		Filter:  filter,
+		Sort:    "name",
+		PerPage: 500,
+	}, &records)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	items := []domain.Folder{}
-	for rows.Next() {
-		f, err := scanFolder(rows)
-		if err != nil {
-			return nil, err
+	// Filter bidangID jika berada di root
+	var accessibleRootFolderIDs map[string]bool
+	if (parentID == nil || *parentID == "" || *parentID == "root") && (bidangID != nil && *bidangID != "") {
+		accessibleRootFolderIDs = make(map[string]bool)
+		var bfList []pbBidangFolder
+		_, _ = r.pb.List(ctx, "bidang_folders", pocketbase.ListParams{
+			Filter:  fmt.Sprintf(`bidang_id = "%s"`, *bidangID),
+			PerPage: 500,
+		}, &bfList)
+		for _, bf := range bfList {
+			accessibleRootFolderIDs[bf.FolderID] = true
 		}
-		items = append(items, *f)
 	}
-	return items, rows.Err()
+
+	items := make([]domain.Folder, 0, len(records))
+	for _, rec := range records {
+		d := rec.toDomain()
+		if accessibleRootFolderIDs != nil {
+			// Jika root, pastikan folder tersebut ditugaskan ke bidang atau memiliki bidang_id yang cocok
+			if !accessibleRootFolderIDs[d.ID] && (d.BidangID == nil || *d.BidangID != *bidangID) {
+				continue
+			}
+		}
+		items = append(items, d)
+	}
+
+	return items, nil
 }
 
 // ListAll mengambil seluruh folder aktif (untuk pohon pindah/salin), dengan filter opsional bidangID.
 func (r *FolderRepo) ListAll(ctx context.Context, bidangID *string) ([]domain.Folder, error) {
-	var query string
-	var args []any
-	if bidangID != nil && *bidangID != "" {
-		query = `
-			SELECT ` + folderColumns + ` FROM kemenag_arsip.folders f
-			WHERE f.deleted_at IS NULL AND kemenag_arsip.can_bidang_access_folder($1::uuid, f.id)
-			ORDER BY f.name ASC`
-		args = append(args, *bidangID)
-	} else {
-		query = `
-			SELECT ` + folderColumns + ` FROM kemenag_arsip.folders
-			WHERE deleted_at IS NULL
-			ORDER BY name ASC`
-	}
-
-	rows, err := r.pool.Query(ctx, query, args...)
+	var records []pbFolder
+	_, err := r.pb.List(ctx, "folders", pocketbase.ListParams{
+		Filter:  `deleted_at = ""`,
+		Sort:    "name",
+		PerPage: 2000,
+	}, &records)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	items := []domain.Folder{}
-	for rows.Next() {
-		f, err := scanFolder(rows)
-		if err != nil {
-			return nil, err
+	items := make([]domain.Folder, 0, len(records))
+	for _, rec := range records {
+		d := rec.toDomain()
+		if bidangID != nil && *bidangID != "" {
+			allowed, _ := r.CanBidangAccess(ctx, *bidangID, d.ID)
+			if !allowed {
+				continue
+			}
 		}
-		items = append(items, *f)
+		items = append(items, d)
 	}
-	return items, rows.Err()
+	return items, nil
 }
 
 // CanBidangAccess memeriksa apakah bidang memiliki hak akses ke folder ini (atau ancestor-nya).
 func (r *FolderRepo) CanBidangAccess(ctx context.Context, bidangID, folderID string) (bool, error) {
 	folderID = strings.TrimSpace(folderID)
-	if folderID == "" || folderID == "root" || len(folderID) != 36 {
+	if folderID == "" || folderID == "root" {
 		return true, nil
 	}
-	var allowed bool
-	err := r.pool.QueryRow(ctx, `SELECT kemenag_arsip.can_bidang_access_folder($1::uuid, $2::uuid)`, bidangID, folderID).Scan(&allowed)
-	return allowed, err
+
+	// Cek apakah bidangID ditugaskan langsung ke folder
+	var bfList []pbBidangFolder
+	_, _ = r.pb.List(ctx, "bidang_folders", pocketbase.ListParams{
+		Filter:  fmt.Sprintf(`bidang_id = "%s" && folder_id = "%s"`, bidangID, folderID),
+		PerPage: 1,
+	}, &bfList)
+	if len(bfList) > 0 {
+		return true, nil
+	}
+
+	currID := folderID
+	for i := 0; i < 10; i++ {
+		var f pbFolder
+		err := r.pb.Get(ctx, "folders", currID, &f)
+		if err != nil {
+			break
+		}
+		if f.BidangID == bidangID {
+			return true, nil
+		}
+		// Cek apakah ancestor ada di bidang_folders
+		var ancBf []pbBidangFolder
+		_, _ = r.pb.List(ctx, "bidang_folders", pocketbase.ListParams{
+			Filter:  fmt.Sprintf(`bidang_id = "%s" && folder_id = "%s"`, bidangID, currID),
+			PerPage: 1,
+		}, &ancBf)
+		if len(ancBf) > 0 {
+			return true, nil
+		}
+		if f.ParentID == "" || f.ParentID == "root" {
+			break
+		}
+		currID = f.ParentID
+	}
+
+	return false, nil
 }
 
 // GetByID mengambil satu folder aktif.
 func (r *FolderRepo) GetByID(ctx context.Context, id string) (*domain.Folder, error) {
-	f, err := scanFolder(r.pool.QueryRow(ctx, `
-		SELECT `+folderColumns+` FROM kemenag_arsip.folders WHERE id = $1`, id))
-	if errors.Is(err, pgx.ErrNoRows) {
+	var rec pbFolder
+	err := r.pb.Get(ctx, "folders", id, &rec)
+	if err != nil {
+		if errors.Is(err, pocketbase.ErrNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if rec.DeletedAt != "" && rec.DeletedAt != "null" {
 		return nil, nil
 	}
-	return f, err
+	d := rec.toDomain()
+	return &d, nil
 }
 
 // GetByIDAnyStatus mengambil folder termasuk yang sudah dihapus.
 func (r *FolderRepo) GetByIDAnyStatus(ctx context.Context, id string) (*domain.Folder, error) {
-	f, err := scanFolder(r.pool.QueryRow(ctx, `
-		SELECT `+folderColumns+` FROM kemenag_arsip.folders WHERE id = $1`, id))
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil
+	var rec pbFolder
+	err := r.pb.Get(ctx, "folders", id, &rec)
+	if err != nil {
+		if errors.Is(err, pocketbase.ErrNotFound) {
+			return nil, nil
+		}
+		return nil, err
 	}
-	return f, err
+	d := rec.toDomain()
+	return &d, nil
 }
 
 // Create menyimpan folder baru dan mengembalikan hasilnya.
 func (r *FolderRepo) Create(ctx context.Context, name string, parentID, bidangID, createdBy *string) (*domain.Folder, error) {
-	f, err := scanFolder(r.pool.QueryRow(ctx, `
-		INSERT INTO kemenag_arsip.folders (name, parent_id, bidang_id, created_by)
-		VALUES ($1, $2, $3, $4)
-		RETURNING `+folderColumns, name, parentID, bidangID, createdBy))
+	newID := uuid.New().String()
+	now := time.Now().Format(time.RFC3339Nano)
+
+	data := map[string]interface{}{
+		"id":         newID,
+		"name":       name,
+		"created_at": now,
+		"updated_at": now,
+	}
+	if parentID != nil && *parentID != "root" {
+		data["parent_id"] = *parentID
+	}
+	if bidangID != nil {
+		data["bidang_id"] = *bidangID
+	}
+	if createdBy != nil {
+		data["created_by"] = *createdBy
+	}
+
+	var created pbFolder
+	err := r.pb.Create(ctx, "folders", data, &created)
 	if err != nil {
 		return nil, err
 	}
-	return f, nil
+	d := created.toDomain()
+	return &d, nil
 }
 
 // Rename mengganti nama folder.
 func (r *FolderRepo) Rename(ctx context.Context, id, name string) error {
-	_, err := r.pool.Exec(ctx, `
-		UPDATE kemenag_arsip.folders SET name = $1, updated_at = now() WHERE id = $2`, name, id)
-	return err
+	return r.pb.Update(ctx, "folders", id, map[string]interface{}{
+		"name":       name,
+		"updated_at": time.Now().Format(time.RFC3339Nano),
+	}, nil)
 }
 
 // UpdateParent memindahkan folder ke parent baru.
 func (r *FolderRepo) UpdateParent(ctx context.Context, id string, parentID *string) error {
-	_, err := r.pool.Exec(ctx, `
-		UPDATE kemenag_arsip.folders SET parent_id = $1, updated_at = now() WHERE id = $2`, parentID, id)
-	return err
+	pID := ""
+	if parentID != nil && *parentID != "root" {
+		pID = *parentID
+	}
+	return r.pb.Update(ctx, "folders", id, map[string]interface{}{
+		"parent_id":  pID,
+		"updated_at": time.Now().Format(time.RFC3339Nano),
+	}, nil)
 }
 
 // GetBidangID mengambil bidang_id sebuah folder.
 func (r *FolderRepo) GetBidangID(ctx context.Context, id string) (*string, error) {
-	id = strings.TrimSpace(id)
-	if id == "" || id == "root" || id == "undefined" || id == "null" || len(id) != 36 {
-		return nil, nil
+	f, err := r.GetByID(ctx, id)
+	if err != nil || f == nil {
+		return nil, err
 	}
-	var bidangID *string
-	err := r.pool.QueryRow(ctx, `SELECT bidang_id FROM kemenag_arsip.folders WHERE id = $1`, id).Scan(&bidangID)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil
-	}
-	return bidangID, err
+	return f.BidangID, nil
 }
 
 // ExistsNameAtParent memeriksa apakah nama sudah dipakai di parent yang sama.
 func (r *FolderRepo) ExistsNameAtParent(ctx context.Context, name string, parentID *string) (bool, error) {
-	var query string
-	var args []any
+	filter := fmt.Sprintf(`deleted_at = "" && name = "%s"`, strings.ReplaceAll(name, `"`, `\"`))
 	if parentID == nil || *parentID == "" || *parentID == "root" {
-		query = `SELECT EXISTS(SELECT 1 FROM kemenag_arsip.folders WHERE deleted_at IS NULL AND LOWER(name) = LOWER($1) AND parent_id IS NULL)`
-		args = []any{name}
+		filter += ` && parent_id = ""`
 	} else {
-		query = `SELECT EXISTS(SELECT 1 FROM kemenag_arsip.folders WHERE deleted_at IS NULL AND LOWER(name) = LOWER($1) AND parent_id = $2::uuid)`
-		args = []any{name, *parentID}
+		filter += fmt.Sprintf(` && parent_id = "%s"`, *parentID)
 	}
-	var exists bool
-	err := r.pool.QueryRow(ctx, query, args...).Scan(&exists)
-	return exists, err
+
+	var list []pbFolder
+	_, err := r.pb.List(ctx, "folders", pocketbase.ListParams{
+		Filter:  filter,
+		PerPage: 1,
+	}, &list)
+	if err != nil {
+		return false, err
+	}
+	return len(list) > 0, nil
 }
 
 // SoftDelete menandai folder sebagai terhapus.
 func (r *FolderRepo) SoftDelete(ctx context.Context, id string) error {
-	_, err := r.pool.Exec(ctx, `
-		UPDATE kemenag_arsip.folders SET deleted_at = now(), updated_at = now() WHERE id = $1`, id)
-	return err
+	now := time.Now().Format(time.RFC3339Nano)
+	return r.pb.Update(ctx, "folders", id, map[string]interface{}{
+		"deleted_at": now,
+		"updated_at": now,
+	}, nil)
 }
 
 // SoftDeleteBatch menandai banyak folder terhapus sekaligus.
 func (r *FolderRepo) SoftDeleteBatch(ctx context.Context, ids []string) error {
-	_, err := r.pool.Exec(ctx, `
-		UPDATE kemenag_arsip.folders SET deleted_at = now(), updated_at = now() WHERE id = ANY($1)`, ids)
-	return err
+	now := time.Now().Format(time.RFC3339Nano)
+	for _, id := range ids {
+		_ = r.pb.Update(ctx, "folders", id, map[string]interface{}{
+			"deleted_at": now,
+			"updated_at": now,
+		}, nil)
+	}
+	return nil
 }
 
 // Restore membatalkan penandaan terhapus.
 func (r *FolderRepo) Restore(ctx context.Context, id string) error {
-	_, err := r.pool.Exec(ctx, `
-		UPDATE kemenag_arsip.folders SET deleted_at = NULL, updated_at = now() WHERE id = $1`, id)
-	return err
+	return r.pb.Update(ctx, "folders", id, map[string]interface{}{
+		"deleted_at": "",
+		"updated_at": time.Now().Format(time.RFC3339Nano),
+	}, nil)
 }
 
 // RestoreBatch memulihkan banyak folder sekaligus.
 func (r *FolderRepo) RestoreBatch(ctx context.Context, ids []string) error {
-	if len(ids) == 0 {
-		return nil
+	for _, id := range ids {
+		_ = r.Restore(ctx, id)
 	}
-	_, err := r.pool.Exec(ctx, `
-		UPDATE kemenag_arsip.folders SET deleted_at = NULL, updated_at = now() WHERE id = ANY($1)`, ids)
-	return err
+	return nil
 }
 
-// HardDelete menghapus baris folder permanen (cascade ke anak).
+// HardDelete menghapus baris folder permanen.
 func (r *FolderRepo) HardDelete(ctx context.Context, id string) error {
-	_, err := r.pool.Exec(ctx, `DELETE FROM kemenag_arsip.folders WHERE id = $1`, id)
-	return err
+	return r.pb.Delete(ctx, "folders", id)
 }
 
 // HardDeleteBatch menghapus banyak folder permanen sekaligus.
 func (r *FolderRepo) HardDeleteBatch(ctx context.Context, ids []string) error {
-	_, err := r.pool.Exec(ctx, `DELETE FROM kemenag_arsip.folders WHERE id = ANY($1)`, ids)
-	return err
+	for _, id := range ids {
+		_ = r.pb.Delete(ctx, "folders", id)
+	}
+	return nil
 }
 
 // ListDeleted mengambil folder yang berada di recycle bin.
 func (r *FolderRepo) ListDeleted(ctx context.Context) ([]domain.Folder, error) {
-	rows, err := r.pool.Query(ctx, `
-		SELECT `+folderColumns+` FROM kemenag_arsip.folders
-		WHERE deleted_at IS NOT NULL
-		ORDER BY deleted_at DESC`)
+	var records []pbFolder
+	_, err := r.pb.List(ctx, "folders", pocketbase.ListParams{
+		Filter:  `deleted_at != ""`,
+		Sort:    "-deleted_at",
+		PerPage: 1000,
+	}, &records)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	items := []domain.Folder{}
-	for rows.Next() {
-		f, err := scanFolder(rows)
-		if err != nil {
-			return nil, err
-		}
-		items = append(items, *f)
+	items := make([]domain.Folder, len(records))
+	for i, rec := range records {
+		items[i] = rec.toDomain()
 	}
-	return items, rows.Err()
+	return items, nil
 }

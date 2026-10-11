@@ -7,23 +7,23 @@ import (
 
 	"github.com/kemenag-baritoutara/betang-kemenag/internal/config"
 	"github.com/kemenag-baritoutara/betang-kemenag/internal/domain"
+	"github.com/kemenag-baritoutara/betang-kemenag/internal/pocketbase"
 	"github.com/kemenag-baritoutara/betang-kemenag/internal/repository"
 )
 
 func TestDataSync(t *testing.T) {
 
 	cfg, err := config.Load()
-	if err != nil || cfg.DatabaseURL == "" {
+	if err != nil || cfg.PocketbaseURL == "" {
 		t.Skipf("skipping live database integration test: %v", err)
 	}
 
-	pool, err := repository.Connect(context.Background(), cfg.DatabaseURL, "kemenag_arsip, kemenag_pusdatin, public")
+	pbClient, err := pocketbase.NewClient(cfg.PocketbaseURL, cfg.PocketbaseAdminEmail, cfg.PocketbaseAdminPassword)
 	if err != nil {
-		t.Fatalf("db connect error: %v", err)
+		t.Fatalf("pocketbase connect error: %v", err)
 	}
-	defer pool.Close()
 
-	repos := repository.New(pool, cfg.PusdatinSchema)
+	repos := repository.New(pbClient)
 	svc := New(repos, nil, nil, cfg)
 
 	// Super Admin User

@@ -41,7 +41,7 @@ type refreshCacheItem struct {
 
 // AuthService menangani autentikasi, sesi, dan otorisasi.
 type AuthService struct {
-	supabase     *auth.SupabaseClient
+	pbAuth       *auth.PBAuthClient
 	userRepo     *repository.UserRepo
 	cfg          *config.Config
 	metaMu       sync.RWMutex
@@ -52,9 +52,9 @@ type AuthService struct {
 }
 
 // NewAuthService membuat instance AuthService baru dengan in-memory cache metadata dan deduplikasi token refresh.
-func NewAuthService(supabase *auth.SupabaseClient, userRepo *repository.UserRepo, cfg *config.Config) *AuthService {
+func NewAuthService(pbAuth *auth.PBAuthClient, userRepo *repository.UserRepo, cfg *config.Config) *AuthService {
 	return &AuthService{
-		supabase:     supabase,
+		pbAuth:       pbAuth,
 		userRepo:     userRepo,
 		cfg:          cfg,
 		metaCache:    make(map[string]userMetaCacheItem),
@@ -71,8 +71,8 @@ var ErrAccountInactive = errors.New("Akun Anda sedang dinonaktifkan. Silakan hub
 // ErrNoPermission dipakai bila user tidak punya hak akses.
 var ErrNoPermission = errors.New("Anda tidak memiliki hak akses untuk tindakan ini.")
 
-// Login memvalidasi Turnstile dan Supabase Auth secara paralel, lalu
-// memastikan user terdaftar di tabel internal kemenag_arsip.users.
+// Login memvalidasi Turnstile dan PocketBase Auth secara paralel, lalu
+// memastikan user terdaftar di koleksi internal users.
 func (s *AuthService) Login(ctx context.Context, email, password, turnstileToken string, rememberMe bool) (*LoginResult, error) {
 	email = strings.ToLower(strings.TrimSpace(email))
 	password = strings.TrimSpace(password)
@@ -84,7 +84,7 @@ func (s *AuthService) Login(ctx context.Context, email, password, turnstileToken
 		wg           sync.WaitGroup
 	)
 
-	// 1) Jalankan verifikasi Turnstile dan Autentikasi Supabase secara paralel
+	// 1) Jalankan verifikasi Turnstile dan Autentikasi PocketBase secara paralel
 	// untuk menghemat waktu latensi jaringan (menghemat ~600-800ms).
 	if s.cfg.TurnstileSecretKey != "" {
 		if turnstileToken == "" {
@@ -105,7 +105,7 @@ func (s *AuthService) Login(ctx context.Context, email, password, turnstileToken
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		tokens, authErr = s.supabase.SignInWithPassword(ctx, email, password)
+		tokens, authErr = s.pbAuth.SignInWithPassword(ctx, email, password)
 	}()
 
 	wg.Wait()
@@ -159,7 +159,7 @@ func (s *AuthService) Login(ctx context.Context, email, password, turnstileToken
 	}
 
 	// Terbitkan JWT mandiri yang ditandatangani oleh Go backend
-	goAccessToken, err := s.supabase.GenerateAccessToken(tokens.UserID, tokens.Email, sessionDuration)
+	goAccessToken, err := s.pbAuth.GenerateAccessToken(tokens.UserID, tokens.Email, sessionDuration)
 	if err != nil {
 		// Fallback ke access token bawaan jika gagal signing
 		goAccessToken = tokens.AccessToken
@@ -184,7 +184,7 @@ func (s *AuthService) Login(ctx context.Context, email, password, turnstileToken
 
 // VerifySession memvalidasi sesi dari cookie secara in-memory (0 ms).
 // Mendukung sliding window renewal agar sesi pengguna aktif diperpanjang otomatis
-// tanpa perlu menembak server Supabase setiap saat. Dilengkapi singleflight guard
+// tanpa perlu menembak server PocketBase setiap saat. Dilengkapi singleflight guard
 // dan cache 60 detik untuk mencegah tabrakan Refresh Token Rotation.
 func (s *AuthService) VerifySession(ctx context.Context, raw string, allowRefresh bool) (*domain.Session, error) {
 	session, err := decodeSession(raw)
@@ -192,14 +192,14 @@ func (s *AuthService) VerifySession(ctx context.Context, raw string, allowRefres
 		return nil, errors.New("sesi tidak valid")
 	}
 
-	claims, err := s.supabase.VerifyAccessToken(session.AccessToken)
+	claims, err := s.pbAuth.VerifyAccessToken(session.AccessToken)
 	if err == nil {
 		// Sesi masih valid. Jika sisa masa berlaku < 24 jam dan merupakan token Go mandiri,
 		// perpanjang masa aktifnya secara otomatis (sliding session 7 hari).
 		nowUnix := time.Now().Unix()
 		if session.ExpiresAt-nowUnix < 24*3600 && session.UserID != "" && session.Email != "" {
 			newDuration := 7 * 24 * time.Hour
-			if newAccessToken, signErr := s.supabase.GenerateAccessToken(session.UserID, session.Email, newDuration); signErr == nil {
+			if newAccessToken, signErr := s.pbAuth.GenerateAccessToken(session.UserID, session.Email, newDuration); signErr == nil {
 				session.AccessToken = newAccessToken
 				session.ExpiresAt = time.Now().Add(newDuration).Unix()
 			}
@@ -226,7 +226,7 @@ func (s *AuthService) VerifySession(ctx context.Context, raw string, allowRefres
 	}
 	s.refreshMu.RUnlock()
 
-	// 2. Jalankan pembaruan token via singleflight agar hanya 1 panggilan yang menembak Supabase
+	// 2. Jalankan pembaruan token via singleflight agar hanya 1 panggilan yang menembak PocketBase
 	val, err, _ := s.refreshGroup.Do(session.RefreshToken, func() (interface{}, error) {
 		// Periksa kembali cache di dalam singleflight
 		s.refreshMu.RLock()
@@ -236,13 +236,13 @@ func (s *AuthService) VerifySession(ctx context.Context, raw string, allowRefres
 		}
 		s.refreshMu.RUnlock()
 
-		tokens, refreshErr := s.supabase.RefreshToken(ctx, session.RefreshToken)
+		tokens, refreshErr := s.pbAuth.RefreshToken(ctx, session.RefreshToken)
 		if refreshErr != nil {
 			return nil, refreshErr
 		}
 
 		// Terbitkan token mandiri Go yang tahan 7 hari ke depan
-		goAccessToken, signErr := s.supabase.GenerateAccessToken(tokens.UserID, tokens.Email, 7*24*time.Hour)
+		goAccessToken, signErr := s.pbAuth.GenerateAccessToken(tokens.UserID, tokens.Email, 7*24*time.Hour)
 		if signErr == nil {
 			tokens.AccessToken = goAccessToken
 			tokens.ExpiresIn = time.Now().Add(7 * 24 * time.Hour).Unix()

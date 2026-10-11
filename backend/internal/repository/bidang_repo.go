@@ -3,185 +3,279 @@ package repository
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
-
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
+	"time"
 
 	"github.com/kemenag-baritoutara/betang-kemenag/internal/domain"
+	"github.com/kemenag-baritoutara/betang-kemenag/internal/pocketbase"
 )
 
-// BidangRepo mengakses tabel kemenag_arsip.bidang.
+// BidangRepo mengakses koleksi bidang di PocketBase.
 type BidangRepo struct {
-	pool *pgxpool.Pool
+	pb *pocketbase.Client
+}
+
+// NewBidangRepo membuat instance BidangRepo baru.
+func NewBidangRepo(pb *pocketbase.Client) *BidangRepo {
+	return &BidangRepo{pb: pb}
+}
+
+type pbBidang struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	SortOrder int    `json:"sort_order"`
+	CreatedAt string `json:"created_at"`
+	Created   string `json:"created"`
+}
+
+func (b *pbBidang) toDomain() domain.Bidang {
+	t, _ := time.Parse(time.RFC3339Nano, b.CreatedAt)
+	if t.IsZero() {
+		t, _ = time.Parse(time.RFC3339Nano, b.Created)
+	}
+	return domain.Bidang{
+		ID:        b.ID,
+		Name:      b.Name,
+		SortOrder: b.SortOrder,
+		CreatedAt: t,
+	}
 }
 
 // List mengembalikan seluruh bidang aktif sesuai urutan.
 func (r *BidangRepo) List(ctx context.Context) ([]domain.Bidang, error) {
-	rows, err := r.pool.Query(ctx, `
-		SELECT id, name, sort_order, created_at
-		FROM kemenag_arsip.bidang
-		ORDER BY sort_order ASC, name ASC`)
+	var records []pbBidang
+	_, err := r.pb.List(ctx, "bidang", pocketbase.ListParams{
+		Sort:    "sort_order,name",
+		PerPage: 500,
+	}, &records)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	items := []domain.Bidang{}
-	for rows.Next() {
-		var b domain.Bidang
-		if err := rows.Scan(&b.ID, &b.Name, &b.SortOrder, &b.CreatedAt); err != nil {
-			return nil, err
-		}
-		items = append(items, b)
+	res := make([]domain.Bidang, len(records))
+	for i, b := range records {
+		res[i] = b.toDomain()
 	}
-	return items, rows.Err()
+	return res, nil
+}
+
+type pbBidangFolder struct {
+	ID        string `json:"id"`
+	BidangID  string `json:"bidang_id"`
+	FolderID  string `json:"folder_id"`
+	CreatedAt string `json:"created_at"`
+}
+
+type pbFileSummary struct {
+	ID        string `json:"id"`
+	BidangID  string `json:"bidang_id"`
+	DeletedAt string `json:"deleted_at"`
+}
+
+type pbFolderSummary struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	DeletedAt string `json:"deleted_at"`
 }
 
 // ListWithCounts mengembalikan bidang beserta jumlah dokumen aktif dan daftar folder root yang diakses.
 func (r *BidangRepo) ListWithCounts(ctx context.Context) ([]domain.BidangWithCount, error) {
-	rows, err := r.pool.Query(ctx, `
-		SELECT b.id, b.name, b.sort_order, b.created_at,
-		       COUNT(DISTINCT f.id) FILTER (WHERE f.deleted_at IS NULL) AS doc_count,
-		       COALESCE(array_agg(DISTINCT bf.folder_id::text) FILTER (WHERE bf.folder_id IS NOT NULL), '{}') AS folder_ids,
-		       COALESCE(array_agg(DISTINCT fold.name) FILTER (WHERE fold.name IS NOT NULL), '{}') AS folder_names
-		FROM kemenag_arsip.bidang b
-		LEFT JOIN kemenag_arsip.files f ON f.bidang_id = b.id
-		LEFT JOIN kemenag_arsip.bidang_folders bf ON bf.bidang_id = b.id
-		LEFT JOIN kemenag_arsip.folders fold ON fold.id = bf.folder_id AND fold.deleted_at IS NULL
-		GROUP BY b.id, b.name, b.sort_order, b.created_at
-		ORDER BY b.sort_order ASC, b.name ASC`)
+	bidangs, err := r.List(ctx)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	items := []domain.BidangWithCount{}
-	for rows.Next() {
-		var b domain.BidangWithCount
-		if err := rows.Scan(&b.ID, &b.Name, &b.SortOrder, &b.CreatedAt, &b.DocCount, &b.AccessibleFolderIDs, &b.AccessibleFolderNames); err != nil {
-			return nil, err
+	// Ambil file aktif untuk hitung doc_count
+	var files []pbFileSummary
+	_, _ = r.pb.List(ctx, "files", pocketbase.ListParams{
+		Filter:  `deleted_at = ""`,
+		PerPage: 5000,
+	}, &files)
+
+	fileCounts := make(map[string]int64)
+	for _, f := range files {
+		if f.BidangID != "" {
+			fileCounts[f.BidangID]++
 		}
-		items = append(items, b)
 	}
-	return items, rows.Err()
+
+	// Ambil relasi bidang_folders
+	var bfList []pbBidangFolder
+	_, _ = r.pb.List(ctx, "bidang_folders", pocketbase.ListParams{
+		PerPage: 1000,
+	}, &bfList)
+
+	// Ambil nama folder untuk pemetaan
+	var folders []pbFolderSummary
+	_, _ = r.pb.List(ctx, "folders", pocketbase.ListParams{
+		Filter:  `deleted_at = ""`,
+		PerPage: 1000,
+	}, &folders)
+	folderNames := make(map[string]string)
+	for _, fold := range folders {
+		folderNames[fold.ID] = fold.Name
+	}
+
+	bidangFolderMap := make(map[string][]string)
+	for _, bf := range bfList {
+		bidangFolderMap[bf.BidangID] = append(bidangFolderMap[bf.BidangID], bf.FolderID)
+	}
+
+	items := make([]domain.BidangWithCount, len(bidangs))
+	for i, b := range bidangs {
+		fIDs := bidangFolderMap[b.ID]
+		fNames := make([]string, 0, len(fIDs))
+		for _, fid := range fIDs {
+			if name, ok := folderNames[fid]; ok {
+				fNames = append(fNames, name)
+			}
+		}
+
+		items[i] = domain.BidangWithCount{
+			Bidang:                b,
+			DocCount:              fileCounts[b.ID],
+			AccessibleFolderIDs:   fIDs,
+			AccessibleFolderNames: fNames,
+		}
+	}
+
+	return items, nil
 }
 
 // GetAccessibleFolderIDs mengambil daftar ID folder root yang dapat diakses oleh satu bidang.
 func (r *BidangRepo) GetAccessibleFolderIDs(ctx context.Context, bidangID string) ([]string, error) {
-	rows, err := r.pool.Query(ctx, `
-		SELECT folder_id::text
-		FROM kemenag_arsip.bidang_folders
-		WHERE bidang_id = $1::uuid`, bidangID)
+	var list []pbBidangFolder
+	_, err := r.pb.List(ctx, "bidang_folders", pocketbase.ListParams{
+		Filter:  fmt.Sprintf(`bidang_id = "%s"`, bidangID),
+		PerPage: 500,
+	}, &list)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
 
-	ids := []string{}
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		ids = append(ids, id)
+	ids := make([]string, len(list))
+	for i, item := range list {
+		ids[i] = item.FolderID
 	}
-	return ids, rows.Err()
+	return ids, nil
 }
 
 // SetAccessibleFolders memperbarui daftar folder root yang dapat diakses oleh satu bidang.
 func (r *BidangRepo) SetAccessibleFolders(ctx context.Context, bidangID string, folderIDs []string) error {
-	tx, err := r.pool.Begin(ctx)
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback(ctx)
-
-	if _, err := tx.Exec(ctx, `DELETE FROM kemenag_arsip.bidang_folders WHERE bidang_id = $1::uuid`, bidangID); err != nil {
-		return err
-	}
-
-	for _, fID := range folderIDs {
-		fID = strings.TrimSpace(fID)
-		if len(fID) == 36 {
-			if _, err := tx.Exec(ctx, `
-				INSERT INTO kemenag_arsip.bidang_folders (bidang_id, folder_id)
-				VALUES ($1::uuid, $2::uuid)
-				ON CONFLICT DO NOTHING`, bidangID, fID); err != nil {
-				return err
-			}
+	// Ambil yang lama untuk dihapus
+	var old []pbBidangFolder
+	_, err := r.pb.List(ctx, "bidang_folders", pocketbase.ListParams{
+		Filter:  fmt.Sprintf(`bidang_id = "%s"`, bidangID),
+		PerPage: 500,
+	}, &old)
+	if err == nil {
+		for _, item := range old {
+			_ = r.pb.Delete(ctx, "bidang_folders", item.ID)
 		}
 	}
 
-	return tx.Commit(ctx)
+	// Insert yang baru
+	for _, fid := range folderIDs {
+		fid = strings.TrimSpace(fid)
+		if fid == "" {
+			continue
+		}
+		compactID := strings.ReplaceAll(bidangID, "-", "")[:16] + strings.ReplaceAll(fid, "-", "")[:16]
+		data := map[string]interface{}{
+			"id":         compactID,
+			"bidang_id":  bidangID,
+			"folder_id":  fid,
+			"created_at": time.Now().Format(time.RFC3339Nano),
+		}
+		_ = r.pb.Create(ctx, "bidang_folders", data, nil)
+	}
+
+	return nil
 }
 
-// FindByName mencari bidang dengan nama yang sama (tidak peka huruf besar/kecil),
-// opsional mengecualikan satu id (dipakai saat update).
-func (r *BidangRepo) FindByName(ctx context.Context, name, excludeID string) (*domain.Bidang, error) {
-	query := `SELECT id, name, sort_order, created_at FROM kemenag_arsip.bidang WHERE LOWER(name) = LOWER($1)`
-	args := []any{name}
-	if excludeID != "" {
-		query += ` AND id <> $2`
-		args = append(args, excludeID)
-	}
-	var b domain.Bidang
-	err := r.pool.QueryRow(ctx, query, args...).Scan(&b.ID, &b.Name, &b.SortOrder, &b.CreatedAt)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil
-	}
+// GetByID mengambil satu bidang berdasarkan UUID.
+func (r *BidangRepo) GetByID(ctx context.Context, id string) (*domain.Bidang, error) {
+	var rec pbBidang
+	err := r.pb.Get(ctx, "bidang", id, &rec)
 	if err != nil {
+		if errors.Is(err, pocketbase.ErrNotFound) {
+			return nil, nil
+		}
 		return nil, err
 	}
-	return &b, nil
+	res := rec.toDomain()
+	return &res, nil
 }
 
-// Create menyimpan bidang baru dengan urutan berikutnya.
-func (r *BidangRepo) Create(ctx context.Context, name string) error {
-	_, err := r.pool.Exec(ctx, `
-		INSERT INTO kemenag_arsip.bidang (name, sort_order)
-		SELECT $1, COALESCE(MAX(sort_order), 0) + 1 FROM kemenag_arsip.bidang`,
-		name)
-	return err
-}
-
-// Update mengubah nama dan urutan bidang.
-func (r *BidangRepo) Update(ctx context.Context, id, name string, sortOrder int) error {
-	_, err := r.pool.Exec(ctx, `
-		UPDATE kemenag_arsip.bidang SET name = $1, sort_order = $2 WHERE id = $3`,
-		name, sortOrder, id)
-	return err
-}
-
-// Delete menghapus bidang beserta relasi folder dan file (cascade).
-func (r *BidangRepo) Delete(ctx context.Context, id string) error {
-	_, err := r.pool.Exec(ctx, `DELETE FROM kemenag_arsip.bidang WHERE id = $1`, id)
-	return err
-}
-
-// Reorder memperbarui urutan seluruh bidang dalam satu transaksi.
-func (r *BidangRepo) Reorder(ctx context.Context, items []domain.Bidang) error {
-	tx, err := r.pool.Begin(ctx)
-	if err != nil {
-		return err
+// FindByName mencari bidang berdasarkan nama (case-insensitive).
+func (r *BidangRepo) FindByName(ctx context.Context, name, excludeID string) (*domain.Bidang, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil, nil
 	}
-	defer tx.Rollback(ctx)
 
-	for _, item := range items {
-		if _, err := tx.Exec(ctx,
-			`UPDATE kemenag_arsip.bidang SET sort_order = $1 WHERE id = $2`,
-			item.SortOrder, item.ID); err != nil {
-			return err
-		}
+	filter := fmt.Sprintf(`name = "%s"`, strings.ReplaceAll(name, `"`, `\"`))
+	if excludeID != "" {
+		filter += fmt.Sprintf(` && id != "%s"`, excludeID)
 	}
-	return tx.Commit(ctx)
+
+	var list []pbBidang
+	_, err := r.pb.List(ctx, "bidang", pocketbase.ListParams{
+		Filter:  filter,
+		PerPage: 1,
+	}, &list)
+	if err != nil || len(list) == 0 {
+		return nil, err
+	}
+
+	res := list[0].toDomain()
+	return &res, nil
 }
 
-// CountActiveFiles menghitung jumlah file aktif milik sebuah bidang.
+// CountActiveFiles menghitung jumlah file aktif milik satu bidang.
 func (r *BidangRepo) CountActiveFiles(ctx context.Context, bidangID string) (int64, error) {
-	var count int64
-	err := r.pool.QueryRow(ctx, `
-		SELECT COUNT(*) FROM kemenag_arsip.files WHERE bidang_id = $1 AND deleted_at IS NULL`,
-		bidangID).Scan(&count)
-	return count, err
+	var list []pbFileSummary
+	lr, err := r.pb.List(ctx, "files", pocketbase.ListParams{
+		Filter:  fmt.Sprintf(`deleted_at = "" && bidang_id = "%s"`, bidangID),
+		PerPage: 1,
+	}, &list)
+	if err != nil {
+		return 0, err
+	}
+	return int64(lr.TotalItems), nil
+}
+
+// Create menambahkan bidang baru.
+func (r *BidangRepo) Create(ctx context.Context, name string) error {
+	data := map[string]interface{}{
+		"name":       name,
+		"sort_order": 0,
+		"created_at": time.Now().Format(time.RFC3339Nano),
+	}
+	return r.pb.Create(ctx, "bidang", data, nil)
+}
+
+// Update memperbarui data bidang.
+func (r *BidangRepo) Update(ctx context.Context, id, name string, sortOrder int) error {
+	data := map[string]interface{}{
+		"name":       name,
+		"sort_order": sortOrder,
+	}
+	return r.pb.Update(ctx, "bidang", id, data, nil)
+}
+
+// Delete menghapus bidang secara permanen.
+func (r *BidangRepo) Delete(ctx context.Context, id string) error {
+	return r.pb.Delete(ctx, "bidang", id)
+}
+
+// Reorder memperbarui urutan seluruh bidang sekaligus.
+func (r *BidangRepo) Reorder(ctx context.Context, items []domain.Bidang) error {
+	for _, item := range items {
+		_ = r.pb.Update(ctx, "bidang", item.ID, map[string]interface{}{
+			"sort_order": item.SortOrder,
+		}, nil)
+	}
+	return nil
 }

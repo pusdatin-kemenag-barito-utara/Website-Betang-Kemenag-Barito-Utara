@@ -27,7 +27,7 @@ export function SystemHealthSection({ currentUser }: SystemHealthSectionProps) {
       </div>
 
       <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {/* Card 1: Database Supabase */}
+        {/* Card 1: Database PocketBase */}
         <div className="flex items-start gap-3.5 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-850">
           <div className="h-10 w-10 shrink-0 rounded-xl bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
             <Database className="h-5 w-5" />
@@ -35,16 +35,16 @@ export function SystemHealthSection({ currentUser }: SystemHealthSectionProps) {
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-bold text-slate-800 dark:text-slate-100">
-                Database Supabase
+                Database PocketBase
               </h3>
               <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-100/80 dark:bg-emerald-950/80 px-2 py-0.5 rounded-full">
                 <CheckCircle2 className="h-3 w-3" /> Online
               </span>
             </div>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 truncate">
-              Schema: <code className="bg-slate-200/70 dark:bg-slate-800 px-1 py-0.5 rounded font-medium text-[10px]">kemenag_arsip</code>
+              Endpoint: <code className="bg-slate-200/70 dark:bg-slate-800 px-1 py-0.5 rounded font-medium text-[10px]">db-arsip.kemenag-baritoutara.com</code>
             </p>
-            <p className="text-[10px] text-slate-400 mt-0.5">PostgreSQL 15 • Port 6543</p>
+            <p className="text-[10px] text-slate-400 mt-0.5">PocketBase v0.40+ • HTTPS / REST</p>
           </div>
         </div>
 
@@ -107,7 +107,7 @@ export function SystemHealthSection({ currentUser }: SystemHealthSectionProps) {
             <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 truncate">
               Host: <code className="bg-slate-200/70 dark:bg-slate-800 px-1 py-0.5 rounded font-medium text-[10px]">127.0.0.1:8080</code>
             </p>
-            <p className="text-[10px] text-slate-400 mt-0.5">High Concurrency • pgx v5</p>
+            <p className="text-[10px] text-slate-400 mt-0.5">High Concurrency • PocketBase Engine</p>
           </div>
         </div>
 
@@ -126,7 +126,7 @@ export function SystemHealthSection({ currentUser }: SystemHealthSectionProps) {
               </span>
             </div>
             <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 truncate">
-              Skema: <code className="bg-slate-200/70 dark:bg-slate-800 px-1 py-0.5 rounded font-medium text-[10px]">kemenag_arsip.users</code>
+              Koleksi: <code className="bg-slate-200/70 dark:bg-slate-800 px-1 py-0.5 rounded font-medium text-[10px]">users (PocketBase Auth)</code>
             </p>
             <p className="text-[10px] text-slate-400 mt-0.5">Terisolasi Penuh Dari Pusdatin</p>
           </div>

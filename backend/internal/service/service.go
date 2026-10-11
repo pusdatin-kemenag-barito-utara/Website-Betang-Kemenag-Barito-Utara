@@ -25,22 +25,22 @@ type Services struct {
 	Storage     *StorageService
 	Maintenance *MaintenanceService
 
-	repos    *repository.Repos
-	r2       *storage.R2Storage
-	cfg      *config.Config
-	supabase *auth.SupabaseClient
+	repos  *repository.Repos
+	r2     *storage.R2Storage
+	cfg    *config.Config
+	pbAuth *auth.PBAuthClient
 }
 
 // New membangun seluruh service beserta dependensinya.
-func New(repos *repository.Repos, r2 *storage.R2Storage, supabase *auth.SupabaseClient, cfg *config.Config) *Services {
+func New(repos *repository.Repos, r2 *storage.R2Storage, pbAuth *auth.PBAuthClient, cfg *config.Config) *Services {
 	s := &Services{
-		repos:    repos,
-		r2:       r2,
-		cfg:      cfg,
-		supabase: supabase,
+		repos:  repos,
+		r2:     r2,
+		cfg:    cfg,
+		pbAuth: pbAuth,
 	}
-	s.Auth = NewAuthService(supabase, repos.User, cfg)
-	s.User = NewUserService(repos.User, supabase, s)
+	s.Auth = NewAuthService(pbAuth, repos.User, cfg)
+	s.User = NewUserService(repos.User, pbAuth, s)
 	s.Bidang = &BidangService{repo: repos.Bidang, folders: repos.Folder, audits: s}
 	s.Folder = &FolderService{folders: repos.Folder, files: repos.File, r2: r2, audits: s}
 	s.File = &FileService{files: repos.File, folders: repos.Folder, r2: r2, audits: s}

@@ -2,15 +2,14 @@
 
 Aplikasi Manajemen Arsip Digital **Kementerian Agama Kabupaten Barito Utara**.
 
-Repositori ini adalah **rewrite penuh (monorepo)** dari aplikasi lama (Next.js + Supabase)
-menjadi arsitektur baru:
+Repositori ini dibangun menggunakan arsitektur modern monorepo:
 
 | Layer  | Teknologi                          | Folder     |
 | ------ | ---------------------------------- | ---------- |
-| Backend| Go (Fiber v3) + PostgreSQL (pgx v5)| `backend/` |
+| Backend| Go (Fiber v3) + PocketBase REST    | `backend/` |
 | Frontend | Astro v7 (SSR) + React islands   | `frontend/`|
 | Storage | Cloudflare R2 (presigned URL)     | -          |
-| Auth   | Supabase Auth (verifikasi JWT HS256)| -         |
+| Auth   | PocketBase Auth (verifikasi JWT)   | -          |
 
 ---
 
@@ -21,12 +20,13 @@ menjadi arsitektur baru:
 ├── backend/                     # API Go Fiber
 │   ├── cmd/api/main.go          # Entry point
 │   └── internal/
-│       ├── auth/                # Verifikasi JWT Supabase
-│       ├── config/              # Konfigurasi dari env
+│       ├── auth/                # Verifikasi & manajemen autentikasi PocketBase
+│       ├── config/              # Konfigurasi dari env / Infisical
 │       ├── domain/              # Model/entity bisnis
 │       ├── handler/             # HTTP handler (folder, file, trash, bidang, dll.)
 │       ├── middleware/          # CORS manual + otentikasi sesi
-│       ├── repository/          # Akses PostgreSQL (schema kemenag_arsip & kemenag_pusdatin)
+│       ├── pocketbase/          # Client PocketBase HTTP REST & Auth
+│       ├── repository/          # Akses koleksi PocketBase (app_settings, bidang, files, folders, users)
 │       ├── server/              # Perakitan server + rute
 │       ├── service/             # Logika bisnis
 │       └── storage/             # S3 client Cloudflare R2
@@ -50,12 +50,10 @@ menjadi arsitektur baru:
 # Server
 PORT=8080
 
-# Supabase (Auth)
-SUPABASE_URL=https://db.kemenag-baritoutara.com
-SUPABASE_ANON_KEY=
-
-# PostgreSQL (satu basis data, dua schema)
-DATABASE_URL=postgresql://user:pass@host:5432/postgres
+# PocketBase (Database & Auth Utama)
+POCKETBASE_URL=https://db-arsip.kemenag-baritoutara.com
+POCKETBASE_ADMIN_EMAIL=baritoutara@kemenag.go.id
+POCKETBASE_ADMIN_PASSWORD=
 
 # Cloudflare R2
 R2_ACCOUNT_ID=
@@ -151,14 +149,14 @@ dengan health check di `/api/health` untuk Coolify.
 
 ## Konsep Penting
 
-- **Sesi**: cookie httpOnly `earsip-auth` (access + refresh token Supabase).
-  Backend memverifikasi JWT HS256; frontend memeriksa sesi via `GET /auth/me`.
+- **Sesi**: cookie httpOnly `earsip-auth` (access + refresh token PocketBase Auth).
+  Backend memverifikasi token JWT; frontend memeriksa sesi via `GET /auth/me`.
 - **Respons API**: selalu `{ success, data, error }`.
 - **Upload/Download R2**: backend membuat presigned URL; frontend meneruskannya
   lewat proxy same-origin `/api/proxy-upload` & `/api/proxy-download`
   (menghindari kendala CORS R2 di browser).
 - **Zip**: `POST /files/zip` di-stream dari backend (menggantikan JSZip klien).
 - **Hak akses**: halaman Bidang & Pengaturan hanya untuk super admin
-  (role `super_admin` dari schema `kemenag_pusdatin`).
+  (role `Super Admin` dari koleksi `users` di PocketBase).
 - **Maintenance**: polling status aplikasi Pusdatin setiap 15 detik;
   saat `maintenance`, pengguna dialihkan ke `/maintenance`.
